@@ -321,6 +321,55 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
+     * Create a DosageHistory from a medicine and amount
+     */
+    fun createDosageHistory(medicineId: UUID, amount: Double): Either<RedisError, DosageHistory> {
+        return either {
+            // Get medicine and verify it exists
+            val medicine = getMedicine(medicineId.toString()).bind()
+            
+            // Update medicine stock
+            val updatedMedicine = medicine.copy(stock = medicine.stock - amount)
+            updateMedicine(medicineId.toString(), updatedMedicine).bind()
+            
+            // Create dosage history
+            val dosageHistory = DosageHistory(
+                id = UUID.randomUUID(),
+                datetime = java.time.LocalDateTime.now(),
+                medicineId = medicineId,
+                amount = amount
+            )
+            
+            val key = "$environment:dosagehistory:${dosageHistory.id}"
+            
+            Either.catch {
+                val jsonString = json.encodeToString(dosageHistory)
+                connection?.sync()?.set(key, jsonString) ?: throw IllegalStateException("Not connected")
+                dosageHistory
+            }.mapLeft { e ->
+                when (e) {
+                    is SerializationException -> RedisError.SerializationError("Failed to serialize dosage history: ${e.message}")
+                    else -> RedisError.OperationError("Failed to create dosage history: ${e.message}")
+                }
+            }.bind()
+        }
+    }
+
+    /**
+     * Add stock to a medicine
+     */
+    fun addStock(medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
+        return either {
+            // Get medicine and verify it exists
+            val medicine = getMedicine(medicineId.toString()).bind()
+            
+            // Update medicine stock
+            val updatedMedicine = medicine.copy(stock = medicine.stock + amount)
+            updateMedicine(medicineId.toString(), updatedMedicine).bind()
+        }
+    }
+
+    /**
      * Close the connection
      */
     fun close() {

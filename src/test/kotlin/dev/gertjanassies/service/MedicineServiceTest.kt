@@ -3,6 +3,7 @@ package dev.gertjanassies.service
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
+import dev.gertjanassies.model.DosageHistory
 import dev.gertjanassies.model.Medicine
 import dev.gertjanassies.model.MedicineRequest
 import io.kotest.core.spec.style.FunSpec
@@ -151,6 +152,71 @@ class MedicineServiceTest : FunSpec({
             result.shouldBeInstanceOf<Either.Right<List<Medicine>>>()
             result.getOrNull()!!.size shouldBe 2
             verify { mockCommands.scan(any<io.lettuce.core.ScanArgs>()) }
+        }
+    }
+
+    context("Dosage history operations") {
+        test("createDosageHistory should create dosage history and reduce stock") {
+            val medicineId = UUID.randomUUID()
+            val medicineJson = """{"id":"$medicineId","name":"Test Medicine","dose":500.0,"unit":"mg","stock":100.0}"""
+            val updatedMedicineJson = """{"id":"$medicineId","name":"Test Medicine","dose":500.0,"unit":"mg","stock":99.0}"""
+            val medicineKey = "test:medicine:$medicineId"
+            
+            every { mockCommands.get(medicineKey) } returns medicineJson andThen updatedMedicineJson
+            every { mockCommands.set(medicineKey, any()) } returns "OK"
+            every { mockCommands.set(match { it.startsWith("test:dosagehistory:") }, any()) } returns "OK"
+
+            val result = redisService.createDosageHistory(medicineId, 1.0)
+
+            result.shouldBeInstanceOf<Either.Right<DosageHistory>>()
+            val dosageHistory = result.getOrNull()!!
+            dosageHistory.medicineId shouldBe medicineId
+            dosageHistory.amount shouldBe 1.0
+            dosageHistory.id shouldNotBe null
+            
+            verify { mockCommands.get(medicineKey) }
+            verify { mockCommands.set(medicineKey, match { it.contains("\"stock\":99.0") }) }
+            verify { mockCommands.set(match { it.startsWith("test:dosagehistory:") }, any()) }
+        }
+
+        test("createDosageHistory should return NotFound when medicine does not exist") {
+            val medicineId = UUID.randomUUID()
+            every { mockCommands.get("test:medicine:$medicineId") } returns null
+
+            val result = redisService.createDosageHistory(medicineId, 1.0)
+
+            result.shouldBeInstanceOf<Either.Left<RedisError.NotFound>>()
+            verify { mockCommands.get("test:medicine:$medicineId") }
+        }
+    }
+
+    context("Stock management") {
+        test("addStock should add stock to medicine") {
+            val medicineId = UUID.randomUUID()
+            val medicineJson = """{"id":"$medicineId","name":"Test Medicine","dose":500.0,"unit":"mg","stock":100.0}"""
+            val medicineKey = "test:medicine:$medicineId"
+            
+            every { mockCommands.get(medicineKey) } returns medicineJson
+            every { mockCommands.set(medicineKey, any()) } returns "OK"
+
+            val result = redisService.addStock(medicineId, 10.0)
+
+            result.shouldBeInstanceOf<Either.Right<Medicine>>()
+            val updatedMedicine = result.getOrNull()!!
+            updatedMedicine.stock shouldBe 110.0
+            
+            verify { mockCommands.get(medicineKey) }
+            verify { mockCommands.set(medicineKey, match { it.contains("\"stock\":110.0") }) }
+        }
+
+        test("addStock should return NotFound when medicine does not exist") {
+            val medicineId = UUID.randomUUID()
+            every { mockCommands.get("test:medicine:$medicineId") } returns null
+
+            val result = redisService.addStock(medicineId, 10.0)
+
+            result.shouldBeInstanceOf<Either.Left<RedisError.NotFound>>()
+            verify { mockCommands.get("test:medicine:$medicineId") }
         }
     }
 })
