@@ -2,6 +2,9 @@ package dev.gertjanassies.routes
 
 import arrow.core.left
 import arrow.core.right
+import dev.gertjanassies.model.AddStockRequest
+import dev.gertjanassies.model.DosageHistory
+import dev.gertjanassies.model.DosageHistoryRequest
 import dev.gertjanassies.model.Medicine
 import dev.gertjanassies.model.MedicineRequest
 import dev.gertjanassies.service.RedisError
@@ -19,6 +22,7 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import io.mockk.*
+import java.time.LocalDateTime
 import java.util.*
 
 class MedicineRoutesTest : FunSpec({
@@ -244,6 +248,160 @@ class MedicineRoutesTest : FunSpec({
                 val response = client.delete("/medicine/$medicineId")
                 
                 response.status shouldBe HttpStatusCode.NotFound
+            }
+        }
+    }
+
+    context("POST /takedose") {
+        test("should create dosage history and reduce stock") {
+            val medicineId = UUID.randomUUID()
+            val dosageHistory = DosageHistory(
+                id = UUID.randomUUID(),
+                datetime = LocalDateTime.now(),
+                medicineId = medicineId,
+                amount = 1.0
+            )
+            val request = DosageHistoryRequest(medicineId, 1.0)
+            every { mockRedisService.createDosageHistory(medicineId, 1.0) } returns dosageHistory.right()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing { medicineRoutes(mockRedisService) }
+                
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.post("/takedose") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+                
+                response.status shouldBe HttpStatusCode.Created
+                val body = response.body<DosageHistory>()
+                body.medicineId shouldBe medicineId
+                body.amount shouldBe 1.0
+                verify { mockRedisService.createDosageHistory(medicineId, 1.0) }
+            }
+        }
+
+        test("should return 404 when medicine not found") {
+            val medicineId = UUID.randomUUID()
+            val request = DosageHistoryRequest(medicineId, 1.0)
+            every { mockRedisService.createDosageHistory(medicineId, 1.0) } returns 
+                RedisError.NotFound("Medicine with id $medicineId not found").left()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing { medicineRoutes(mockRedisService) }
+                
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.post("/takedose") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+                
+                response.status shouldBe HttpStatusCode.NotFound
+            }
+        }
+
+        test("should return 500 on error") {
+            val medicineId = UUID.randomUUID()
+            val request = DosageHistoryRequest(medicineId, 1.0)
+            every { mockRedisService.createDosageHistory(medicineId, 1.0) } returns 
+                RedisError.OperationError("Failed to create dosage history").left()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing { medicineRoutes(mockRedisService) }
+                
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.post("/takedose") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+                
+                response.status shouldBe HttpStatusCode.InternalServerError
+            }
+        }
+    }
+
+    context("POST /addstock") {
+        test("should add stock to medicine") {
+            val medicineId = UUID.randomUUID()
+            val updatedMedicine = Medicine(medicineId, "Test Medicine", 500.0, "mg", 110.0)
+            val request = AddStockRequest(medicineId, 10.0)
+            every { mockRedisService.addStock(medicineId, 10.0) } returns updatedMedicine.right()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing { medicineRoutes(mockRedisService) }
+                
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.post("/addstock") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+                
+                response.status shouldBe HttpStatusCode.OK
+                val body = response.body<Medicine>()
+                body.stock shouldBe 110.0
+                verify { mockRedisService.addStock(medicineId, 10.0) }
+            }
+        }
+
+        test("should return 404 when medicine not found") {
+            val medicineId = UUID.randomUUID()
+            val request = AddStockRequest(medicineId, 10.0)
+            every { mockRedisService.addStock(medicineId, 10.0) } returns 
+                RedisError.NotFound("Medicine with id $medicineId not found").left()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing { medicineRoutes(mockRedisService) }
+                
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.post("/addstock") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+                
+                response.status shouldBe HttpStatusCode.NotFound
+            }
+        }
+
+        test("should return 500 on error") {
+            val medicineId = UUID.randomUUID()
+            val request = AddStockRequest(medicineId, 10.0)
+            every { mockRedisService.addStock(medicineId, 10.0) } returns 
+                RedisError.OperationError("Failed to add stock").left()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing { medicineRoutes(mockRedisService) }
+                
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.post("/addstock") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+                
+                response.status shouldBe HttpStatusCode.InternalServerError
             }
         }
     }

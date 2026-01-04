@@ -1,6 +1,8 @@
 package dev.gertjanassies.routes
 
 import arrow.core.raise.either
+import dev.gertjanassies.model.AddStockRequest
+import dev.gertjanassies.model.DosageHistoryRequest
 import dev.gertjanassies.model.Medicine
 import dev.gertjanassies.model.MedicineRequest
 import dev.gertjanassies.service.RedisService
@@ -89,6 +91,40 @@ fun Route.medicineRoutes(redisService: RedisService) {
         either {
             redisService.deleteMedicine(id).bind()
             call.respond(HttpStatusCode.NoContent)
+        }.onLeft { error ->
+            when (error) {
+                is dev.gertjanassies.service.RedisError.NotFound ->
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
+                else ->
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+            }
+        }
+    }
+
+    // Record a dose taken
+    post("/takedose") {
+        val request = call.receive<DosageHistoryRequest>()
+        
+        either {
+            val dosageHistory = redisService.createDosageHistory(request.medicineId, request.amount).bind()
+            call.respond(HttpStatusCode.Created, dosageHistory)
+        }.onLeft { error ->
+            when (error) {
+                is dev.gertjanassies.service.RedisError.NotFound ->
+                    call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
+                else ->
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+            }
+        }
+    }
+
+    // Add stock to medicine
+    post("/addstock") {
+        val request = call.receive<AddStockRequest>()
+        
+        either {
+            val updatedMedicine = redisService.addStock(request.medicineId, request.amount).bind()
+            call.respond(HttpStatusCode.OK, updatedMedicine)
         }.onLeft { error ->
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->

@@ -321,6 +321,144 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
+     * Creates a [DosageHistory] entry for a given medicine and dosage amount and persists it in Redis.
+     *
+     * This operation has the side effect of reducing the current stock of the specified medicine
+     * by the given [amount] and updating the stored [Medicine] accordingly.
+     *
+     * Uses Redis WATCH for optimistic locking to prevent race conditions.
+     *
+     * @param medicineId The unique identifier of the [Medicine] for which the dosage is taken.
+     * @param amount The amount of the medicine taken, which will be subtracted from the medicine's stock.
+     * @return An [Either] containing:
+     *   - [DosageHistory] on success, representing the created dosage history entry.
+     *   - [RedisError] on failure, for example:
+     *       - [RedisError.NotFound] if the medicine with the given [medicineId] does not exist.
+     *       - [RedisError.SerializationError] if the [DosageHistory] cannot be serialized to JSON.
+     *       - [RedisError.OperationError] if persisting the dosage history or updating the medicine fails
+     *         (e.g. connection issues or an invalid Redis state).
+     */
+    fun createDosageHistory(medicineId: UUID, amount: Double): Either<RedisError, DosageHistory> {
+        return either {
+            val syncCommands = connection?.sync() ?: throw IllegalStateException("Not connected")
+            val medicineKey = "$environment:medicine:$medicineId"
+            
+            // Retry loop for optimistic locking with WATCH
+            var retryCount = 0
+            val maxRetries = 10
+            
+            while (retryCount < maxRetries) {
+                Either.catch {
+                    // Watch the medicine key for changes
+                    syncCommands.watch(medicineKey)
+                    
+                    // Get medicine and verify it exists
+                    val medicineJson = syncCommands.get(medicineKey)
+                        ?: throw NoSuchElementException("Medicine with id $medicineId not found")
+                    
+                    val medicine = json.decodeFromString<Medicine>(medicineJson)
+                    
+                    // Create dosage history
+                    val dosageHistory = DosageHistory(
+                        id = UUID.randomUUID(),
+                        datetime = java.time.LocalDateTime.now(),
+                        medicineId = medicineId,
+                        amount = amount
+                    )
+                    
+                    val dosageKey = "$environment:dosagehistory:${dosageHistory.id}"
+                    val updatedMedicine = medicine.copy(stock = medicine.stock - amount)
+                    
+                    // Start transaction
+                    syncCommands.multi()
+                    
+                    val updatedMedicineJson = json.encodeToString(updatedMedicine)
+                    val dosageHistoryJson = json.encodeToString(dosageHistory)
+                    
+                    syncCommands.set(medicineKey, updatedMedicineJson)
+                    syncCommands.set(dosageKey, dosageHistoryJson)
+                    
+                    val result = syncCommands.exec()
+                    
+                    if (result.wasDiscarded()) {
+                        // Transaction failed due to concurrent modification, retry
+                        retryCount++
+                        null
+                    } else {
+                        // Success
+                        return@either dosageHistory
+                    }
+                }.mapLeft { e ->
+                    syncCommands.unwatch()
+                    when (e) {
+                        is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Medicine not found"))
+                        is SerializationException -> raise(RedisError.SerializationError("Failed to serialize: ${e.message}"))
+                        else -> raise(RedisError.OperationError("Failed to create dosage history: ${e.message}"))
+                    }
+                }.bind()
+            }
+            
+            // Max retries exceeded
+            raise(RedisError.OperationError("Failed to create dosage history after $maxRetries retries due to concurrent modifications"))
+        }
+    }
+
+    /**
+     * Add stock to a medicine using Redis WATCH for optimistic locking
+     */
+    fun addStock(medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
+        return either {
+            val syncCommands = connection?.sync() ?: throw IllegalStateException("Not connected")
+            val medicineKey = "$environment:medicine:$medicineId"
+            
+            // Retry loop for optimistic locking with WATCH
+            var retryCount = 0
+            val maxRetries = 10
+            
+            while (retryCount < maxRetries) {
+                Either.catch {
+                    // Watch the medicine key for changes
+                    syncCommands.watch(medicineKey)
+                    
+                    // Get medicine and verify it exists
+                    val medicineJson = syncCommands.get(medicineKey)
+                        ?: throw NoSuchElementException("Medicine with id $medicineId not found")
+                    
+                    val medicine = json.decodeFromString<Medicine>(medicineJson)
+                    val updatedMedicine = medicine.copy(stock = medicine.stock + amount)
+                    
+                    // Start transaction
+                    syncCommands.multi()
+                    
+                    val updatedMedicineJson = json.encodeToString(updatedMedicine)
+                    syncCommands.set(medicineKey, updatedMedicineJson)
+                    
+                    val result = syncCommands.exec()
+                    
+                    if (result.wasDiscarded()) {
+                        // Transaction failed due to concurrent modification, retry
+                        retryCount++
+                        null
+                    } else {
+                        // Success
+                        return@either updatedMedicine
+                    }
+                }.mapLeft { e ->
+                    syncCommands.unwatch()
+                    when (e) {
+                        is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Medicine not found"))
+                        is SerializationException -> raise(RedisError.SerializationError("Failed to serialize medicine: ${e.message}"))
+                        else -> raise(RedisError.OperationError("Failed to add stock: ${e.message}"))
+                    }
+                }.bind()
+            }
+            
+            // Max retries exceeded
+            raise(RedisError.OperationError("Failed to add stock after $maxRetries retries due to concurrent modifications"))
+        }
+    }
+
+    /**
      * Close the connection
      */
     fun close() {
