@@ -321,7 +321,20 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Create a DosageHistory from a medicine and amount
+     * Creates a [DosageHistory] entry for a given medicine and dosage amount and persists it in Redis.
+     *
+     * This operation has the side effect of reducing the current stock of the specified medicine
+     * by the given [amount] and updating the stored [Medicine] accordingly.
+     *
+     * @param medicineId The unique identifier of the [Medicine] for which the dosage is taken.
+     * @param amount The amount of the medicine taken, which will be subtracted from the medicine's stock.
+     * @return An [Either] containing:
+     *   - [DosageHistory] on success, representing the created dosage history entry.
+     *   - [RedisError] on failure, for example:
+     *       - [RedisError.NotFound] if the medicine with the given [medicineId] does not exist.
+     *       - [RedisError.SerializationError] if the [DosageHistory] cannot be serialized to JSON.
+     *       - [RedisError.OperationError] if persisting the dosage history or updating the medicine fails
+     *         (e.g. connection issues or an invalid Redis state).
      */
     fun createDosageHistory(medicineId: UUID, amount: Double): Either<RedisError, DosageHistory> {
         return either {
