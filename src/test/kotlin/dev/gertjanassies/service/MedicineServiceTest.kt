@@ -159,12 +159,17 @@ class MedicineServiceTest : FunSpec({
         test("createDosageHistory should create dosage history and reduce stock") {
             val medicineId = UUID.randomUUID()
             val medicineJson = """{"id":"$medicineId","name":"Test Medicine","dose":500.0,"unit":"mg","stock":100.0}"""
-            val updatedMedicineJson = """{"id":"$medicineId","name":"Test Medicine","dose":500.0,"unit":"mg","stock":99.0}"""
             val medicineKey = "test:medicine:$medicineId"
             
-            every { mockCommands.get(medicineKey) } returns medicineJson andThen updatedMedicineJson
+            val mockTransactionResult = mockk<io.lettuce.core.TransactionResult>()
+            every { mockTransactionResult.wasDiscarded() } returns false
+            
+            every { mockCommands.watch(medicineKey) } returns "OK"
+            every { mockCommands.get(medicineKey) } returns medicineJson
+            every { mockCommands.multi() } returns "OK"
             every { mockCommands.set(medicineKey, any()) } returns "OK"
             every { mockCommands.set(match { it.startsWith("test:dosagehistory:") }, any()) } returns "OK"
+            every { mockCommands.exec() } returns mockTransactionResult
 
             val result = redisService.createDosageHistory(medicineId, 1.0)
 
@@ -174,19 +179,28 @@ class MedicineServiceTest : FunSpec({
             dosageHistory.amount shouldBe 1.0
             dosageHistory.id shouldNotBe null
             
+            verify { mockCommands.watch(medicineKey) }
             verify { mockCommands.get(medicineKey) }
+            verify { mockCommands.multi() }
             verify { mockCommands.set(medicineKey, match { it.contains("\"stock\":99.0") }) }
             verify { mockCommands.set(match { it.startsWith("test:dosagehistory:") }, any()) }
+            verify { mockCommands.exec() }
         }
 
         test("createDosageHistory should return NotFound when medicine does not exist") {
             val medicineId = UUID.randomUUID()
-            every { mockCommands.get("test:medicine:$medicineId") } returns null
+            val medicineKey = "test:medicine:$medicineId"
+            
+            every { mockCommands.watch(medicineKey) } returns "OK"
+            every { mockCommands.get(medicineKey) } returns null
+            every { mockCommands.unwatch() } returns "OK"
 
             val result = redisService.createDosageHistory(medicineId, 1.0)
 
             result.shouldBeInstanceOf<Either.Left<RedisError.NotFound>>()
-            verify { mockCommands.get("test:medicine:$medicineId") }
+            verify { mockCommands.watch(medicineKey) }
+            verify { mockCommands.get(medicineKey) }
+            verify { mockCommands.unwatch() }
         }
     }
 
@@ -196,8 +210,14 @@ class MedicineServiceTest : FunSpec({
             val medicineJson = """{"id":"$medicineId","name":"Test Medicine","dose":500.0,"unit":"mg","stock":100.0}"""
             val medicineKey = "test:medicine:$medicineId"
             
+            val mockTransactionResult = mockk<io.lettuce.core.TransactionResult>()
+            every { mockTransactionResult.wasDiscarded() } returns false
+            
+            every { mockCommands.watch(medicineKey) } returns "OK"
             every { mockCommands.get(medicineKey) } returns medicineJson
+            every { mockCommands.multi() } returns "OK"
             every { mockCommands.set(medicineKey, any()) } returns "OK"
+            every { mockCommands.exec() } returns mockTransactionResult
 
             val result = redisService.addStock(medicineId, 10.0)
 
@@ -205,18 +225,27 @@ class MedicineServiceTest : FunSpec({
             val updatedMedicine = result.getOrNull()!!
             updatedMedicine.stock shouldBe 110.0
             
+            verify { mockCommands.watch(medicineKey) }
             verify { mockCommands.get(medicineKey) }
+            verify { mockCommands.multi() }
             verify { mockCommands.set(medicineKey, match { it.contains("\"stock\":110.0") }) }
+            verify { mockCommands.exec() }
         }
 
         test("addStock should return NotFound when medicine does not exist") {
             val medicineId = UUID.randomUUID()
-            every { mockCommands.get("test:medicine:$medicineId") } returns null
+            val medicineKey = "test:medicine:$medicineId"
+            
+            every { mockCommands.watch(medicineKey) } returns "OK"
+            every { mockCommands.get(medicineKey) } returns null
+            every { mockCommands.unwatch() } returns "OK"
 
             val result = redisService.addStock(medicineId, 10.0)
 
             result.shouldBeInstanceOf<Either.Left<RedisError.NotFound>>()
-            verify { mockCommands.get("test:medicine:$medicineId") }
+            verify { mockCommands.watch(medicineKey) }
+            verify { mockCommands.get(medicineKey) }
+            verify { mockCommands.unwatch() }
         }
     }
 })
