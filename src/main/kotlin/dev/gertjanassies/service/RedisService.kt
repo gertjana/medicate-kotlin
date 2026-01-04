@@ -338,12 +338,28 @@ class RedisService(private val host: String, private val port: Int, private val 
      */
     fun createDosageHistory(medicineId: UUID, amount: Double): Either<RedisError, DosageHistory> {
         return either {
-            // Get medicine and verify it exists
-            val medicine = getMedicine(medicineId.toString()).bind()
+            val syncCommands = connection?.sync() ?: throw IllegalStateException("Not connected")
+            val medicineKey = "$environment:medicine:$medicineId"
             
-            // Update medicine stock
-            val updatedMedicine = medicine.copy(stock = medicine.stock - amount)
-            updateMedicine(medicineId.toString(), updatedMedicine).bind()
+            // Get medicine and verify it exists
+            val medicineJson = Either.catch {
+                syncCommands.get(medicineKey)
+            }.mapLeft { 
+                RedisError.OperationError("Failed to get medicine: ${it.message}")
+            }.bind()
+            
+            if (medicineJson == null) {
+                raise(RedisError.NotFound("Medicine with id $medicineId not found"))
+            }
+            
+            val medicine = Either.catch {
+                json.decodeFromString<Medicine>(medicineJson)
+            }.mapLeft { e ->
+                when (e) {
+                    is SerializationException -> RedisError.SerializationError("Failed to deserialize medicine: ${e.message}")
+                    else -> RedisError.OperationError("Failed to parse medicine: ${e.message}")
+                }
+            }.bind()
             
             // Create dosage history
             val dosageHistory = DosageHistory(
@@ -353,15 +369,29 @@ class RedisService(private val host: String, private val port: Int, private val 
                 amount = amount
             )
             
-            val key = "$environment:dosagehistory:${dosageHistory.id}"
+            val dosageKey = "$environment:dosagehistory:${dosageHistory.id}"
+            val updatedMedicine = medicine.copy(stock = medicine.stock - amount)
             
+            // Use Redis transaction to atomically update medicine and create dosage history
             Either.catch {
-                val jsonString = json.encodeToString(dosageHistory)
-                connection?.sync()?.set(key, jsonString) ?: throw IllegalStateException("Not connected")
+                syncCommands.multi()
+                
+                val updatedMedicineJson = json.encodeToString(updatedMedicine)
+                val dosageHistoryJson = json.encodeToString(dosageHistory)
+                
+                syncCommands.set(medicineKey, updatedMedicineJson)
+                syncCommands.set(dosageKey, dosageHistoryJson)
+                
+                val result = syncCommands.exec()
+                
+                if (result.wasDiscarded()) {
+                    throw IllegalStateException("Transaction was discarded")
+                }
+                
                 dosageHistory
             }.mapLeft { e ->
                 when (e) {
-                    is SerializationException -> RedisError.SerializationError("Failed to serialize dosage history: ${e.message}")
+                    is SerializationException -> RedisError.SerializationError("Failed to serialize: ${e.message}")
                     else -> RedisError.OperationError("Failed to create dosage history: ${e.message}")
                 }
             }.bind()
@@ -369,16 +399,55 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Add stock to a medicine
+     * Add stock to a medicine using Redis transaction
      */
     fun addStock(medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
         return either {
-            // Get medicine and verify it exists
-            val medicine = getMedicine(medicineId.toString()).bind()
+            val syncCommands = connection?.sync() ?: throw IllegalStateException("Not connected")
+            val medicineKey = "$environment:medicine:$medicineId"
             
-            // Update medicine stock
+            // Get medicine and verify it exists
+            val medicineJson = Either.catch {
+                syncCommands.get(medicineKey)
+            }.mapLeft { 
+                RedisError.OperationError("Failed to get medicine: ${it.message}")
+            }.bind()
+            
+            if (medicineJson == null) {
+                raise(RedisError.NotFound("Medicine with id $medicineId not found"))
+            }
+            
+            val medicine = Either.catch {
+                json.decodeFromString<Medicine>(medicineJson)
+            }.mapLeft { e ->
+                when (e) {
+                    is SerializationException -> RedisError.SerializationError("Failed to deserialize medicine: ${e.message}")
+                    else -> RedisError.OperationError("Failed to parse medicine: ${e.message}")
+                }
+            }.bind()
+            
             val updatedMedicine = medicine.copy(stock = medicine.stock + amount)
-            updateMedicine(medicineId.toString(), updatedMedicine).bind()
+            
+            // Use Redis transaction for atomic update
+            Either.catch {
+                syncCommands.multi()
+                
+                val updatedMedicineJson = json.encodeToString(updatedMedicine)
+                syncCommands.set(medicineKey, updatedMedicineJson)
+                
+                val result = syncCommands.exec()
+                
+                if (result.wasDiscarded()) {
+                    throw IllegalStateException("Transaction was discarded")
+                }
+                
+                updatedMedicine
+            }.mapLeft { e ->
+                when (e) {
+                    is SerializationException -> RedisError.SerializationError("Failed to serialize medicine: ${e.message}")
+                    else -> RedisError.OperationError("Failed to add stock: ${e.message}")
+                }
+            }.bind()
         }
     }
 
