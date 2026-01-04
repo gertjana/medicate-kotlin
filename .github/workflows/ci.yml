@@ -71,7 +71,7 @@ jobs:
         run: chmod +x gradlew
       
       - name: Build fat JAR
-        run: ./gradlew clean build --no-daemon
+        run: ./gradlew clean assemble -x test --no-daemon
       
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
