@@ -20,16 +20,17 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'gradle'
       
-      - name: Generate Gradle wrapper
-        run: gradle wrapper
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       
       - name: Run tests with coverage
-        run: ./gradlew test jacocoTestReport --no-daemon
+        run: ./gradlew test jacocoTestReport --no-daemon --parallel
       
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
@@ -51,7 +52,6 @@ jobs:
   build:
     name: Build Fat JAR
     runs-on: ubuntu-latest
-    needs: test
     
     steps:
       - name: Checkout code
@@ -62,16 +62,17 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: 'gradle'
       
-      - name: Generate Gradle wrapper
-        run: gradle wrapper
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
       
       - name: Build fat JAR
-        run: ./gradlew clean assemble -x test --no-daemon
+        run: ./gradlew assemble -x test --no-daemon --parallel
       
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
