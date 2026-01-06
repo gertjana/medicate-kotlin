@@ -51,6 +51,7 @@ jobs:
 
   build:
     name: Build Fat JAR
+    needs: test
     runs-on: ubuntu-latest
     
     steps:
