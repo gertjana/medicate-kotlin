@@ -8,5 +8,7 @@ data class ScheduleRequest(
     @Serializable(with = UUIDSerializer::class)
     val medicineId: UUID,
     val time: String,
-    val amount: Double
+    val amount: Double,
+    @Serializable(with = DayOfWeekListSerializer::class)
+    val daysOfWeek: List<DayOfWeek> = emptyList()
 )

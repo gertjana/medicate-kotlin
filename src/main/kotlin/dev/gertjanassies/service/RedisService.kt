@@ -201,7 +201,8 @@ class RedisService(private val host: String, private val port: Int, private val 
             id = UUID.randomUUID(),
             medicineId = request.medicineId,
             time = request.time,
-            amount = request.amount
+            amount = request.amount,
+            daysOfWeek = request.daysOfWeek
         )
         val key = "$environment:schedule:${schedule.id}"
         
@@ -301,7 +302,16 @@ class RedisService(private val host: String, private val port: Int, private val 
      */
     fun getDailySchedule(): Either<RedisError, DailySchedule> {
         return either {
-            val schedules = getAllSchedules().bind()
+            val allSchedules = getAllSchedules().bind()
+            
+            // Get current day of week as enum
+            val today = java.time.LocalDate.now()
+            val currentDay = DayOfWeek.fromJavaDay(today.dayOfWeek)
+            
+            // Filter schedules: include if daysOfWeek is empty or contains today
+            val schedules = allSchedules.filter { schedule ->
+                schedule.daysOfWeek.isEmpty() || schedule.daysOfWeek.contains(currentDay)
+            }
             
             // Group schedules by time
             val groupedByTime = schedules.groupBy { it.time }
@@ -338,7 +348,7 @@ class RedisService(private val host: String, private val port: Int, private val 
      *       - [RedisError.OperationError] if persisting the dosage history or updating the medicine fails
      *         (e.g. connection issues or an invalid Redis state).
      */
-    fun createDosageHistory(medicineId: UUID, amount: Double): Either<RedisError, DosageHistory> {
+    fun createDosageHistory(medicineId: UUID, amount: Double, scheduledTime: String? = null, datetime: java.time.LocalDateTime? = null): Either<RedisError, DosageHistory> {
         return either {
             val syncCommands = connection?.sync() ?: throw IllegalStateException("Not connected")
             val medicineKey = "$environment:medicine:$medicineId"
@@ -361,9 +371,10 @@ class RedisService(private val host: String, private val port: Int, private val 
                     // Create dosage history
                     val dosageHistory = DosageHistory(
                         id = UUID.randomUUID(),
-                        datetime = java.time.LocalDateTime.now(),
+                        datetime = datetime ?: java.time.LocalDateTime.now(),
                         medicineId = medicineId,
-                        amount = amount
+                        amount = amount,
+                        scheduledTime = scheduledTime
                     )
                     
                     val dosageKey = "$environment:dosagehistory:${dosageHistory.id}"
@@ -455,6 +466,39 @@ class RedisService(private val host: String, private val port: Int, private val 
             
             // Max retries exceeded
             raise(RedisError.OperationError("Failed to add stock after $maxRetries retries due to concurrent modifications"))
+        }
+    }
+
+    /**
+     * Get all DosageHistory entries from Redis
+     */
+    fun getAllDosageHistories(): Either<RedisError, List<DosageHistory>> {
+        return Either.catch {
+            val pattern = "$environment:dosagehistory:*"
+            val keys = mutableListOf<String>()
+            
+            val syncCommands = connection?.sync() ?: throw IllegalStateException("Not connected")
+            var scanCursor = syncCommands.scan(ScanArgs.Builder.matches(pattern))
+            
+            // Iterate through all cursor pages
+            while (true) {
+                keys.addAll(scanCursor.keys)
+                if (scanCursor.isFinished) break
+                scanCursor = syncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern))
+            }
+            
+            // Get all values for the keys and sort by datetime descending
+            keys.mapNotNull { key ->
+                syncCommands.get(key)?.let { jsonString ->
+                    try {
+                        json.decodeFromString<DosageHistory>(jsonString)
+                    } catch (e: Exception) {
+                        null // Skip invalid entries
+                    }
+                }
+            }.sortedByDescending { it.datetime }
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to retrieve dosage histories: ${e.message}")
         }
     }
 

@@ -10,5 +10,7 @@ data class Schedule(
     @Serializable(with = UUIDSerializer::class)
     val medicineId: UUID,
     val time: String, // e.g., "08:00", "12:00"
-    val amount: Double // Amount of medicine to take
+    val amount: Double, // Amount of medicine to take
+    @Serializable(with = DayOfWeekListSerializer::class)
+    val daysOfWeek: List<DayOfWeek> = emptyList() // Empty list means all days
 )

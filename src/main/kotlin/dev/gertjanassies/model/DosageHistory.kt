@@ -12,5 +12,6 @@ data class DosageHistory(
     val datetime: LocalDateTime,
     @Serializable(with = UUIDSerializer::class)
     val medicineId: UUID,
-    val amount: Double
+    val amount: Double,
+    val scheduledTime: String? = null
 )

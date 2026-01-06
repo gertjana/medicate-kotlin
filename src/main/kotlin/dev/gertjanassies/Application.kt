@@ -1,15 +1,18 @@
 package dev.gertjanassies
 
 import dev.gertjanassies.routes.dailyRoutes
+import dev.gertjanassies.routes.dosageHistoryRoutes
 import dev.gertjanassies.routes.healthRoutes
 import dev.gertjanassies.routes.medicineRoutes
 import dev.gertjanassies.routes.scheduleRoutes
 import dev.gertjanassies.service.RedisService
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.routing.*
 
 fun main() {
@@ -18,6 +21,17 @@ fun main() {
 }
 
 fun Application.module() {
+    // Configure CORS
+    install(CORS) {
+        allowMethod(HttpMethod.Options)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Patch)
+        allowHeader(HttpHeaders.Authorization)
+        allowHeader(HttpHeaders.ContentType)
+        anyHost() // For development - restrict in production
+    }
+    
     // Configure content negotiation
     install(ContentNegotiation) {
         json()
@@ -46,6 +60,7 @@ fun Application.module() {
         medicineRoutes(redisService)
         scheduleRoutes(redisService)
         dailyRoutes(redisService)
+        dosageHistoryRoutes(redisService)
     }
 
     // Cleanup on shutdown

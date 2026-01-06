@@ -106,7 +106,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
         val request = call.receive<DosageHistoryRequest>()
         
         either {
-            val dosageHistory = redisService.createDosageHistory(request.medicineId, request.amount).bind()
+            val dosageHistory = redisService.createDosageHistory(request.medicineId, request.amount, request.scheduledTime, request.datetime).bind()
             call.respond(HttpStatusCode.Created, dosageHistory)
         }.onLeft { error ->
             when (error) {
