@@ -1,6 +1,5 @@
 .gradle
 build/
-!gradle-wrapper.jar
 .gradletasknamecache
 
 frontend/node_modules
