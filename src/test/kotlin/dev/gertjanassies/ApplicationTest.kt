@@ -64,9 +64,9 @@ class ApplicationTest {
         val healthResponse = client.get("/api/health")
         assertEquals(HttpStatusCode.OK, healthResponse.status)
 
-        // Medicine endpoint should be under /api
-        val medicineResponse = client.get("/api/medicine")
-        assertEquals(HttpStatusCode.OK, medicineResponse.status)
+        // Test that routes without the /api prefix don't exist
+        val notFoundResponse = client.get("/health")
+        assertEquals(HttpStatusCode.NotFound, notFoundResponse.status)
     }
 
     @Test
