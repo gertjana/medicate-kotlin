@@ -35,6 +35,9 @@ RUN ./gradlew assemble --no-daemon -x test
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
+# Install curl for healthchecks
+RUN apk add --no-cache curl
+
 # Copy backend JAR
 COPY --from=backend-builder /app/build/libs/*.jar ./app.jar
 
