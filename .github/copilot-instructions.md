@@ -13,3 +13,4 @@ This is a Kotlin project using Ktor framework with Arrow for functional programm
 - Handle errors using Either and Option types
 - Use Arrow's IO for side effects
 - Follow immutable data patterns
+- Use Mocks for testing services
