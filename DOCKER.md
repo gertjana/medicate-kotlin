@@ -63,16 +63,16 @@ In development mode:
 - Frontend runs on http://localhost:5173 with Vite dev server
 - Backend runs on http://localhost:8080
 - CORS is enabled to allow cross-origin requests
-- Frontend proxies API calls to backend via `/api` prefix
+- Frontend proxies API calls to backend via `/api` prefix (Vite strips `/api` when forwarding to backend)
 
 ## Production Mode (Docker)
 
 In production mode (when SERVE_STATIC=true):
 - Both frontend and backend served from single origin (http://localhost:8080)
 - CORS is **disabled** (not needed for same-origin)
-- Frontend static files served from the `static` filesystem directory in the container (for example, `/app/static`)
-- API routes accessible at `/health`, `/medicine`, `/schedule`, etc.
-- SPA routing handled by serving index.html for non-API routes
+- Frontend static files (JS, CSS, images) served from the `static` filesystem directory in the container (for example, `/app/static`)
+- API routes accessible at `/api/health`, `/api/medicine`, `/api/schedule`, etc.
+- SPA routing: All non-API routes automatically serve `index.html`, allowing client-side routing to work (e.g., refreshing on `/medicines` or `/schedules` routes)
 
 ## Architecture
 

@@ -17,6 +17,7 @@ import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.http.content.*
+import io.ktor.server.request.*
 import java.io.File
 
 fun main() {
@@ -79,25 +80,30 @@ fun Application.module() {
 
     // Configure routing
     routing {
-        // API routes
-        healthRoutes()
-        medicineRoutes(redisService)
-        scheduleRoutes(redisService)
-        dailyRoutes(redisService)
-        dosageHistoryRoutes(redisService)
+        // API routes under /api prefix
+        route("/api") {
+            healthRoutes()
+            medicineRoutes(redisService)
+            scheduleRoutes(redisService)
+            dailyRoutes(redisService)
+            dosageHistoryRoutes(redisService)
+        }
         
         // Serve static files if enabled
         if (serveStatic) {
             val staticDir = File("static")
             if (staticDir.exists()) {
-                // Root path serves index.html
-                get("/") {
-                    call.respondFile(File(staticDir, "index.html"))
-                }
+                // Serve static assets (JS, CSS, images, etc.)
+                staticFiles("/", staticDir)
                 
-                // Serve static assets
-                static("/") {
-                    files(staticDir)
+                // SPA fallback: serve index.html for any non-API routes that don't match static files
+                // This allows client-side routing to work correctly
+                get("{...}") {
+                    val path = call.request.path()
+                    // Only serve index.html for non-API routes
+                    if (!path.startsWith("/api/")) {
+                        call.respondFile(File(staticDir, "index.html"))
+                    }
                 }
             } else {
                 this@module.log.warn("Static directory not found at: ${staticDir.absolutePath}")
