@@ -1,0 +1,10 @@
+.gradle
+build/
+.gradletasknamecache
+
+frontend/node_modules
+frontend/build
+frontend/.svelte-kit
+
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
