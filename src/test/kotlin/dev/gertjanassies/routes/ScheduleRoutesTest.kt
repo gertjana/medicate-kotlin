@@ -19,7 +19,6 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import io.mockk.*
-import io.mockk.coEvery
 import java.util.*
 
 class ScheduleRoutesTest : FunSpec({
