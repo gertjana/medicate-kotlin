@@ -70,9 +70,9 @@ In development mode:
 In production mode (when SERVE_STATIC=true):
 - Both frontend and backend served from single origin (http://localhost:8080)
 - CORS is **disabled** (not needed for same-origin)
-- Frontend static files served from the `static` filesystem directory in the container (for example, `/app/static`)
-- API routes accessible at `/health`, `/medicine`, `/schedule`, etc.
-- SPA routing handled by serving index.html for non-API routes
+- Frontend static files (JS, CSS, images) served from the `static` filesystem directory in the container (for example, `/app/static`)
+- API routes accessible at `/health`, `/medicine`, `/schedule`, etc. - registered first to take precedence
+- SPA routing: All non-API routes automatically serve `index.html`, allowing client-side routing to work (e.g., refreshing on `/medicines` or `/schedules` routes)
 
 ## Architecture
 
