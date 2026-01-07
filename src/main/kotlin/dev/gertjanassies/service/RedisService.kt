@@ -460,7 +460,7 @@ class RedisService(private val host: String, private val port: Int, private val 
                         return@either updatedMedicine
                     }
                 }.mapLeft { e ->
-                    asyncCommands.unwatch().await()
+                    runCatching { asyncCommands.unwatch().await() }
                     when (e) {
                         is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Medicine not found"))
                         is SerializationException -> raise(RedisError.SerializationError("Failed to serialize medicine: ${e.message}"))
