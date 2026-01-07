@@ -387,11 +387,16 @@ class RedisService(private val host: String, private val port: Int, private val 
                     val updatedMedicineJson = json.encodeToString(updatedMedicine)
                     val dosageHistoryJson = json.encodeToString(dosageHistory)
                     
-                    // Queue commands (don't await inside transaction)
+                    // Queue commands in the transaction.
+                    // Note: In Lettuce, commands between MULTI and EXEC are queued on the Redis server
+                    // and the returned RedisFuture objects only complete when EXEC is called.
+                    // We intentionally do NOT await these futures here - they will complete after EXEC.
+                    // See: https://redis.github.io/lettuce/user-guide/transactions-multi/
                     asyncCommands.set(medicineKey, updatedMedicineJson)
                     asyncCommands.set(dosageKey, dosageHistoryJson)
                     
-                    // Execute transaction
+                    // Execute transaction - this atomically executes all queued commands
+                    // and completes all the RedisFuture objects from the queued commands
                     val result = asyncCommands.exec().await()
                     
                     if (result.wasDiscarded()) {
@@ -445,10 +450,14 @@ class RedisService(private val host: String, private val port: Int, private val 
                     asyncCommands.multi().await()
                     
                     val updatedMedicineJson = json.encodeToString(updatedMedicine)
-                    // Queue command (don't await inside transaction)
+                    
+                    // Queue command in the transaction.
+                    // Note: In Lettuce, commands between MULTI and EXEC are queued on the Redis server
+                    // and the returned RedisFuture only completes when EXEC is called.
+                    // We intentionally do NOT await this future here - it will complete after EXEC.
                     asyncCommands.set(medicineKey, updatedMedicineJson)
                     
-                    // Execute transaction
+                    // Execute transaction - this atomically executes all queued commands
                     val result = asyncCommands.exec().await()
                     
                     if (result.wasDiscarded()) {
