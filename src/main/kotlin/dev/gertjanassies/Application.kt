@@ -29,7 +29,7 @@ fun Application.module() {
     val serveStatic = environment.config.propertyOrNull("app.serveStatic")?.getString()?.toBoolean()
         ?: System.getenv("SERVE_STATIC")?.toBoolean() ?: false
     
-    // Configure CORS - only needed when frontend is served separately
+    // Configure CORS - only needed in development when frontend is served separately
     if (!serveStatic) {
         install(CORS) {
             allowMethod(HttpMethod.Options)
@@ -38,7 +38,11 @@ fun Application.module() {
             allowMethod(HttpMethod.Patch)
             allowHeader(HttpHeaders.Authorization)
             allowHeader(HttpHeaders.ContentType)
-            anyHost() // For development - restrict in production
+            // Only allow localhost origins in development
+            allowHost("localhost:5173") // Vite dev server
+            allowHost("localhost:3000") // Alternative dev port
+            allowHost("127.0.0.1:5173")
+            allowHost("127.0.0.1:3000")
         }
     }
     
