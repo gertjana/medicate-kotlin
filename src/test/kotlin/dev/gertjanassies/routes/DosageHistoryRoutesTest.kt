@@ -18,6 +18,7 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import io.mockk.*
+import io.mockk.coEvery
 import java.time.LocalDateTime
 import java.util.*
 
@@ -34,7 +35,7 @@ class DosageHistoryRoutesTest : FunSpec({
 
     context("GET /history") {
         test("should return empty list when no histories exist") {
-            every { mockRedisService.getAllDosageHistories() } returns emptyList<DosageHistory>().right()
+            coEvery { mockRedisService.getAllDosageHistories() } returns emptyList<DosageHistory>().right()
 
             testApplication {
                 environment {
@@ -52,7 +53,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<List<DosageHistory>>()
                 body.size shouldBe 0
-                verify { mockRedisService.getAllDosageHistories() }
+                coVerify { mockRedisService.getAllDosageHistories() }
             }
         }
 
@@ -82,7 +83,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 )
             )
 
-            every { mockRedisService.getAllDosageHistories() } returns histories.right()
+            coEvery { mockRedisService.getAllDosageHistories() } returns histories.right()
 
             testApplication {
                 environment {
@@ -104,7 +105,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 body[0].amount shouldBe 100.0
                 body[1].datetime shouldBe LocalDateTime.of(2026, 1, 6, 14, 30)
                 body[2].datetime shouldBe LocalDateTime.of(2026, 1, 5, 10, 0)
-                verify { mockRedisService.getAllDosageHistories() }
+                coVerify { mockRedisService.getAllDosageHistories() }
             }
         }
 
@@ -129,7 +130,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 )
             )
 
-            every { mockRedisService.getAllDosageHistories() } returns histories.right()
+            coEvery { mockRedisService.getAllDosageHistories() } returns histories.right()
 
             testApplication {
                 environment {
@@ -151,12 +152,12 @@ class DosageHistoryRoutesTest : FunSpec({
                 body[0].amount shouldBe 1000.0
                 body[1].medicineId shouldBe medicineId1
                 body[1].amount shouldBe 100.0
-                verify { mockRedisService.getAllDosageHistories() }
+                coVerify { mockRedisService.getAllDosageHistories() }
             }
         }
 
         test("should return 500 on error") {
-            every { mockRedisService.getAllDosageHistories() } returns RedisError.OperationError("Database error").left()
+            coEvery { mockRedisService.getAllDosageHistories() } returns RedisError.OperationError("Database error").left()
 
             testApplication {
                 environment {
@@ -171,7 +172,7 @@ class DosageHistoryRoutesTest : FunSpec({
 
                 val response = client.get("/api/history")
                 response.status shouldBe HttpStatusCode.InternalServerError
-                verify { mockRedisService.getAllDosageHistories() }
+                coVerify { mockRedisService.getAllDosageHistories() }
             }
         }
     }
