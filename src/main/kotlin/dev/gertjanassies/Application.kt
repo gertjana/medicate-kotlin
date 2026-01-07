@@ -11,9 +11,13 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.http.content.*
+import java.io.File
 
 fun main() {
     embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module)
@@ -21,15 +25,31 @@ fun main() {
 }
 
 fun Application.module() {
-    // Configure CORS
-    install(CORS) {
-        allowMethod(HttpMethod.Options)
-        allowMethod(HttpMethod.Put)
-        allowMethod(HttpMethod.Delete)
-        allowMethod(HttpMethod.Patch)
-        allowHeader(HttpHeaders.Authorization)
-        allowHeader(HttpHeaders.ContentType)
-        anyHost() // For development - restrict in production
+    val serveStatic = environment.config.propertyOrNull("app.serveStatic")?.getString()?.toBoolean()
+        ?: System.getenv("SERVE_STATIC")?.toBoolean() ?: false
+    
+    // Configure CORS - only needed when frontend is served separately
+    if (!serveStatic) {
+        install(CORS) {
+            allowMethod(HttpMethod.Options)
+            allowMethod(HttpMethod.Put)
+            allowMethod(HttpMethod.Delete)
+            allowMethod(HttpMethod.Patch)
+            allowHeader(HttpHeaders.Authorization)
+            allowHeader(HttpHeaders.ContentType)
+            anyHost() // For development - restrict in production
+        }
+    }
+    
+    // Configure compression for static files
+    install(Compression) {
+        gzip {
+            priority = 1.0
+        }
+        deflate {
+            priority = 10.0
+            minimumSize(1024)
+        }
     }
     
     // Configure content negotiation
@@ -38,29 +58,51 @@ fun Application.module() {
     }
 
     // Initialize Redis service (optional, for demonstration)
-    val redisHost = environment.config.propertyOrNull("redis.host")?.getString() ?: "localhost"
-    val redisPort = environment.config.propertyOrNull("redis.port")?.getString()?.toInt() ?: 6379
-    val appEnvironment = environment.config.propertyOrNull("app.environment")?.getString() ?: "test"
+    val redisHost = environment.config.propertyOrNull("redis.host")?.getString()?.takeIf { it != "localhost" }
+        ?: System.getenv("REDIS_HOST") ?: "localhost"
+    val redisPort = environment.config.propertyOrNull("redis.port")?.getString()?.toInt()
+        ?: System.getenv("REDIS_PORT")?.toIntOrNull() ?: 6379
+    val appEnvironment = environment.config.propertyOrNull("app.environment")?.getString()
+        ?: System.getenv("APP_ENV") ?: "test"
     
     val redisService = RedisService(redisHost, redisPort, appEnvironment)
     
     // Attempt to connect to Redis (using functional error handling)
     redisService.connect().fold(
         ifLeft = { error -> 
-            log.warn("Failed to connect to Redis: $error. Continuing without Redis.")
+            this@module.log.warn("Failed to connect to Redis: $error. Continuing without Redis.")
         },
         ifRight = { 
-            log.info("Successfully connected to Redis at $redisHost:$redisPort")
+            this@module.log.info("Successfully connected to Redis at $redisHost:$redisPort")
         }
     )
 
     // Configure routing
     routing {
+        // API routes
         healthRoutes()
         medicineRoutes(redisService)
         scheduleRoutes(redisService)
         dailyRoutes(redisService)
         dosageHistoryRoutes(redisService)
+        
+        // Serve static files if enabled
+        if (serveStatic) {
+            val staticDir = File("static")
+            if (staticDir.exists()) {
+                // Root path serves index.html
+                get("/") {
+                    call.respondFile(File(staticDir, "index.html"))
+                }
+                
+                // Serve static assets
+                static("/") {
+                    files(staticDir)
+                }
+            } else {
+                this@module.log.warn("Static directory not found at: ${staticDir.absolutePath}")
+            }
+        }
     }
 
     // Cleanup on shutdown
