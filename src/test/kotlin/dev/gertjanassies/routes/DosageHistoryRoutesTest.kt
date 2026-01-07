@@ -1,7 +1,9 @@
 package dev.gertjanassies.routes
 
+import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.DosageHistory
+import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -45,8 +47,11 @@ class DosageHistoryRoutesTest : FunSpec({
                     }
                 }
 
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/api/history")
                 response.status shouldBe HttpStatusCode.OK
+                val body = response.body<List<DosageHistory>>()
+                body.size shouldBe 0
                 verify { mockRedisService.getAllDosageHistories() }
             }
         }
@@ -90,8 +95,15 @@ class DosageHistoryRoutesTest : FunSpec({
                     }
                 }
 
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/api/history")
                 response.status shouldBe HttpStatusCode.OK
+                val body = response.body<List<DosageHistory>>()
+                body.size shouldBe 3
+                body[0].datetime shouldBe LocalDateTime.of(2026, 1, 7, 9, 0)
+                body[0].amount shouldBe 100.0
+                body[1].datetime shouldBe LocalDateTime.of(2026, 1, 6, 14, 30)
+                body[2].datetime shouldBe LocalDateTime.of(2026, 1, 5, 10, 0)
                 verify { mockRedisService.getAllDosageHistories() }
             }
         }
@@ -130,8 +142,35 @@ class DosageHistoryRoutesTest : FunSpec({
                     }
                 }
 
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/api/history")
                 response.status shouldBe HttpStatusCode.OK
+                val body = response.body<List<DosageHistory>>()
+                body.size shouldBe 2
+                body[0].medicineId shouldBe medicineId2
+                body[0].amount shouldBe 1000.0
+                body[1].medicineId shouldBe medicineId1
+                body[1].amount shouldBe 100.0
+                verify { mockRedisService.getAllDosageHistories() }
+            }
+        }
+
+        test("should return 500 on error") {
+            every { mockRedisService.getAllDosageHistories() } returns RedisError.OperationError("Database error").left()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/api") {
+                        dosageHistoryRoutes(mockRedisService)
+                    }
+                }
+
+                val response = client.get("/api/history")
+                response.status shouldBe HttpStatusCode.InternalServerError
                 verify { mockRedisService.getAllDosageHistories() }
             }
         }
