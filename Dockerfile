@@ -41,6 +41,11 @@ COPY --from=backend-builder /app/build/libs/*.jar ./app.jar
 # Copy built frontend
 COPY --from=frontend-builder /app/frontend/build ./static
 
+# Create non-root user and switch to it
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
+    chown -R appuser:appgroup /app
+USER appuser
+
 # Expose port
 EXPOSE 8080
 
