@@ -20,6 +20,17 @@ import io.ktor.server.http.content.*
 import io.ktor.server.request.*
 import java.io.File
 
+// API route prefixes that should not be intercepted by SPA fallback
+private val API_ROUTES = setOf(
+    "/health",
+    "/medicine",
+    "/schedule",
+    "/daily",
+    "/history",
+    "/takedose",
+    "/addstock"
+)
+
 fun main() {
     embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module)
         .start(wait = true)
@@ -94,18 +105,13 @@ fun Application.module() {
                 // Serve static assets (JS, CSS, images, etc.)
                 staticFiles("/", staticDir)
                 
-                // SPA fallback: serve index.html for any non-API routes
+                // SPA fallback: serve index.html for any non-API routes that don't match static files
                 // This allows client-side routing to work correctly
                 get("{...}") {
                     val path = call.request.path()
-                    // Don't intercept API routes
-                    if (!path.startsWith("/health") && 
-                        !path.startsWith("/medicine") && 
-                        !path.startsWith("/schedule") && 
-                        !path.startsWith("/daily") && 
-                        !path.startsWith("/history") &&
-                        !path.startsWith("/takedose") &&
-                        !path.startsWith("/addstock")) {
+                    // Only serve index.html for non-API routes
+                    val isApiRoute = API_ROUTES.any { path.startsWith(it) }
+                    if (!isApiRoute) {
                         call.respondFile(File(staticDir, "index.html"))
                     }
                 }
