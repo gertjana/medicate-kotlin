@@ -55,7 +55,7 @@ class DailyRoutesTest : FunSpec({
                 )
             )
             
-            every { mockRedisService.getDailySchedule() } returns dailySchedule.right()
+            coEvery { mockRedisService.getDailySchedule() } returns dailySchedule.right()
 
             testApplication {
                 environment {
@@ -74,12 +74,12 @@ class DailyRoutesTest : FunSpec({
                 body.schedule[0].medicines.size shouldBe 2
                 body.schedule[1].time shouldBe "12:00"
                 body.schedule[1].medicines.size shouldBe 1
-                verify { mockRedisService.getDailySchedule() }
+                coVerify { mockRedisService.getDailySchedule() }
             }
         }
 
         test("should return 500 on error") {
-            every { mockRedisService.getDailySchedule() } returns 
+            coEvery { mockRedisService.getDailySchedule() } returns 
                 RedisError.OperationError("Failed to retrieve schedule").left()
 
             testApplication {

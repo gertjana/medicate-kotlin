@@ -39,7 +39,7 @@ class ScheduleRoutesTest : FunSpec({
                 Schedule(UUID.randomUUID(), medicineId, "08:00", 1.0),
                 Schedule(UUID.randomUUID(), medicineId, "20:00", 2.0)
             )
-            every { mockRedisService.getAllSchedules() } returns schedules.right()
+            coEvery { mockRedisService.getAllSchedules() } returns schedules.right()
 
             testApplication {
                 environment {
@@ -51,12 +51,12 @@ class ScheduleRoutesTest : FunSpec({
                 val response = client.get("/schedule")
                 
                 response.status shouldBe HttpStatusCode.OK
-                verify { mockRedisService.getAllSchedules() }
+                coVerify { mockRedisService.getAllSchedules() }
             }
         }
 
         test("should return 500 on error") {
-            every { mockRedisService.getAllSchedules() } returns RedisError.OperationError("Error").left()
+            coEvery { mockRedisService.getAllSchedules() } returns RedisError.OperationError("Error").left()
 
             testApplication {
                 environment {
@@ -77,7 +77,7 @@ class ScheduleRoutesTest : FunSpec({
             val scheduleId = UUID.randomUUID()
             val medicineId = UUID.randomUUID()
             val schedule = Schedule(scheduleId, medicineId, "08:00", 1.0)
-            every { mockRedisService.getSchedule(scheduleId.toString()) } returns schedule.right()
+            coEvery { mockRedisService.getSchedule(scheduleId.toString()) } returns schedule.right()
 
             testApplication {
                 environment {
@@ -92,13 +92,13 @@ class ScheduleRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Schedule>()
                 body.id shouldBe scheduleId
-                verify { mockRedisService.getSchedule(scheduleId.toString()) }
+                coVerify { mockRedisService.getSchedule(scheduleId.toString()) }
             }
         }
 
         test("should return 404 when schedule not found") {
             val scheduleId = UUID.randomUUID()
-            every { mockRedisService.getSchedule(scheduleId.toString()) } returns 
+            coEvery { mockRedisService.getSchedule(scheduleId.toString()) } returns 
                 RedisError.NotFound("Schedule not found").left()
 
             testApplication {
@@ -120,7 +120,7 @@ class ScheduleRoutesTest : FunSpec({
             val medicineId = UUID.randomUUID()
             val createdSchedule = Schedule(UUID.randomUUID(), medicineId, "12:00", 1.5)
             val request = ScheduleRequest(medicineId, "12:00", 1.5)
-            every { mockRedisService.createSchedule(any()) } returns createdSchedule.right()
+            coEvery { mockRedisService.createSchedule(any()) } returns createdSchedule.right()
 
             testApplication {
                 environment {
@@ -138,13 +138,13 @@ class ScheduleRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.Created
                 val body = response.body<Schedule>()
                 body.time shouldBe "12:00"
-                verify { mockRedisService.createSchedule(any()) }
+                coVerify { mockRedisService.createSchedule(any()) }
             }
         }
 
         test("should return 500 on create error") {
             val request = ScheduleRequest(UUID.randomUUID(), "12:00", 1.5)
-            every { mockRedisService.createSchedule(any()) } returns 
+            coEvery { mockRedisService.createSchedule(any()) } returns 
                 RedisError.OperationError("Failed to create").left()
 
             testApplication {
@@ -169,7 +169,7 @@ class ScheduleRoutesTest : FunSpec({
         test("should update schedule") {
             val scheduleId = UUID.randomUUID()
             val schedule = Schedule(scheduleId, UUID.randomUUID(), "14:00", 2.0)
-            every { mockRedisService.updateSchedule(scheduleId.toString(), any()) } returns schedule.right()
+            coEvery { mockRedisService.updateSchedule(scheduleId.toString(), any()) } returns schedule.right()
 
             testApplication {
                 environment {
@@ -185,14 +185,14 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 
                 response.status shouldBe HttpStatusCode.OK
-                verify { mockRedisService.updateSchedule(scheduleId.toString(), any()) }
+                coVerify { mockRedisService.updateSchedule(scheduleId.toString(), any()) }
             }
         }
 
         test("should return 404 when schedule not found") {
             val scheduleId = UUID.randomUUID()
             val schedule = Schedule(scheduleId, UUID.randomUUID(), "14:00", 2.0)
-            every { mockRedisService.updateSchedule(scheduleId.toString(), any()) } returns 
+            coEvery { mockRedisService.updateSchedule(scheduleId.toString(), any()) } returns 
                 RedisError.NotFound("Schedule not found").left()
 
             testApplication {
@@ -216,7 +216,7 @@ class ScheduleRoutesTest : FunSpec({
     context("DELETE /schedule/{id}") {
         test("should delete schedule") {
             val scheduleId = UUID.randomUUID()
-            every { mockRedisService.deleteSchedule(scheduleId.toString()) } returns Unit.right()
+            coEvery { mockRedisService.deleteSchedule(scheduleId.toString()) } returns Unit.right()
 
             testApplication {
                 environment {
@@ -228,13 +228,13 @@ class ScheduleRoutesTest : FunSpec({
                 val response = client.delete("/schedule/$scheduleId")
                 
                 response.status shouldBe HttpStatusCode.NoContent
-                verify { mockRedisService.deleteSchedule(scheduleId.toString()) }
+                coVerify { mockRedisService.deleteSchedule(scheduleId.toString()) }
             }
         }
 
         test("should return 404 when schedule not found") {
             val scheduleId = UUID.randomUUID()
-            every { mockRedisService.deleteSchedule(scheduleId.toString()) } returns 
+            coEvery { mockRedisService.deleteSchedule(scheduleId.toString()) } returns 
                 RedisError.NotFound("Schedule not found").left()
 
             testApplication {

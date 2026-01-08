@@ -42,7 +42,7 @@ class MedicineRoutesTest : FunSpec({
                 Medicine(UUID.randomUUID(), "Medicine A", 100.0, "mg", 50.0),
                 Medicine(UUID.randomUUID(), "Medicine B", 200.0, "mg", 75.0)
             )
-            every { mockRedisService.getAllMedicines() } returns medicines.right()
+            coEvery { mockRedisService.getAllMedicines() } returns medicines.right()
 
             testApplication {
                 environment {
@@ -54,12 +54,12 @@ class MedicineRoutesTest : FunSpec({
                 val response = client.get("/medicine")
                 
                 response.status shouldBe HttpStatusCode.OK
-                verify { mockRedisService.getAllMedicines() }
+                coVerify { mockRedisService.getAllMedicines() }
             }
         }
 
         test("should return 500 on error") {
-            every { mockRedisService.getAllMedicines() } returns RedisError.OperationError("Error").left()
+            coEvery { mockRedisService.getAllMedicines() } returns RedisError.OperationError("Error").left()
 
             testApplication {
                 environment {
@@ -79,7 +79,7 @@ class MedicineRoutesTest : FunSpec({
         test("should return medicine by id") {
             val medicineId = UUID.randomUUID()
             val medicine = Medicine(medicineId, "Test Medicine", 500.0, "mg", 100.0)
-            every { mockRedisService.getMedicine(medicineId.toString()) } returns medicine.right()
+            coEvery { mockRedisService.getMedicine(medicineId.toString()) } returns medicine.right()
 
             testApplication {
                 environment {
@@ -94,13 +94,13 @@ class MedicineRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Medicine>()
                 body.id shouldBe medicineId
-                verify { mockRedisService.getMedicine(medicineId.toString()) }
+                coVerify { mockRedisService.getMedicine(medicineId.toString()) }
             }
         }
 
         test("should return 404 when medicine not found") {
             val medicineId = UUID.randomUUID()
-            every { mockRedisService.getMedicine(medicineId.toString()) } returns 
+            coEvery { mockRedisService.getMedicine(medicineId.toString()) } returns 
                 RedisError.NotFound("Medicine not found").left()
 
             testApplication {
@@ -121,7 +121,7 @@ class MedicineRoutesTest : FunSpec({
         test("should create medicine") {
             val createdMedicine = Medicine(UUID.randomUUID(), "New Medicine", 250.0, "mg", 60.0)
             val request = MedicineRequest("New Medicine", 250.0, "mg", 60.0)
-            every { mockRedisService.createMedicine(any()) } returns createdMedicine.right()
+            coEvery { mockRedisService.createMedicine(any()) } returns createdMedicine.right()
 
             testApplication {
                 environment {
@@ -139,13 +139,13 @@ class MedicineRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.Created
                 val body = response.body<Medicine>()
                 body.name shouldBe "New Medicine"
-                verify { mockRedisService.createMedicine(any()) }
+                coVerify { mockRedisService.createMedicine(any()) }
             }
         }
 
         test("should return 500 on create error") {
             val request = MedicineRequest("New Medicine", 250.0, "mg", 60.0)
-            every { mockRedisService.createMedicine(any()) } returns 
+            coEvery { mockRedisService.createMedicine(any()) } returns 
                 RedisError.OperationError("Failed to create").left()
 
             testApplication {
@@ -170,7 +170,7 @@ class MedicineRoutesTest : FunSpec({
         test("should update medicine") {
             val medicineId = UUID.randomUUID()
             val medicine = Medicine(medicineId, "Updated Medicine", 750.0, "mg", 150.0)
-            every { mockRedisService.updateMedicine(medicineId.toString(), any()) } returns medicine.right()
+            coEvery { mockRedisService.updateMedicine(medicineId.toString(), any()) } returns medicine.right()
 
             testApplication {
                 environment {
@@ -186,14 +186,14 @@ class MedicineRoutesTest : FunSpec({
                 }
                 
                 response.status shouldBe HttpStatusCode.OK
-                verify { mockRedisService.updateMedicine(medicineId.toString(), any()) }
+                coVerify { mockRedisService.updateMedicine(medicineId.toString(), any()) }
             }
         }
 
         test("should return 404 when medicine not found") {
             val medicineId = UUID.randomUUID()
             val medicine = Medicine(medicineId, "Updated Medicine", 750.0, "mg", 150.0)
-            every { mockRedisService.updateMedicine(medicineId.toString(), any()) } returns 
+            coEvery { mockRedisService.updateMedicine(medicineId.toString(), any()) } returns 
                 RedisError.NotFound("Medicine not found").left()
 
             testApplication {
@@ -217,7 +217,7 @@ class MedicineRoutesTest : FunSpec({
     context("DELETE /medicine/{id}") {
         test("should delete medicine") {
             val medicineId = UUID.randomUUID()
-            every { mockRedisService.deleteMedicine(medicineId.toString()) } returns Unit.right()
+            coEvery { mockRedisService.deleteMedicine(medicineId.toString()) } returns Unit.right()
 
             testApplication {
                 environment {
@@ -229,13 +229,13 @@ class MedicineRoutesTest : FunSpec({
                 val response = client.delete("/medicine/$medicineId")
                 
                 response.status shouldBe HttpStatusCode.NoContent
-                verify { mockRedisService.deleteMedicine(medicineId.toString()) }
+                coVerify { mockRedisService.deleteMedicine(medicineId.toString()) }
             }
         }
 
         test("should return 404 when medicine not found") {
             val medicineId = UUID.randomUUID()
-            every { mockRedisService.deleteMedicine(medicineId.toString()) } returns 
+            coEvery { mockRedisService.deleteMedicine(medicineId.toString()) } returns 
                 RedisError.NotFound("Medicine not found").left()
 
             testApplication {
@@ -262,7 +262,7 @@ class MedicineRoutesTest : FunSpec({
                 amount = 1.0
             )
             val request = DosageHistoryRequest(medicineId, 1.0)
-            every { mockRedisService.createDosageHistory(medicineId, 1.0) } returns dosageHistory.right()
+            coEvery { mockRedisService.createDosageHistory(medicineId, 1.0) } returns dosageHistory.right()
 
             testApplication {
                 environment {
@@ -281,14 +281,14 @@ class MedicineRoutesTest : FunSpec({
                 val body = response.body<DosageHistory>()
                 body.medicineId shouldBe medicineId
                 body.amount shouldBe 1.0
-                verify { mockRedisService.createDosageHistory(medicineId, 1.0) }
+                coVerify { mockRedisService.createDosageHistory(medicineId, 1.0) }
             }
         }
 
         test("should return 404 when medicine not found") {
             val medicineId = UUID.randomUUID()
             val request = DosageHistoryRequest(medicineId, 1.0)
-            every { mockRedisService.createDosageHistory(medicineId, 1.0) } returns 
+            coEvery { mockRedisService.createDosageHistory(medicineId, 1.0) } returns 
                 RedisError.NotFound("Medicine with id $medicineId not found").left()
 
             testApplication {
@@ -311,7 +311,7 @@ class MedicineRoutesTest : FunSpec({
         test("should return 500 on error") {
             val medicineId = UUID.randomUUID()
             val request = DosageHistoryRequest(medicineId, 1.0)
-            every { mockRedisService.createDosageHistory(medicineId, 1.0) } returns 
+            coEvery { mockRedisService.createDosageHistory(medicineId, 1.0) } returns 
                 RedisError.OperationError("Failed to create dosage history").left()
 
             testApplication {
@@ -337,7 +337,7 @@ class MedicineRoutesTest : FunSpec({
             val medicineId = UUID.randomUUID()
             val updatedMedicine = Medicine(medicineId, "Test Medicine", 500.0, "mg", 110.0)
             val request = AddStockRequest(medicineId, 10.0)
-            every { mockRedisService.addStock(medicineId, 10.0) } returns updatedMedicine.right()
+            coEvery { mockRedisService.addStock(medicineId, 10.0) } returns updatedMedicine.right()
 
             testApplication {
                 environment {
@@ -355,14 +355,14 @@ class MedicineRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Medicine>()
                 body.stock shouldBe 110.0
-                verify { mockRedisService.addStock(medicineId, 10.0) }
+                coVerify { mockRedisService.addStock(medicineId, 10.0) }
             }
         }
 
         test("should return 404 when medicine not found") {
             val medicineId = UUID.randomUUID()
             val request = AddStockRequest(medicineId, 10.0)
-            every { mockRedisService.addStock(medicineId, 10.0) } returns 
+            coEvery { mockRedisService.addStock(medicineId, 10.0) } returns 
                 RedisError.NotFound("Medicine with id $medicineId not found").left()
 
             testApplication {
@@ -385,7 +385,7 @@ class MedicineRoutesTest : FunSpec({
         test("should return 500 on error") {
             val medicineId = UUID.randomUUID()
             val request = AddStockRequest(medicineId, 10.0)
-            every { mockRedisService.addStock(medicineId, 10.0) } returns 
+            coEvery { mockRedisService.addStock(medicineId, 10.0) } returns 
                 RedisError.OperationError("Failed to add stock").left()
 
             testApplication {

@@ -8,14 +8,15 @@ import dev.gertjanassies.model.*
 import io.lettuce.core.RedisClient
 import io.lettuce.core.ScanArgs
 import io.lettuce.core.api.StatefulRedisConnection
-import io.lettuce.core.api.sync.RedisCommands
+import io.lettuce.core.api.async.RedisAsyncCommands
+import kotlinx.coroutines.future.await
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import java.util.*
 
 /**
- * Redis service using functional programming patterns with Arrow
+ * Redis service using functional programming patterns with Arrow and async coroutines
  */
 class RedisService(private val host: String, private val port: Int, private val environment: String = "test") {
     private var client: RedisClient? = null
@@ -25,32 +26,32 @@ class RedisService(private val host: String, private val port: Int, private val 
     /**
      * Connect to Redis using Either for error handling
      */
-    fun connect(): Either<RedisError, RedisCommands<String, String>> = Either.catch {
+    fun connect(): Either<RedisError, RedisAsyncCommands<String, String>> = Either.catch {
         val redisClient = RedisClient.create("redis://$host:$port")
         val conn = redisClient.connect()
         client = redisClient
         connection = conn
-        conn.sync()
+        conn.async()
     }.mapLeft { RedisError.ConnectionError(it.message ?: "Unknown error") }
 
     /**
-     * Get a value from Redis
+     * Get a value from Redis asynchronously
      */
-    fun get(key: String): Either<RedisError, String?> = Either.catch {
-        connection?.sync()?.get(key)
+    suspend fun get(key: String): Either<RedisError, String?> = Either.catch {
+        connection?.async()?.get(key)?.await()
     }.mapLeft { RedisError.OperationError(it.message ?: "Unknown error") }
 
     /**
-     * Set a value in Redis
+     * Set a value in Redis asynchronously
      */
-    fun set(key: String, value: String): Either<RedisError, String> = Either.catch {
-        connection?.sync()?.set(key, value) ?: throw IllegalStateException("Not connected")
+    suspend fun set(key: String, value: String): Either<RedisError, String> = Either.catch {
+        connection?.async()?.set(key, value)?.await() ?: throw IllegalStateException("Not connected")
     }.mapLeft { RedisError.OperationError(it.message ?: "Unknown error") }
 
     /**
-     * Get a Medicine object from Redis by ID
+     * Get a Medicine object from Redis by ID asynchronously
      */
-    fun getMedicine(id: String): Either<RedisError, Medicine> {
+    suspend fun getMedicine(id: String): Either<RedisError, Medicine> {
         val key = "$environment:medicine:$id"
         val jsonString = get(key).getOrNull()
         
@@ -68,9 +69,9 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Create a new Medicine in Redis
+     * Create a new Medicine in Redis asynchronously
      */
-    fun createMedicine(request: MedicineRequest): Either<RedisError, Medicine> {
+    suspend fun createMedicine(request: MedicineRequest): Either<RedisError, Medicine> {
         val medicine = Medicine(
             id = UUID.randomUUID(),
             name = request.name,
@@ -82,7 +83,7 @@ class RedisService(private val host: String, private val port: Int, private val 
         
         return Either.catch {
             val jsonString = json.encodeToString(medicine)
-            connection?.sync()?.set(key, jsonString) ?: throw IllegalStateException("Not connected")
+            connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
             medicine
         }.mapLeft { e ->
             when (e) {
@@ -93,9 +94,9 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Update an existing Medicine in Redis
+     * Update an existing Medicine in Redis asynchronously
      */
-    fun updateMedicine(id: String, medicine: Medicine): Either<RedisError, Medicine> {
+    suspend fun updateMedicine(id: String, medicine: Medicine): Either<RedisError, Medicine> {
         val key = "$environment:medicine:$id"
         
         // Check if medicine exists
@@ -107,7 +108,7 @@ class RedisService(private val host: String, private val port: Int, private val 
                 // Update the medicine
                 Either.catch {
                     val jsonString = json.encodeToString(medicine)
-                    connection?.sync()?.set(key, jsonString) ?: throw IllegalStateException("Not connected")
+                    connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
                     medicine
                 }.mapLeft { e ->
                     when (e) {
@@ -120,13 +121,13 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Delete a Medicine from Redis
+     * Delete a Medicine from Redis asynchronously
      */
-    fun deleteMedicine(id: String): Either<RedisError, Unit> {
+    suspend fun deleteMedicine(id: String): Either<RedisError, Unit> {
         val key = "$environment:medicine:$id"
         
         return Either.catch {
-            val deleted = connection?.sync()?.del(key) ?: throw IllegalStateException("Not connected")
+            val deleted = connection?.async()?.del(key)?.await() ?: throw IllegalStateException("Not connected")
             if (deleted == 0L) {
                 throw NoSuchElementException("Medicine with id $id not found")
             }
@@ -139,26 +140,26 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Get all Medicines from Redis
+     * Get all Medicines from Redis asynchronously
      */
-    fun getAllMedicines(): Either<RedisError, List<Medicine>> {
+    suspend fun getAllMedicines(): Either<RedisError, List<Medicine>> {
         return Either.catch {
             val pattern = "$environment:medicine:*"
             val keys = mutableListOf<String>()
             
-            val syncCommands = connection?.sync() ?: throw IllegalStateException("Not connected")
-            var scanCursor = syncCommands.scan(ScanArgs.Builder.matches(pattern))
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
             
             // Iterate through all cursor pages
             while (true) {
                 keys.addAll(scanCursor.keys)
                 if (scanCursor.isFinished) break
-                scanCursor = syncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern))
+                scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
             }
             
             // Get all values for the keys
             keys.mapNotNull { key ->
-                syncCommands.get(key)?.let { jsonString ->
+                asyncCommands.get(key).await()?.let { jsonString ->
                     try {
                         json.decodeFromString<Medicine>(jsonString)
                     } catch (e: Exception) {
@@ -174,9 +175,9 @@ class RedisService(private val host: String, private val port: Int, private val 
     // Schedule operations
 
     /**
-     * Get a Schedule object from Redis by ID
+     * Get a Schedule object from Redis by ID asynchronously
      */
-    fun getSchedule(id: String): Either<RedisError, Schedule> {
+    suspend fun getSchedule(id: String): Either<RedisError, Schedule> {
         val key = "$environment:schedule:$id"
         val jsonString = get(key).getOrNull()
         
@@ -194,9 +195,9 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Create a new Schedule in Redis
+     * Create a new Schedule in Redis asynchronously
      */
-    fun createSchedule(request: ScheduleRequest): Either<RedisError, Schedule> {
+    suspend fun createSchedule(request: ScheduleRequest): Either<RedisError, Schedule> {
         val schedule = Schedule(
             id = UUID.randomUUID(),
             medicineId = request.medicineId,
@@ -208,7 +209,7 @@ class RedisService(private val host: String, private val port: Int, private val 
         
         return Either.catch {
             val jsonString = json.encodeToString(schedule)
-            connection?.sync()?.set(key, jsonString) ?: throw IllegalStateException("Not connected")
+            connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
             schedule
         }.mapLeft { e ->
             when (e) {
@@ -219,9 +220,9 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Update an existing Schedule in Redis
+     * Update an existing Schedule in Redis asynchronously
      */
-    fun updateSchedule(id: String, schedule: Schedule): Either<RedisError, Schedule> {
+    suspend fun updateSchedule(id: String, schedule: Schedule): Either<RedisError, Schedule> {
         val key = "$environment:schedule:$id"
         
         // Check if schedule exists
@@ -233,7 +234,7 @@ class RedisService(private val host: String, private val port: Int, private val 
                 // Update the schedule
                 Either.catch {
                     val jsonString = json.encodeToString(schedule)
-                    connection?.sync()?.set(key, jsonString) ?: throw IllegalStateException("Not connected")
+                    connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
                     schedule
                 }.mapLeft { e ->
                     when (e) {
@@ -246,13 +247,13 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Delete a Schedule from Redis
+     * Delete a Schedule from Redis asynchronously
      */
-    fun deleteSchedule(id: String): Either<RedisError, Unit> {
+    suspend fun deleteSchedule(id: String): Either<RedisError, Unit> {
         val key = "$environment:schedule:$id"
         
         return Either.catch {
-            val deleted = connection?.sync()?.del(key) ?: throw IllegalStateException("Not connected")
+            val deleted = connection?.async()?.del(key)?.await() ?: throw IllegalStateException("Not connected")
             if (deleted == 0L) {
                 throw NoSuchElementException("Schedule with id $id not found")
             }
@@ -265,26 +266,26 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Get all Schedules from Redis
+     * Get all Schedules from Redis asynchronously
      */
-    fun getAllSchedules(): Either<RedisError, List<Schedule>> {
+    suspend fun getAllSchedules(): Either<RedisError, List<Schedule>> {
         return Either.catch {
             val pattern = "$environment:schedule:*"
             val keys = mutableListOf<String>()
             
-            val syncCommands = connection?.sync() ?: throw IllegalStateException("Not connected")
-            var scanCursor = syncCommands.scan(ScanArgs.Builder.matches(pattern))
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
             
             // Iterate through all cursor pages
             while (true) {
                 keys.addAll(scanCursor.keys)
                 if (scanCursor.isFinished) break
-                scanCursor = syncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern))
+                scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
             }
             
             // Get all values for the keys
             keys.mapNotNull { key ->
-                syncCommands.get(key)?.let { jsonString ->
+                asyncCommands.get(key).await()?.let { jsonString ->
                     try {
                         json.decodeFromString<Schedule>(jsonString)
                     } catch (e: Exception) {
@@ -298,9 +299,9 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Get daily schedule with medicines grouped by time
+     * Get daily schedule with medicines grouped by time asynchronously
      */
-    fun getDailySchedule(): Either<RedisError, DailySchedule> {
+    suspend fun getDailySchedule(): Either<RedisError, DailySchedule> {
         return either {
             val allSchedules = getAllSchedules().bind()
             
@@ -331,7 +332,7 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Creates a [DosageHistory] entry for a given medicine and dosage amount and persists it in Redis.
+     * Creates a [DosageHistory] entry for a given medicine and dosage amount and persists it in Redis asynchronously.
      *
      * This operation has the side effect of reducing the current stock of the specified medicine
      * by the given [amount] and updating the stored [Medicine] accordingly.
@@ -348,9 +349,9 @@ class RedisService(private val host: String, private val port: Int, private val 
      *       - [RedisError.OperationError] if persisting the dosage history or updating the medicine fails
      *         (e.g. connection issues or an invalid Redis state).
      */
-    fun createDosageHistory(medicineId: UUID, amount: Double, scheduledTime: String? = null, datetime: java.time.LocalDateTime? = null): Either<RedisError, DosageHistory> {
+    suspend fun createDosageHistory(medicineId: UUID, amount: Double, scheduledTime: String? = null, datetime: java.time.LocalDateTime? = null): Either<RedisError, DosageHistory> {
         return either {
-            val syncCommands = connection?.sync() ?: throw IllegalStateException("Not connected")
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
             val medicineKey = "$environment:medicine:$medicineId"
             
             // Retry loop for optimistic locking with WATCH
@@ -360,10 +361,10 @@ class RedisService(private val host: String, private val port: Int, private val 
             while (retryCount < maxRetries) {
                 Either.catch {
                     // Watch the medicine key for changes
-                    syncCommands.watch(medicineKey)
+                    asyncCommands.watch(medicineKey).await()
                     
                     // Get medicine and verify it exists
-                    val medicineJson = syncCommands.get(medicineKey)
+                    val medicineJson = asyncCommands.get(medicineKey).await()
                         ?: throw NoSuchElementException("Medicine with id $medicineId not found")
                     
                     val medicine = json.decodeFromString<Medicine>(medicineJson)
@@ -381,15 +382,22 @@ class RedisService(private val host: String, private val port: Int, private val 
                     val updatedMedicine = medicine.copy(stock = medicine.stock - amount)
                     
                     // Start transaction
-                    syncCommands.multi()
+                    asyncCommands.multi().await()
                     
                     val updatedMedicineJson = json.encodeToString(updatedMedicine)
                     val dosageHistoryJson = json.encodeToString(dosageHistory)
                     
-                    syncCommands.set(medicineKey, updatedMedicineJson)
-                    syncCommands.set(dosageKey, dosageHistoryJson)
+                    // Queue commands in the transaction.
+                    // Note: In Lettuce, commands between MULTI and EXEC are queued on the Redis server
+                    // and the returned RedisFuture objects only complete when EXEC is called.
+                    // We intentionally do NOT await these futures here - they will complete after EXEC.
+                    // See: https://redis.github.io/lettuce/user-guide/transactions-multi/
+                    asyncCommands.set(medicineKey, updatedMedicineJson)
+                    asyncCommands.set(dosageKey, dosageHistoryJson)
                     
-                    val result = syncCommands.exec()
+                    // Execute transaction - this atomically executes all queued commands
+                    // and completes all the RedisFuture objects from the queued commands
+                    val result = asyncCommands.exec().await()
                     
                     if (result.wasDiscarded()) {
                         // Transaction failed due to concurrent modification, retry
@@ -400,7 +408,7 @@ class RedisService(private val host: String, private val port: Int, private val 
                         return@either dosageHistory
                     }
                 }.mapLeft { e ->
-                    syncCommands.unwatch()
+                    runCatching { asyncCommands.unwatch().await() }
                     when (e) {
                         is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Medicine not found"))
                         is SerializationException -> raise(RedisError.SerializationError("Failed to serialize: ${e.message}"))
@@ -415,11 +423,11 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Add stock to a medicine using Redis WATCH for optimistic locking
+     * Add stock to a medicine using Redis WATCH for optimistic locking asynchronously
      */
-    fun addStock(medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
+    suspend fun addStock(medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
         return either {
-            val syncCommands = connection?.sync() ?: throw IllegalStateException("Not connected")
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
             val medicineKey = "$environment:medicine:$medicineId"
             
             // Retry loop for optimistic locking with WATCH
@@ -429,22 +437,28 @@ class RedisService(private val host: String, private val port: Int, private val 
             while (retryCount < maxRetries) {
                 Either.catch {
                     // Watch the medicine key for changes
-                    syncCommands.watch(medicineKey)
+                    asyncCommands.watch(medicineKey).await()
                     
                     // Get medicine and verify it exists
-                    val medicineJson = syncCommands.get(medicineKey)
+                    val medicineJson = asyncCommands.get(medicineKey).await()
                         ?: throw NoSuchElementException("Medicine with id $medicineId not found")
                     
                     val medicine = json.decodeFromString<Medicine>(medicineJson)
                     val updatedMedicine = medicine.copy(stock = medicine.stock + amount)
                     
                     // Start transaction
-                    syncCommands.multi()
+                    asyncCommands.multi().await()
                     
                     val updatedMedicineJson = json.encodeToString(updatedMedicine)
-                    syncCommands.set(medicineKey, updatedMedicineJson)
                     
-                    val result = syncCommands.exec()
+                    // Queue command in the transaction.
+                    // Note: In Lettuce, commands between MULTI and EXEC are queued on the Redis server
+                    // and the returned RedisFuture only completes when EXEC is called.
+                    // We intentionally do NOT await this future here - it will complete after EXEC.
+                    asyncCommands.set(medicineKey, updatedMedicineJson)
+                    
+                    // Execute transaction - this atomically executes all queued commands
+                    val result = asyncCommands.exec().await()
                     
                     if (result.wasDiscarded()) {
                         // Transaction failed due to concurrent modification, retry
@@ -455,7 +469,7 @@ class RedisService(private val host: String, private val port: Int, private val 
                         return@either updatedMedicine
                     }
                 }.mapLeft { e ->
-                    syncCommands.unwatch()
+                    runCatching { asyncCommands.unwatch().await() }
                     when (e) {
                         is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Medicine not found"))
                         is SerializationException -> raise(RedisError.SerializationError("Failed to serialize medicine: ${e.message}"))
@@ -470,26 +484,26 @@ class RedisService(private val host: String, private val port: Int, private val 
     }
 
     /**
-     * Get all DosageHistory entries from Redis
+     * Get all DosageHistory entries from Redis asynchronously
      */
-    fun getAllDosageHistories(): Either<RedisError, List<DosageHistory>> {
+    suspend fun getAllDosageHistories(): Either<RedisError, List<DosageHistory>> {
         return Either.catch {
             val pattern = "$environment:dosagehistory:*"
             val keys = mutableListOf<String>()
             
-            val syncCommands = connection?.sync() ?: throw IllegalStateException("Not connected")
-            var scanCursor = syncCommands.scan(ScanArgs.Builder.matches(pattern))
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
             
             // Iterate through all cursor pages
             while (true) {
                 keys.addAll(scanCursor.keys)
                 if (scanCursor.isFinished) break
-                scanCursor = syncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern))
+                scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
             }
             
             // Get all values for the keys and sort by datetime descending
             keys.mapNotNull { key ->
-                syncCommands.get(key)?.let { jsonString ->
+                asyncCommands.get(key).await()?.let { jsonString ->
                     try {
                         json.decodeFromString<DosageHistory>(jsonString)
                     } catch (e: Exception) {
