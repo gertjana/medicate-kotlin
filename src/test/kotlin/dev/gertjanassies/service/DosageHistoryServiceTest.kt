@@ -35,11 +35,7 @@ class DosageHistoryServiceTest : FunSpec({
     beforeEach {
         mockConnection = mockk()
         mockAsyncCommands = mockk()
-        redisService = RedisService(host = "localhost", port = 6379, environment = environment)
-
-        val connectionField = RedisService::class.java.getDeclaredField("connection")
-        connectionField.isAccessible = true
-        connectionField.set(redisService, mockConnection)
+        redisService = RedisService(environment = environment, connection = mockConnection)
     }
 
     afterEach {
