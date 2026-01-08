@@ -11,8 +11,9 @@
 		type Medicine
 	} from '$lib/api';
 
-	export let data = {};
-	export let params = {};
+	// SvelteKit props - using const since they're not used internally
+	export const data = {};
+	export const params = {};
 
 	let schedules: Schedule[] = [];
 	let medicines: Medicine[] = [];
@@ -248,8 +249,8 @@
 				<h3 class="text-xl font-bold mb-4">{editingId ? 'Edit' : 'Add'} Schedule</h3>
 				<form on:submit|preventDefault={handleSubmit} class="space-y-4">
 					<div>
-						<label class="block mb-1 font-semibold">Medicine</label>
-						<select bind:value={formData.medicineId} class="input w-full" required>
+						<label for="schedule-medicine" class="block mb-1 font-semibold">Medicine</label>
+						<select id="schedule-medicine" bind:value={formData.medicineId} class="input w-full" required>
 							<option value="">Select a medicine</option>
 							{#each medicines as medicine}
 								<option value={medicine.id}>
@@ -259,12 +260,13 @@
 						</select>
 					</div>
 					<div>
-						<label class="block mb-1 font-semibold">Time</label>
-						<input type="time" bind:value={formData.time} class="input w-full" required />
+						<label for="schedule-time" class="block mb-1 font-semibold">Time</label>
+						<input id="schedule-time" type="time" bind:value={formData.time} class="input w-full" required />
 					</div>
 					<div>
-						<label class="block mb-1 font-semibold">Amount (number of doses)</label>
+						<label for="schedule-amount" class="block mb-1 font-semibold">Amount (number of doses)</label>
 						<input
+							id="schedule-amount"
 							type="number"
 							step="0.01"
 							bind:value={formData.amount}
@@ -273,7 +275,7 @@
 						/>
 					</div>
 					<div>
-						<label class="block mb-2 font-semibold">Days of Week</label>
+						<label for="schedule-days" class="block mb-2 font-semibold">Days of Week</label>
 						<div class="flex flex-wrap gap-3 mb-2">
 							<label class="flex items-center gap-2 cursor-pointer">
 								<input

@@ -2,9 +2,9 @@
 	import '../app.css';
 	import { page } from '$app/stores';
 	
-	// Suppress warnings about SvelteKit props
-	export let data = {};
-	export let params = {};
+	// SvelteKit props - using const since they're not used internally
+	export const data = {};
+	export const params = {};
 
 	const navItems = [
 		{ path: '/', label: 'Dashboard' },

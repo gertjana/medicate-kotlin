@@ -10,8 +10,9 @@
 		type Medicine
 	} from '$lib/api';
 
-	export let data = {};
-	export let params = {};
+	// SvelteKit props - using const since they're not used internally
+	export const data = {};
+	export const params = {};
 
 	let medicines: Medicine[] = [];
 	let loading = true;
@@ -167,13 +168,14 @@
 			<h3 class="text-xl font-bold mb-4">{editingId ? 'Edit' : 'Add'} Medicine</h3>
 			<form on:submit|preventDefault={handleSubmit} class="space-y-4">
 				<div>
-					<label class="block mb-1 font-semibold">Name</label>
-					<input type="text" bind:value={formData.name} class="input w-full" required />
+					<label for="medicine-name" class="block mb-1 font-semibold">Name</label>
+					<input id="medicine-name" type="text" bind:value={formData.name} class="input w-full" required />
 				</div>
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label class="block mb-1 font-semibold">Dose</label>
+						<label for="medicine-dose" class="block mb-1 font-semibold">Dose</label>
 						<input
+							id="medicine-dose"
 							type="number"
 							step="0.01"
 							bind:value={formData.dose}
@@ -182,13 +184,14 @@
 						/>
 					</div>
 					<div>
-						<label class="block mb-1 font-semibold">Unit</label>
-						<input type="text" bind:value={formData.unit} class="input w-full" required />
+						<label for="medicine-unit" class="block mb-1 font-semibold">Unit</label>
+						<input id="medicine-unit" type="text" bind:value={formData.unit} class="input w-full" required />
 					</div>
 				</div>
 				<div>
-					<label class="block mb-1 font-semibold">Stock</label>
+					<label for="medicine-stock" class="block mb-1 font-semibold">Stock</label>
 					<input
+						id="medicine-stock"
 						type="number"
 						step="0.01"
 						bind:value={formData.stock}
@@ -254,14 +257,14 @@
 			<h3 class="text-xl font-bold mb-4">Add Stock</h3>
 			<form on:submit|preventDefault={handleAddStock}>
 				<div class="mb-4">
-					<label class="block mb-1 font-semibold">Amount to add</label>
+					<label for="stock-amount" class="block mb-1 font-semibold">Amount to add</label>
 					<input
+						id="stock-amount"
 						type="number"
 						step="0.01"
 						bind:value={stockAmount}
 						class="input w-full"
 						required
-						autofocus
 					/>
 				</div>
 				<div class="flex gap-2">

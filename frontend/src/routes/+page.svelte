@@ -3,8 +3,9 @@
 	import { browser } from '$app/environment';
 	import { getDailySchedule, getDosageHistories, takeDose, type DailySchedule, type DosageHistory, type TimeSlot } from '$lib/api';
 
-	export let data = {};
-	export let params = {};
+	// SvelteKit props - using const since they're not used internally
+	export const data = {};
+	export const params = {};
 
 	let dailySchedule: DailySchedule | null = null;
 	let dosageHistories: DosageHistory[] = [];
