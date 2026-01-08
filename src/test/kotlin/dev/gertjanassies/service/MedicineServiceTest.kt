@@ -1,46 +1,346 @@
 package dev.gertjanassies.service
 
-import arrow.core.Either
-import arrow.core.left
-import arrow.core.right
 import dev.gertjanassies.model.*
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import io.lettuce.core.RedisFuture
+import io.lettuce.core.api.StatefulRedisConnection
+import io.lettuce.core.api.async.RedisAsyncCommands
 import io.mockk.*
-import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.*
+import java.util.concurrent.CompletableFuture
 
 /**
- * Demonstration of sync testing while mocking Redis using MockK.
- * 
- * This test suite demonstrates the recommended testing approach:
- * 1. Mock the RedisService itself rather than the low-level Redis connection
- * 2. Use `every` to stub non-suspend methods
- * 3. Use `coEvery` to stub suspend methods
- * 4. Use `runBlocking` to execute suspend functions synchronously in tests
- * 5. Use `verify` and `coVerify` to assert method calls
- * 
- * NOTE: Testing async Redis operations at the connection level requires complex
- * setup with mockkStatic for extension functions. The recommended approach is to:
- * - Test business logic by mocking the RedisService (as shown here)
- * - Test Redis integration with actual Redis (using testcontainers)
- * - Test routes by mocking the service (as seen in route tests)
+ * Test suite for Medicine-related operations in RedisService.
+ *
+ * Tests cover:
+ * - getMedicine: retrieval and deserialization
+ * - createMedicine: creation with validation
+ * - updateMedicine: updates with existence checks
+ * - deleteMedicine: deletion with error handling
+ * - getAllMedicines: scan cursor pagination and filtering
  */
 class MedicineServiceTest : FunSpec({
-    lateinit var mockRedisService: RedisService
-    
+
+    lateinit var mockConnection: StatefulRedisConnection<String, String>
+    lateinit var mockAsyncCommands: RedisAsyncCommands<String, String>
+    lateinit var redisService: RedisService
+
+    val json = Json { ignoreUnknownKeys = true }
+    val environment = "test"
+
     beforeEach {
-        mockRedisService = mockk()
+        mockConnection = mockk()
+        mockAsyncCommands = mockk()
+        redisService = RedisService(host = "localhost", port = 6379, environment = environment)
+
+        val connectionField = RedisService::class.java.getDeclaredField("connection")
+        connectionField.isAccessible = true
+        connectionField.set(redisService, mockConnection)
     }
-    
+
     afterEach {
         clearAllMocks()
     }
-    
-    context("Medicine operations with mocked RedisService") {
-        test("getAllMedicines should return list of medicines") {
-            // Arrange
+
+    // ...existing helper code...
+    class TestRedisFuture<T>(completableFuture: CompletableFuture<T>) :
+        CompletableFuture<T>(), RedisFuture<T> {
+        init {
+            completableFuture.whenComplete { result, exception ->
+                if (exception != null) {
+                    completeExceptionally(exception)
+                } else {
+                    complete(result)
+                }
+            }
+        }
+
+        override fun getError(): String? = null
+
+        override fun await(timeout: Long, unit: java.util.concurrent.TimeUnit): Boolean {
+            return try {
+                get(timeout, unit)
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+    }
+
+    fun <T> createRedisFutureMock(value: T): RedisFuture<T> {
+        return TestRedisFuture(CompletableFuture.completedFuture(value))
+    }
+
+    fun <T> createFailedRedisFutureMock(exception: Exception): RedisFuture<T> {
+        val future = CompletableFuture<T>()
+        future.completeExceptionally(exception)
+        return TestRedisFuture(future)
+    }
+
+    context("getMedicine") {
+        test("should successfully retrieve and deserialize a medicine") {
+            val medicineId = UUID.randomUUID()
+            val medicine = Medicine(
+                id = medicineId,
+                name = "Aspirin",
+                dose = 500.0,
+                unit = "mg",
+                stock = 100.0
+            )
+            val medicineJson = json.encodeToString(medicine)
+            val key = "$environment:medicine:$medicineId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(key) } returns createRedisFutureMock(medicineJson)
+
+            val result = redisService.getMedicine(medicineId.toString())
+
+            result.isRight() shouldBe true
+            result.getOrNull()?.shouldBe(medicine)
+            result.getOrNull()?.name shouldBe "Aspirin"
+            result.getOrNull()?.dose shouldBe 500.0
+            result.getOrNull()?.stock shouldBe 100.0
+
+            verify(exactly = 1) { mockConnection.async() }
+            verify(exactly = 1) { mockAsyncCommands.get(key) }
+        }
+
+        test("should return NotFound error when medicine doesn't exist") {
+            val medicineId = UUID.randomUUID()
+            val key = "$environment:medicine:$medicineId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(key) } returns createRedisFutureMock(null as String?)
+
+            val result = redisService.getMedicine(medicineId.toString())
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
+            result.leftOrNull()?.message shouldBe "Medicine with id $medicineId not found"
+
+            verify(exactly = 1) { mockConnection.async() }
+            verify(exactly = 1) { mockAsyncCommands.get(key) }
+        }
+
+        test("should return SerializationError when medicine JSON is invalid") {
+            val medicineId = UUID.randomUUID()
+            val invalidJson = """{"invalid": "data"}"""
+            val key = "$environment:medicine:$medicineId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(key) } returns createRedisFutureMock(invalidJson)
+
+            val result = redisService.getMedicine(medicineId.toString())
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.SerializationError>()
+            result.leftOrNull()?.message?.contains("Failed to deserialize medicine") shouldBe true
+
+            verify(exactly = 1) { mockConnection.async() }
+            verify(exactly = 1) { mockAsyncCommands.get(key) }
+        }
+
+        test("should handle RedisFuture that throws an exception") {
+            val medicineId = UUID.randomUUID()
+            val key = "$environment:medicine:$medicineId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(key) } returns createFailedRedisFutureMock(RuntimeException("Redis connection error"))
+
+            val result = redisService.getMedicine(medicineId.toString())
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
+            result.leftOrNull()?.message shouldBe "Medicine with id $medicineId not found"
+
+            verify(exactly = 1) { mockConnection.async() }
+            verify(exactly = 1) { mockAsyncCommands.get(key) }
+        }
+
+        test("should handle malformed JSON causing deserialization error") {
+            val medicineId = UUID.randomUUID()
+            val malformedJson = """not valid json at all"""
+            val key = "$environment:medicine:$medicineId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(key) } returns createRedisFutureMock(malformedJson)
+
+            val result = redisService.getMedicine(medicineId.toString())
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.SerializationError>()
+            result.leftOrNull()?.message?.contains("Failed to deserialize medicine") shouldBe true
+
+            verify(exactly = 1) { mockConnection.async() }
+            verify(exactly = 1) { mockAsyncCommands.get(key) }
+        }
+
+        test("should handle different medicine instances with various data") {
+            val medicineId = UUID.randomUUID()
+            val medicine = Medicine(
+                id = medicineId,
+                name = "Ibuprofen",
+                dose = 400.0,
+                unit = "mg",
+                stock = 50.5
+            )
+            val medicineJson = json.encodeToString(medicine)
+            val key = "$environment:medicine:$medicineId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(key) } returns createRedisFutureMock(medicineJson)
+
+            val result = redisService.getMedicine(medicineId.toString())
+
+            val retrieved = result.getOrNull()!!
+            retrieved.id shouldBe medicineId
+            retrieved.name shouldBe "Ibuprofen"
+            retrieved.dose shouldBe 400.0
+            retrieved.unit shouldBe "mg"
+            retrieved.stock shouldBe 50.5
+        }
+    }
+
+    context("createMedicine") {
+        test("should successfully create a new medicine") {
+            val medicineRequest = MedicineRequest(
+                name = "Paracetamol",
+                dose = 1000.0,
+                unit = "mg",
+                stock = 200.0
+            )
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.set(any(), any()) } returns createRedisFutureMock("OK")
+
+            val result = redisService.createMedicine(medicineRequest)
+
+            result.isRight() shouldBe true
+            val created = result.getOrNull()!!
+            created.name shouldBe "Paracetamol"
+            created.dose shouldBe 1000.0
+            created.unit shouldBe "mg"
+            created.stock shouldBe 200.0
+
+            verify(exactly = 1) { mockAsyncCommands.set(any(), any()) }
+        }
+
+        test("should return OperationError when connection fails during create") {
+            val medicineRequest = MedicineRequest(
+                name = "Metformin",
+                dose = 500.0,
+                unit = "mg",
+                stock = 150.0
+            )
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.set(any(), any()) } returns createFailedRedisFutureMock(RuntimeException("Connection lost"))
+
+            val result = redisService.createMedicine(medicineRequest)
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
+            result.leftOrNull()?.message?.contains("Failed to create medicine") shouldBe true
+        }
+    }
+
+    context("updateMedicine") {
+        test("should successfully update an existing medicine") {
+            val medicineId = UUID.randomUUID()
+            val updatedMedicine = Medicine(
+                id = medicineId,
+                name = "Aspirin Updated",
+                dose = 750.0,
+                unit = "mg",
+                stock = 150.0
+            )
+            val key = "$environment:medicine:$medicineId"
+            val existingJson = json.encodeToString(updatedMedicine.copy(name = "Aspirin"))
+            val updatedJson = json.encodeToString(updatedMedicine)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(key) } returns createRedisFutureMock(existingJson)
+            every { mockAsyncCommands.set(key, updatedJson) } returns createRedisFutureMock("OK")
+
+            val result = redisService.updateMedicine(medicineId.toString(), updatedMedicine)
+
+            result.isRight() shouldBe true
+            result.getOrNull()?.name shouldBe "Aspirin Updated"
+            result.getOrNull()?.dose shouldBe 750.0
+
+            verify(exactly = 1) { mockAsyncCommands.get(key) }
+            verify(exactly = 1) { mockAsyncCommands.set(key, updatedJson) }
+        }
+
+        test("should return NotFound when updating non-existent medicine") {
+            val medicineId = UUID.randomUUID()
+            val medicine = Medicine(
+                id = medicineId,
+                name = "Phantom Medicine",
+                dose = 100.0,
+                unit = "mg",
+                stock = 0.0
+            )
+            val key = "$environment:medicine:$medicineId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(key) } returns createRedisFutureMock(null as String?)
+
+            val result = redisService.updateMedicine(medicineId.toString(), medicine)
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
+        }
+    }
+
+    context("deleteMedicine") {
+        test("should successfully delete an existing medicine") {
+            val medicineId = UUID.randomUUID()
+            val key = "$environment:medicine:$medicineId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.del(key) } returns createRedisFutureMock(1L)
+
+            val result = redisService.deleteMedicine(medicineId.toString())
+
+            result.isRight() shouldBe true
+
+            verify(exactly = 1) { mockAsyncCommands.del(key) }
+        }
+
+        test("should return NotFound when deleting non-existent medicine") {
+            val medicineId = UUID.randomUUID()
+            val key = "$environment:medicine:$medicineId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.del(key) } returns createRedisFutureMock(0L)
+
+            val result = redisService.deleteMedicine(medicineId.toString())
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
+        }
+
+        test("should return OperationError when delete fails") {
+            val medicineId = UUID.randomUUID()
+            val key = "$environment:medicine:$medicineId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.del(key) } returns createFailedRedisFutureMock(RuntimeException("Redis error"))
+
+            val result = redisService.deleteMedicine(medicineId.toString())
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
+        }
+    }
+
+    context("getAllMedicines") {
+        test("should successfully retrieve all medicines with single scan cursor page") {
             val medicine1 = Medicine(
                 id = UUID.randomUUID(),
                 name = "Aspirin",
@@ -51,241 +351,140 @@ class MedicineServiceTest : FunSpec({
             val medicine2 = Medicine(
                 id = UUID.randomUUID(),
                 name = "Ibuprofen",
-                dose = 200.0,
+                dose = 400.0,
                 unit = "mg",
                 stock = 50.0
             )
-            val medicines = listOf(medicine1, medicine2)
-            
-            // Mock the suspend function using coEvery
-            coEvery { mockRedisService.getAllMedicines() } returns medicines.right()
-            
-            // Act - Run the suspend function synchronously using runBlocking
-            val result = runBlocking { mockRedisService.getAllMedicines() }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Right<List<Medicine>>>()
-            val resultMedicines = result.getOrNull()!!
-            resultMedicines.size shouldBe 2
-            resultMedicines[0].name shouldBe "Aspirin"
-            resultMedicines[1].name shouldBe "Ibuprofen"
-            
-            // Verify the method was called
-            coVerify { mockRedisService.getAllMedicines() }
+            val key1 = "$environment:medicine:${medicine1.id}"
+            val key2 = "$environment:medicine:${medicine2.id}"
+            val json1 = json.encodeToString(medicine1)
+            val json2 = json.encodeToString(medicine2)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns listOf(key1, key2)
+            every { mockScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor)
+
+            every { mockAsyncCommands.get(key1) } returns createRedisFutureMock(json1)
+            every { mockAsyncCommands.get(key2) } returns createRedisFutureMock(json2)
+
+            val result = redisService.getAllMedicines()
+
+            result.isRight() shouldBe true
+            val medicines = result.getOrNull()!!
+            medicines.size shouldBe 2
+            medicines[0].name shouldBe "Aspirin"
+            medicines[1].name shouldBe "Ibuprofen"
+
+            verify(exactly = 1) { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) }
+            verify(exactly = 1) { mockAsyncCommands.get(key1) }
+            verify(exactly = 1) { mockAsyncCommands.get(key2) }
         }
-        
-        test("getAllMedicines should handle errors") {
-            // Arrange
-            coEvery { mockRedisService.getAllMedicines() } returns 
-                RedisError.OperationError("Redis connection failed").left()
-            
-            // Act
-            val result = runBlocking { mockRedisService.getAllMedicines() }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Left<RedisError>>()
-            result.leftOrNull()!!.shouldBeInstanceOf<RedisError.OperationError>()
-        }
-        
-        test("getMedicine should return medicine when it exists") {
-            // Arrange
-            val medicineId = UUID.randomUUID()
-            val medicine = Medicine(
-                id = medicineId,
-                name = "Aspirin",
-                dose = 500.0,
-                unit = "mg",
-                stock = 100.0
-            )
-            
-            coEvery { mockRedisService.getMedicine(medicineId.toString()) } returns medicine.right()
-            
-            // Act
-            val result = runBlocking { mockRedisService.getMedicine(medicineId.toString()) }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Right<Medicine>>()
-            val retrievedMedicine = result.getOrNull()!!
-            retrievedMedicine.id shouldBe medicineId
-            retrievedMedicine.name shouldBe "Aspirin"
-            
-            coVerify { mockRedisService.getMedicine(medicineId.toString()) }
-        }
-        
-        test("getMedicine should return NotFound when medicine doesn't exist") {
-            // Arrange
-            val medicineId = UUID.randomUUID()
-            coEvery { mockRedisService.getMedicine(medicineId.toString()) } returns 
-                RedisError.NotFound("Medicine with id $medicineId not found").left()
-            
-            // Act
-            val result = runBlocking { mockRedisService.getMedicine(medicineId.toString()) }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Left<RedisError.NotFound>>()
-            result.leftOrNull()!!.message shouldBe "Medicine with id $medicineId not found"
-        }
-        
-        test("createMedicine should create and return new medicine") {
-            // Arrange
-            val request = MedicineRequest(
-                name = "Aspirin",
-                dose = 500.0,
-                unit = "mg",
-                stock = 100.0
-            )
-            val createdMedicine = Medicine(
+
+        test("should successfully retrieve medicines with multiple scan cursor pages") {
+            val medicine1 = Medicine(
                 id = UUID.randomUUID(),
-                name = "Aspirin",
-                dose = 500.0,
+                name = "Medicine1",
+                dose = 100.0,
                 unit = "mg",
-                stock = 100.0
+                stock = 10.0
             )
-            
-            coEvery { mockRedisService.createMedicine(request) } returns createdMedicine.right()
-            
-            // Act
-            val result = runBlocking { mockRedisService.createMedicine(request) }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Right<Medicine>>()
-            val medicine = result.getOrNull()!!
-            medicine.name shouldBe "Aspirin"
-            medicine.dose shouldBe 500.0
-            
-            coVerify { mockRedisService.createMedicine(request) }
-        }
-        
-        test("updateMedicine should update existing medicine") {
-            // Arrange
-            val medicineId = UUID.randomUUID()
-            val updatedMedicine = Medicine(
-                id = medicineId,
-                name = "Aspirin",
-                dose = 500.0,
-                unit = "mg",
-                stock = 150.0
-            )
-            
-            coEvery { mockRedisService.updateMedicine(medicineId.toString(), updatedMedicine) } returns 
-                updatedMedicine.right()
-            
-            // Act
-            val result = runBlocking { mockRedisService.updateMedicine(medicineId.toString(), updatedMedicine) }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Right<Medicine>>()
-            result.getOrNull()!!.stock shouldBe 150.0
-            
-            coVerify { mockRedisService.updateMedicine(medicineId.toString(), updatedMedicine) }
-        }
-        
-        test("updateMedicine should return NotFound when medicine doesn't exist") {
-            // Arrange
-            val medicineId = UUID.randomUUID()
-            val medicine = Medicine(
-                id = medicineId,
-                name = "Aspirin",
-                dose = 500.0,
-                unit = "mg",
-                stock = 100.0
-            )
-            
-            coEvery { mockRedisService.updateMedicine(medicineId.toString(), medicine) } returns 
-                RedisError.NotFound("Medicine not found").left()
-            
-            // Act
-            val result = runBlocking { mockRedisService.updateMedicine(medicineId.toString(), medicine) }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Left<RedisError.NotFound>>()
-        }
-        
-        test("deleteMedicine should delete existing medicine") {
-            // Arrange
-            val medicineId = UUID.randomUUID()
-            coEvery { mockRedisService.deleteMedicine(medicineId.toString()) } returns Unit.right()
-            
-            // Act
-            val result = runBlocking { mockRedisService.deleteMedicine(medicineId.toString()) }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Right<Unit>>()
-            coVerify { mockRedisService.deleteMedicine(medicineId.toString()) }
-        }
-        
-        test("deleteMedicine should return NotFound when medicine doesn't exist") {
-            // Arrange
-            val medicineId = UUID.randomUUID()
-            coEvery { mockRedisService.deleteMedicine(medicineId.toString()) } returns 
-                RedisError.NotFound("Medicine not found").left()
-            
-            // Act
-            val result = runBlocking { mockRedisService.deleteMedicine(medicineId.toString()) }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Left<RedisError.NotFound>>()
-        }
-        
-        test("addStock should add stock to existing medicine") {
-            // Arrange
-            val medicineId = UUID.randomUUID()
-            val updatedMedicine = Medicine(
-                id = medicineId,
-                name = "Aspirin",
-                dose = 500.0,
-                unit = "mg",
-                stock = 150.0
-            )
-            
-            coEvery { mockRedisService.addStock(medicineId, 50.0) } returns updatedMedicine.right()
-            
-            // Act
-            val result = runBlocking { mockRedisService.addStock(medicineId, 50.0) }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Right<Medicine>>()
-            result.getOrNull()!!.stock shouldBe 150.0
-            
-            coVerify { mockRedisService.addStock(medicineId, 50.0) }
-        }
-        
-        test("addStock should return NotFound when medicine doesn't exist") {
-            // Arrange
-            val medicineId = UUID.randomUUID()
-            coEvery { mockRedisService.addStock(medicineId, 50.0) } returns 
-                RedisError.NotFound("Medicine not found").left()
-            
-            // Act
-            val result = runBlocking { mockRedisService.addStock(medicineId, 50.0) }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Left<RedisError.NotFound>>()
-        }
-        
-        test("createDosageHistory should create dosage history and reduce stock") {
-            // Arrange
-            val medicineId = UUID.randomUUID()
-            val dosageHistory = DosageHistory(
+            val medicine2 = Medicine(
                 id = UUID.randomUUID(),
-                datetime = java.time.LocalDateTime.now(),
-                medicineId = medicineId,
-                amount = 1.0,
-                scheduledTime = null
+                name = "Medicine2",
+                dose = 200.0,
+                unit = "mg",
+                stock = 20.0
             )
-            
-            coEvery { mockRedisService.createDosageHistory(medicineId, 1.0) } returns dosageHistory.right()
-            
-            // Act
-            val result = runBlocking { mockRedisService.createDosageHistory(medicineId, 1.0) }
-            
-            // Assert
-            result.shouldBeInstanceOf<Either.Right<DosageHistory>>()
-            val history = result.getOrNull()!!
-            history.medicineId shouldBe medicineId
-            history.amount shouldBe 1.0
-            
-            coVerify { mockRedisService.createDosageHistory(medicineId, 1.0) }
+            val key1 = "$environment:medicine:${medicine1.id}"
+            val key2 = "$environment:medicine:${medicine2.id}"
+            val json1 = json.encodeToString(medicine1)
+            val json2 = json.encodeToString(medicine2)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            val mockScanCursor1 = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor1.keys } returns listOf(key1)
+            every { mockScanCursor1.isFinished } returns false
+            every { mockScanCursor1.cursor } returns "1234567890"
+
+            val mockScanCursor2 = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor2.keys } returns listOf(key2)
+            every { mockScanCursor2.isFinished } returns true
+
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor1)
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanCursor>(), any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor2)
+
+            every { mockAsyncCommands.get(key1) } returns createRedisFutureMock(json1)
+            every { mockAsyncCommands.get(key2) } returns createRedisFutureMock(json2)
+
+            val result = redisService.getAllMedicines()
+
+            result.isRight() shouldBe true
+            val medicines = result.getOrNull()!!
+            medicines.size shouldBe 2
+            medicines.any { it.name == "Medicine1" } shouldBe true
+            medicines.any { it.name == "Medicine2" } shouldBe true
+
+            verify(exactly = 1) { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) }
+            verify(exactly = 1) { mockAsyncCommands.scan(any<io.lettuce.core.ScanCursor>(), any<io.lettuce.core.ScanArgs>()) }
+        }
+
+        test("should return empty list when no medicines exist") {
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns emptyList()
+            every { mockScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor)
+
+            val result = redisService.getAllMedicines()
+
+            result.isRight() shouldBe true
+            result.getOrNull()!!.size shouldBe 0
+        }
+
+        test("should skip invalid medicines during deserialization") {
+            val validMedicine = Medicine(
+                id = UUID.randomUUID(),
+                name = "Valid",
+                dose = 100.0,
+                unit = "mg",
+                stock = 10.0
+            )
+            val keyValid = "$environment:medicine:${validMedicine.id}"
+            val keyInvalid = "$environment:medicine:invalid-key"
+            val validJson = json.encodeToString(validMedicine)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns listOf(keyValid, keyInvalid)
+            every { mockScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor)
+
+            every { mockAsyncCommands.get(keyValid) } returns createRedisFutureMock(validJson)
+            every { mockAsyncCommands.get(keyInvalid) } returns createRedisFutureMock("""not valid json""")
+
+            val result = redisService.getAllMedicines()
+
+            result.isRight() shouldBe true
+            result.getOrNull()!!.size shouldBe 1
+            result.getOrNull()!![0].name shouldBe "Valid"
+        }
+
+        test("should return OperationError when scan fails") {
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createFailedRedisFutureMock(RuntimeException("Scan failed"))
+
+            val result = redisService.getAllMedicines()
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
+            result.leftOrNull()?.message?.contains("Failed to retrieve medicines") shouldBe true
         }
     }
 })
+
