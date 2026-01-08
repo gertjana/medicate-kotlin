@@ -42,11 +42,13 @@ class RedisService private constructor(
      * If connection is already set (for testing), returns it
      */
     fun connect(): Either<RedisError, RedisAsyncCommands<String, String>> = Either.catch {
-        if (connection != null) {
+        connection?.let { conn ->
             // Connection already provided (test mode)
-            connection!!.async()
-        } else {
+            conn.async()
+        } ?: run {
             // Connect to Redis (production mode)
+            requireNotNull(host) { "Host must be provided for production mode" }
+            requireNotNull(port) { "Port must be provided for production mode" }
             val redisClient = RedisClient.create("redis://$host:$port")
             val conn = redisClient.connect()
             client = redisClient
