@@ -36,7 +36,7 @@ class DailyRoutesTest : FunSpec({
             val medicineId2 = UUID.randomUUID()
             val medicine1 = Medicine(medicineId1, "Aspirin", 500.0, "mg", 100.0)
             val medicine2 = Medicine(medicineId2, "Ibuprofen", 400.0, "mg", 75.0)
-            
+
             val dailySchedule = DailySchedule(
                 schedule = listOf(
                     TimeSlot(
@@ -54,7 +54,7 @@ class DailyRoutesTest : FunSpec({
                     )
                 )
             )
-            
+
             coEvery { mockRedisService.getDailySchedule() } returns dailySchedule.right()
 
             testApplication {
@@ -63,10 +63,10 @@ class DailyRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { dailyRoutes(mockRedisService) }
-                
+
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/daily")
-                
+
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<DailySchedule>()
                 body.schedule.size shouldBe 2
@@ -79,7 +79,7 @@ class DailyRoutesTest : FunSpec({
         }
 
         test("should return 500 on error") {
-            coEvery { mockRedisService.getDailySchedule() } returns 
+            coEvery { mockRedisService.getDailySchedule() } returns
                 RedisError.OperationError("Failed to retrieve schedule").left()
 
             testApplication {
@@ -88,9 +88,9 @@ class DailyRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { dailyRoutes(mockRedisService) }
-                
+
                 val response = client.get("/daily")
-                
+
                 response.status shouldBe HttpStatusCode.InternalServerError
             }
         }

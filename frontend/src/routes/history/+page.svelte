@@ -53,7 +53,7 @@
 	function groupHistories() {
 		// Day of week mapping
 		const dayOfWeekCodes = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-		
+
 		// Get unique scheduled times
 		const scheduledTimes = Array.from(new Set(schedules.map(s => s.time))).sort((a, b) => b.localeCompare(a));
 
@@ -118,7 +118,7 @@
 			const [hours, minutes] = time.split(':').map(Number);
 			const doseDatetime = new Date(dateObj);
 			doseDatetime.setHours(hours, minutes, 0, 0);
-			
+
 			// Format as ISO local datetime (without timezone): "2026-01-05T08:00:00"
 			const year = doseDatetime.getFullYear();
 			const month = String(doseDatetime.getMonth() + 1).padStart(2, '0');
@@ -198,7 +198,7 @@
 										{timeSlot.time}
 									</td>
 									<td class="py-2 px-4">
-										<button 
+										<button
 											on:click={() => takeAllMissing(dateGroup.dateObj, timeSlot.time, timeSlot.scheduledMedicines || [])}
 											class="btn btn-primary"
 										>

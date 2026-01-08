@@ -111,7 +111,7 @@ class DosageHistoryRoutesTest : FunSpec({
         test("should handle multiple medicines") {
             val medicineId1 = UUID.randomUUID()
             val medicineId2 = UUID.randomUUID()
-            
+
             val histories = listOf(
                 DosageHistory(
                     id = UUID.randomUUID(),

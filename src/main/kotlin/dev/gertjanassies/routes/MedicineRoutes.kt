@@ -50,7 +50,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
     // Create new medicine
     post("/medicine") {
         val request = call.receive<MedicineRequest>()
-        
+
         either {
             val created = redisService.createMedicine(request).bind()
             call.respond(HttpStatusCode.Created, created)
@@ -67,7 +67,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
         }
 
         val medicine = call.receive<Medicine>()
-        
+
         either {
             val updated = redisService.updateMedicine(id, medicine).bind()
             call.respond(HttpStatusCode.OK, updated)
@@ -104,7 +104,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
     // Record a dose taken
     post("/takedose") {
         val request = call.receive<DosageHistoryRequest>()
-        
+
         either {
             val dosageHistory = redisService.createDosageHistory(request.medicineId, request.amount, request.scheduledTime, request.datetime).bind()
             call.respond(HttpStatusCode.Created, dosageHistory)
@@ -121,7 +121,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
     // Add stock to medicine
     post("/addstock") {
         val request = call.receive<AddStockRequest>()
-        
+
         either {
             val updatedMedicine = redisService.addStock(request.medicineId, request.amount).bind()
             call.respond(HttpStatusCode.OK, updatedMedicine)

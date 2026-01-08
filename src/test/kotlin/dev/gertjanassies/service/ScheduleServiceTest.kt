@@ -710,4 +710,3 @@ class ScheduleServiceTest : FunSpec({
         }
     }
 })
-

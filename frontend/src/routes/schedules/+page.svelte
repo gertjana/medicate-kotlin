@@ -194,7 +194,7 @@
 
 	function groupSchedules() {
 		const groups: { [key: string]: Schedule[] } = {};
-		
+
 		schedules.forEach(schedule => {
 			const daysKey = schedule.daysOfWeek || '';
 			const key = `${schedule.time}|${daysKey}`;

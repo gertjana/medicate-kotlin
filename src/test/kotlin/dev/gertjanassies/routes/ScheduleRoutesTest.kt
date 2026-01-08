@@ -47,9 +47,9 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { scheduleRoutes(mockRedisService) }
-                
+
                 val response = client.get("/schedule")
-                
+
                 response.status shouldBe HttpStatusCode.OK
                 coVerify { mockRedisService.getAllSchedules() }
             }
@@ -64,9 +64,9 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { scheduleRoutes(mockRedisService) }
-                
+
                 val response = client.get("/schedule")
-                
+
                 response.status shouldBe HttpStatusCode.InternalServerError
             }
         }
@@ -85,10 +85,10 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { scheduleRoutes(mockRedisService) }
-                
+
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/schedule/$scheduleId")
-                
+
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Schedule>()
                 body.id shouldBe scheduleId
@@ -98,7 +98,7 @@ class ScheduleRoutesTest : FunSpec({
 
         test("should return 404 when schedule not found") {
             val scheduleId = UUID.randomUUID()
-            coEvery { mockRedisService.getSchedule(scheduleId.toString()) } returns 
+            coEvery { mockRedisService.getSchedule(scheduleId.toString()) } returns
                 RedisError.NotFound("Schedule not found").left()
 
             testApplication {
@@ -107,9 +107,9 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { scheduleRoutes(mockRedisService) }
-                
+
                 val response = client.get("/schedule/$scheduleId")
-                
+
                 response.status shouldBe HttpStatusCode.NotFound
             }
         }
@@ -128,13 +128,13 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { scheduleRoutes(mockRedisService) }
-                
+
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/schedule") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
-                
+
                 response.status shouldBe HttpStatusCode.Created
                 val body = response.body<Schedule>()
                 body.time shouldBe "12:00"
@@ -144,7 +144,7 @@ class ScheduleRoutesTest : FunSpec({
 
         test("should return 500 on create error") {
             val request = ScheduleRequest(UUID.randomUUID(), "12:00", 1.5)
-            coEvery { mockRedisService.createSchedule(any()) } returns 
+            coEvery { mockRedisService.createSchedule(any()) } returns
                 RedisError.OperationError("Failed to create").left()
 
             testApplication {
@@ -153,13 +153,13 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { scheduleRoutes(mockRedisService) }
-                
+
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/schedule") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
-                
+
                 response.status shouldBe HttpStatusCode.InternalServerError
             }
         }
@@ -177,13 +177,13 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { scheduleRoutes(mockRedisService) }
-                
+
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.put("/schedule/$scheduleId") {
                     contentType(ContentType.Application.Json)
                     setBody(schedule)
                 }
-                
+
                 response.status shouldBe HttpStatusCode.OK
                 coVerify { mockRedisService.updateSchedule(scheduleId.toString(), any()) }
             }
@@ -192,7 +192,7 @@ class ScheduleRoutesTest : FunSpec({
         test("should return 404 when schedule not found") {
             val scheduleId = UUID.randomUUID()
             val schedule = Schedule(scheduleId, UUID.randomUUID(), "14:00", 2.0)
-            coEvery { mockRedisService.updateSchedule(scheduleId.toString(), any()) } returns 
+            coEvery { mockRedisService.updateSchedule(scheduleId.toString(), any()) } returns
                 RedisError.NotFound("Schedule not found").left()
 
             testApplication {
@@ -201,13 +201,13 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { scheduleRoutes(mockRedisService) }
-                
+
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.put("/schedule/$scheduleId") {
                     contentType(ContentType.Application.Json)
                     setBody(schedule)
                 }
-                
+
                 response.status shouldBe HttpStatusCode.NotFound
             }
         }
@@ -224,9 +224,9 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { scheduleRoutes(mockRedisService) }
-                
+
                 val response = client.delete("/schedule/$scheduleId")
-                
+
                 response.status shouldBe HttpStatusCode.NoContent
                 coVerify { mockRedisService.deleteSchedule(scheduleId.toString()) }
             }
@@ -234,7 +234,7 @@ class ScheduleRoutesTest : FunSpec({
 
         test("should return 404 when schedule not found") {
             val scheduleId = UUID.randomUUID()
-            coEvery { mockRedisService.deleteSchedule(scheduleId.toString()) } returns 
+            coEvery { mockRedisService.deleteSchedule(scheduleId.toString()) } returns
                 RedisError.NotFound("Schedule not found").left()
 
             testApplication {
@@ -243,9 +243,9 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 install(ContentNegotiation) { json() }
                 routing { scheduleRoutes(mockRedisService) }
-                
+
                 val response = client.delete("/schedule/$scheduleId")
-                
+
                 response.status shouldBe HttpStatusCode.NotFound
             }
         }

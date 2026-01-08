@@ -1,23 +1,23 @@
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
-    hooks:
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-yaml
-      - id: check-case-conflict
-      - id: check-merge-conflict
-      - id: detect-private-key
-      - id: mixed-line-ending
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+  - id: trailing-whitespace
+  - id: end-of-file-fixer
+  - id: check-yaml
+  - id: check-case-conflict
+  - id: check-merge-conflict
+  - id: detect-private-key
+  - id: mixed-line-ending
 
-  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
-    rev: v2.14.0
-    hooks:
-      - id: pretty-format-yaml
-        args: [--autofix, --indent, '2']
+- repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+  rev: v2.14.0
+  hooks:
+  - id: pretty-format-yaml
+    args: [--autofix, --indent, '2']
 
-  - repo: https://github.com/pinterest/ktlint
-    rev: 1.5.0
-    hooks:
-      - id: ktlint
-        args: [--format]
+#  - repo: https://github.com/pinterest/ktlint
+#    rev: 1.5.0
+#    hooks:
+#      - id: ktlint
+#        args: [--format]

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/stores';
-	
+
 	// SvelteKit props - using const since they're not used internally
 	export const data = {};
 	export const params = {};

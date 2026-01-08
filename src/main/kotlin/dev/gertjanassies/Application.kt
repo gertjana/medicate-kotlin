@@ -28,7 +28,7 @@ fun main() {
 fun Application.module() {
     val serveStatic = environment.config.propertyOrNull("app.serveStatic")?.getString()?.toBoolean()
         ?: System.getenv("SERVE_STATIC")?.toBoolean() ?: false
-    
+
     // Configure CORS - only needed in development when frontend is served separately
     if (!serveStatic) {
         install(CORS) {
@@ -45,7 +45,7 @@ fun Application.module() {
             allowHost("127.0.0.1:3000")
         }
     }
-    
+
     // Configure compression for static files
     install(Compression) {
         gzip {
@@ -56,7 +56,7 @@ fun Application.module() {
             minimumSize(1024)
         }
     }
-    
+
     // Configure content negotiation
     install(ContentNegotiation) {
         json()
@@ -69,15 +69,15 @@ fun Application.module() {
         ?: System.getenv("REDIS_PORT")?.toIntOrNull() ?: 6379
     val appEnvironment = environment.config.propertyOrNull("app.environment")?.getString()
         ?: System.getenv("APP_ENV") ?: "test"
-    
+
     val redisService = RedisService(redisHost, redisPort, appEnvironment)
-    
+
     // Attempt to connect to Redis (using functional error handling)
     redisService.connect().fold(
-        ifLeft = { error -> 
+        ifLeft = { error ->
             this@module.log.warn("Failed to connect to Redis: $error. Continuing without Redis.")
         },
-        ifRight = { 
+        ifRight = {
             this@module.log.info("Successfully connected to Redis at $redisHost:$redisPort")
         }
     )
@@ -92,14 +92,14 @@ fun Application.module() {
             dailyRoutes(redisService)
             dosageHistoryRoutes(redisService)
         }
-        
+
         // Serve static files if enabled
         if (serveStatic) {
             val staticDir = File("static")
             if (staticDir.exists()) {
                 // Serve static assets (JS, CSS, images, etc.)
                 staticFiles("/", staticDir)
-                
+
                 // SPA fallback: serve index.html for any non-API routes that don't match static files
                 // This allows client-side routing to work correctly
                 get("{...}") {

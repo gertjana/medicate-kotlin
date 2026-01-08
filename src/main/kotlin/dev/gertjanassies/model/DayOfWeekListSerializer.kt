@@ -14,12 +14,12 @@ import kotlinx.serialization.encoding.Encoder
 object DayOfWeekListSerializer : KSerializer<List<DayOfWeek>> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("DayOfWeekList", PrimitiveKind.STRING)
-    
+
     override fun serialize(encoder: Encoder, value: List<DayOfWeek>) {
         val str = value.joinToString(",") { it.code }
         encoder.encodeString(str)
     }
-    
+
     override fun deserialize(decoder: Decoder): List<DayOfWeek> {
         val str = decoder.decodeString()
         if (str.isBlank()) return emptyList()

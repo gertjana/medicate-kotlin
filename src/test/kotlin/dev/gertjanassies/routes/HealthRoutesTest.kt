@@ -13,9 +13,9 @@ class HealthRoutesTest : FunSpec({
         test("should return 200 OK") {
             testApplication {
                 routing { healthRoutes() }
-                
+
                 val response = client.get("/health")
-                
+
                 response.status shouldBe HttpStatusCode.OK
                 response.bodyAsText() shouldBe ""
             }

@@ -16,7 +16,7 @@ enum class DayOfWeek(val code: String) {
         fun fromCode(code: String): DayOfWeek? {
             return values().find { it.code == code.uppercase() }
         }
-        
+
         fun fromJavaDay(day: java.time.DayOfWeek): DayOfWeek {
             return when (day) {
                 java.time.DayOfWeek.MONDAY -> MONDAY

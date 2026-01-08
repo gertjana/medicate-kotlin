@@ -47,7 +47,7 @@ fun Route.scheduleRoutes(redisService: RedisService) {
     // Create new schedule
     post("/schedule") {
         val request = call.receive<ScheduleRequest>()
-        
+
         either {
             val created = redisService.createSchedule(request).bind()
             call.respond(HttpStatusCode.Created, created)
@@ -64,7 +64,7 @@ fun Route.scheduleRoutes(redisService: RedisService) {
         }
 
         val schedule = call.receive<Schedule>()
-        
+
         either {
             val updated = redisService.updateSchedule(id, schedule).bind()
             call.respond(HttpStatusCode.OK, updated)

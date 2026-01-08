@@ -42,13 +42,13 @@
 	function isTakenToday(medicineId: string, scheduledTime: string): boolean {
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
-		
+
 		return dosageHistories.some(history => {
 			const historyDate = new Date(history.datetime);
 			const historyDateOnly = new Date(historyDate);
 			historyDateOnly.setHours(0, 0, 0, 0);
-			
-			return history.medicineId === medicineId && 
+
+			return history.medicineId === medicineId &&
 				historyDateOnly.getTime() === today.getTime() &&
 				history.scheduledTime === scheduledTime;
 		});
@@ -69,8 +69,8 @@
 	}
 
 	async function takeAllForTimeSlot(timeSlot: TimeSlot) {
-		const medicinesToTake = timeSlot.medicines.filter(item => 
-			!isTakenToday(item.medicine.id, timeSlot.time) && 
+		const medicinesToTake = timeSlot.medicines.filter(item =>
+			!isTakenToday(item.medicine.id, timeSlot.time) &&
 			item.medicine.stock >= item.amount
 		);
 
@@ -141,7 +141,7 @@
 								✓ All Taken
 							</button>
 						{:else}
-							<button 
+							<button
 								on:click={() => takeAllForTimeSlot(timeSlot)}
 								class="btn btn-primary"
 							>

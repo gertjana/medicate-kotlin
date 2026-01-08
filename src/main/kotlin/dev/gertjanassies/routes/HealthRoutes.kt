@@ -19,7 +19,7 @@ fun Route.healthRoutes() {
     }
 }
 
-private suspend fun performHealthCheck(): Either<String, Unit> {    
+private suspend fun performHealthCheck(): Either<String, Unit> {
     // Optionally check for more things (but not external services, never external services)
     return Unit.right()
 }

@@ -16,7 +16,7 @@ class ApplicationTest {
                 put("app.serveStatic", "false")
             }
         }
-        
+
         application {
             module()
         }
@@ -37,7 +37,7 @@ class ApplicationTest {
                 put("app.serveStatic", "true")
             }
         }
-        
+
         application {
             module()
         }
@@ -55,7 +55,7 @@ class ApplicationTest {
                 put("app.serveStatic", "false")
             }
         }
-        
+
         application {
             module()
         }
@@ -76,7 +76,7 @@ class ApplicationTest {
                 put("app.serveStatic", "false")
             }
         }
-        
+
         application {
             module()
         }
@@ -93,7 +93,7 @@ class ApplicationTest {
                 put("app.serveStatic", "false")
             }
         }
-        
+
         application {
             module()
         }
@@ -122,7 +122,7 @@ class ApplicationTest {
                 put("app.serveStatic", "false")
             }
         }
-        
+
         application {
             module()
         }
