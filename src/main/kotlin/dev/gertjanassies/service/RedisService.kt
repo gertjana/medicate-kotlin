@@ -22,7 +22,8 @@ class RedisService private constructor(
     private val host: String?,
     private val port: Int?,
     private val environment: String,
-    private var connection: StatefulRedisConnection<String, String>?
+    private var connection: StatefulRedisConnection<String, String>?,
+    private val isConnectionOwner: Boolean
 ) {
     private var client: RedisClient? = null
     private val json = Json { ignoreUnknownKeys = true }
@@ -30,12 +31,12 @@ class RedisService private constructor(
     /**
      * Primary constructor for production use
      */
-    constructor(host: String, port: Int, environment: String = "test") : this(host, port, environment, null)
+    constructor(host: String, port: Int, environment: String = "test") : this(host, port, environment, null, true)
     
     /**
      * Constructor for testing that accepts a connection
      */
-    constructor(environment: String, connection: StatefulRedisConnection<String, String>) : this(null, null, environment, connection)
+    constructor(environment: String, connection: StatefulRedisConnection<String, String>) : this(null, null, environment, connection, false)
 
     /**
      * Connect to Redis using Either for error handling
@@ -541,10 +542,13 @@ class RedisService private constructor(
 
     /**
      * Close the connection
+     * Only closes the connection if it was created by this service (not injected for testing)
      */
     fun close() {
-        connection?.close()
-        client?.shutdown()
+        if (isConnectionOwner) {
+            connection?.close()
+            client?.shutdown()
+        }
     }
 }
 
