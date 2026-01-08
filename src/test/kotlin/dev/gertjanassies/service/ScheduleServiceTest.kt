@@ -1,17 +1,17 @@
 package dev.gertjanassies.service
 
 import dev.gertjanassies.model.*
+import dev.gertjanassies.util.createFailedRedisFutureMock
+import dev.gertjanassies.util.createRedisFutureMock
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import io.lettuce.core.RedisFuture
 import io.lettuce.core.api.StatefulRedisConnection
 import io.lettuce.core.api.async.RedisAsyncCommands
 import io.mockk.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.*
-import java.util.concurrent.CompletableFuture
 
 /**
  * Test suite for Schedule-related operations in RedisService.
@@ -44,41 +44,6 @@ class ScheduleServiceTest : FunSpec({
 
     afterEach {
         clearAllMocks()
-    }
-
-    // ...existing helper code...
-    class TestRedisFuture<T>(completableFuture: CompletableFuture<T>) :
-        CompletableFuture<T>(), RedisFuture<T> {
-        init {
-            completableFuture.whenComplete { result, exception ->
-                if (exception != null) {
-                    completeExceptionally(exception)
-                } else {
-                    complete(result)
-                }
-            }
-        }
-
-        override fun getError(): String? = null
-
-        override fun await(timeout: Long, unit: java.util.concurrent.TimeUnit): Boolean {
-            return try {
-                get(timeout, unit)
-                true
-            } catch (_: Exception) {
-                false
-            }
-        }
-    }
-
-    fun <T> createRedisFutureMock(value: T): RedisFuture<T> {
-        return TestRedisFuture(CompletableFuture.completedFuture(value))
-    }
-
-    fun <T> createFailedRedisFutureMock(exception: Exception): RedisFuture<T> {
-        val future = CompletableFuture<T>()
-        future.completeExceptionally(exception)
-        return TestRedisFuture(future)
     }
 
     context("getSchedule") {
