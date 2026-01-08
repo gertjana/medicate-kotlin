@@ -18,20 +18,41 @@ import java.util.*
 /**
  * Redis service using functional programming patterns with Arrow and async coroutines
  */
-class RedisService(private val host: String, private val port: Int, private val environment: String = "test") {
+class RedisService private constructor(
+    private val host: String?,
+    private val port: Int?,
+    private val environment: String,
+    private var connection: StatefulRedisConnection<String, String>?
+) {
     private var client: RedisClient? = null
-    private var connection: StatefulRedisConnection<String, String>? = null
     private val json = Json { ignoreUnknownKeys = true }
+    
+    /**
+     * Primary constructor for production use
+     */
+    constructor(host: String, port: Int, environment: String = "test") : this(host, port, environment, null)
+    
+    /**
+     * Constructor for testing that accepts a connection
+     */
+    constructor(environment: String, connection: StatefulRedisConnection<String, String>) : this(null, null, environment, connection)
 
     /**
      * Connect to Redis using Either for error handling
+     * If connection is already set (for testing), returns it
      */
     fun connect(): Either<RedisError, RedisAsyncCommands<String, String>> = Either.catch {
-        val redisClient = RedisClient.create("redis://$host:$port")
-        val conn = redisClient.connect()
-        client = redisClient
-        connection = conn
-        conn.async()
+        if (connection != null) {
+            // Connection already provided (test mode)
+            connection!!.async()
+        } else {
+            // Connect to Redis (production mode)
+            val redisClient = RedisClient.create("redis://$host:$port")
+            val conn = redisClient.connect()
+            client = redisClient
+            connection = conn
+            conn.async()
+        }
     }.mapLeft { RedisError.ConnectionError(it.message ?: "Unknown error") }
 
     /**
