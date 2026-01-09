@@ -38,7 +38,8 @@
 		name: '',
 		dose: '',
 		unit: '',
-		stock: ''
+		stock: '',
+		description: ''
 	};
 
 	function scrollToForm() {
@@ -63,7 +64,7 @@
 
 	function startCreate() {
 		editingId = null;
-		formData = { name: '', dose: '', unit: '', stock: '' };
+		formData = { name: '', dose: '', unit: '', stock: '', description: '' };
 		showForm = true;
 		setTimeout(scrollToForm, 50);
 	}
@@ -74,7 +75,8 @@
 			name: medicine.name,
 			dose: medicine.dose.toString(),
 			unit: medicine.unit,
-			stock: medicine.stock.toString()
+			stock: medicine.stock.toString(),
+			description: medicine.description || ''
 		};
 		showForm = true;
 		setTimeout(scrollToForm, 50);
@@ -83,7 +85,7 @@
 	function cancelForm() {
 		showForm = false;
 		editingId = null;
-		formData = { name: '', dose: '', unit: '', stock: '' };
+		formData = { name: '', dose: '', unit: '', stock: '', description: '' };
 	}
 
 	async function handleSubmit() {
@@ -93,7 +95,8 @@
 				name: formData.name,
 				dose: parseFloat(formData.dose),
 				unit: formData.unit,
-				stock: parseFloat(formData.stock)
+				stock: parseFloat(formData.stock),
+				description: formData.description || undefined
 			};
 
 			if (editingId) {
@@ -199,6 +202,16 @@
 						required
 					/>
 				</div>
+				<div>
+					<label for="medicine-description" class="block mb-1 font-semibold">Description (Optional)</label>
+					<textarea
+						id="medicine-description"
+						bind:value={formData.description}
+						class="input w-full"
+						rows="3"
+						placeholder="Enter medicine description..."
+					/>
+				</div>
 				<div class="flex gap-2">
 					<button type="submit" class="btn btn-primary">Save</button>
 					<button type="button" on:click={cancelForm} class="btn">Cancel</button>
@@ -225,6 +238,11 @@
 						<p class="text-gray-600">
 							{medicine.dose}{medicine.unit} per dose
 						</p>
+						{#if medicine.description}
+							<p class="text-sm text-gray-600 mt-2 italic">
+								{medicine.description}
+							</p>
+						{/if}
 						<p class="mt-2">
 							<span class="font-semibold">Stock:</span>
 							<span class={medicine.stock <= 10 ? 'text-red-600 font-semibold' : ''}>
