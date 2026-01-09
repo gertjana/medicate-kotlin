@@ -541,6 +541,63 @@ class RedisService private constructor(
     }
 
     /**
+     * Get weekly adherence (last 7 days)
+     */
+    suspend fun getWeeklyAdherence(): Either<RedisError, WeeklyAdherence> {
+        return either {
+            val allSchedules = getAllSchedules().bind()
+            val dosageHistories = getAllDosageHistories().bind()
+
+            val days = (6 downTo 0).map { daysAgo ->
+                val date = java.time.LocalDate.now().minusDays(daysAgo.toLong())
+                val dayOfWeek = DayOfWeek.fromJavaDay(date.dayOfWeek)
+
+                // Calculate expected medications for this day
+                val expectedSchedules = allSchedules.filter { schedule ->
+                    schedule.daysOfWeek.isEmpty() || schedule.daysOfWeek.contains(dayOfWeek)
+                }
+                val expectedCount = expectedSchedules.size
+
+                // Count how many were actually taken
+                val takenCount = dosageHistories.count { history ->
+                    val historyDate = history.datetime.toLocalDate()
+                    historyDate.isEqual(date)
+                }
+
+                // Determine status
+                val status = when {
+                    expectedCount == 0 -> AdherenceStatus.NONE
+                    takenCount == 0 -> AdherenceStatus.NONE
+                    takenCount >= expectedCount -> AdherenceStatus.COMPLETE
+                    else -> AdherenceStatus.PARTIAL
+                }
+
+                DayAdherence(
+                    date = date.toString(), // Convert to ISO string format
+                    dayOfWeek = dayOfWeek.name,
+                    dayNumber = date.dayOfMonth,
+                    month = date.monthValue,
+                    status = status,
+                    expectedCount = expectedCount,
+                    takenCount = takenCount
+                )
+            }
+
+            WeeklyAdherence(days)
+        }
+    }
+
+    /**
+     * Get medicines with low stock (< threshold)
+     */
+    suspend fun getLowStockMedicines(threshold: Double = 10.0): Either<RedisError, List<Medicine>> {
+        return either {
+            val allMedicines = getAllMedicines().bind()
+            allMedicines.filter { it.stock < threshold }
+        }
+    }
+
+    /**
      * Close the connection
      * Only closes the connection if it was created by this service (not injected for testing)
      */

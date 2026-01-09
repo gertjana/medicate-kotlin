@@ -51,8 +51,9 @@
 	}
 
 	function groupHistories() {
-		// Day of week mapping
-		const dayOfWeekCodes = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+		// Day of week mapping - JavaScript getDay() returns 0=Sunday, 1=Monday, etc.
+		// Map to two-letter codes that match backend DayOfWeek enum
+		const dayCodeMap = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
 		// Get unique scheduled times
 		const scheduledTimes = Array.from(new Set(schedules.map(s => s.time))).sort((a, b) => b.localeCompare(a));
@@ -68,7 +69,7 @@
 
 		groupedHistories = last7Days.map(dateObj => {
 			const dateKey = dateObj.toLocaleDateString();
-			const dayOfWeek = dayOfWeekCodes[dateObj.getDay()];
+			const dayCode = dayCodeMap[dateObj.getDay()]; // Get two-letter code like "MO"
 
 			// For each scheduled time, check if doses were taken
 			const timeSlots = scheduledTimes.map(time => {
@@ -84,13 +85,12 @@
 					.filter(s => {
 						// Include schedule if:
 						// 1. Time matches
-						// 2. No daysOfWeek specified (applies to all days), OR
-						// 3. daysOfWeek is empty string (applies to all days), OR
-						// 4. daysOfWeek contains this day of week
+						// 2. daysOfWeek is not set or empty string (applies to all days), OR
+						// 3. daysOfWeek contains this day code
 						if (s.time !== time) return false;
 						if (!s.daysOfWeek || s.daysOfWeek.trim() === '') return true;
 						const scheduleDays = s.daysOfWeek.split(',').map(d => d.trim());
-						return scheduleDays.includes(dayOfWeek);
+						return scheduleDays.includes(dayCode);
 					})
 					.map(s => ({ medicineId: s.medicineId, amount: s.amount }));
 
@@ -174,67 +174,52 @@
 			<p class="text-gray-600">Loading history...</p>
 		</div>
 	{:else if groupedHistories.length > 0}
-		<div class="card overflow-x-auto">
-			<table class="w-full">
-				<thead>
-					<tr class="border-b border-gray-200">
-						<th class="text-left py-2 px-4 font-semibold text-sm">Date</th>
-						<th class="text-left py-2 px-4 font-semibold text-sm">Time</th>
-						<th class="text-left py-2 px-4 font-semibold text-sm">Medicine</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each groupedHistories as dateGroup, dateIndex}
-						{@const totalDateRows = dateGroup.timeSlots.reduce((sum, ts) => sum + (ts.isMissing ? 1 : ts.histories.length), 0)}
-						{#each dateGroup.timeSlots as timeSlot, timeIndex}
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+			{#each groupedHistories as dateGroup}
+				<div class="card">
+					<div class="mb-4 pb-3 border-b border-gray-200">
+						<h3 class="text-xl font-bold">{dateGroup.date}</h3>
+					</div>
+					<div class="space-y-4">
+						{#each dateGroup.timeSlots as timeSlot}
 							{#if timeSlot.isMissing}
-								<tr class="border-b border-gray-100 bg-yellow-50">
-									{#if timeIndex === 0}
-										<td class="py-2 px-4 align-top text-sm border-r border-gray-200" rowspan={totalDateRows}>
-											{dateGroup.date}
-										</td>
-									{/if}
-									<td class="py-2 px-4 text-sm text-gray-700 border-r border-gray-200">
-										{timeSlot.time}
-									</td>
-									<td class="py-2 px-4">
-										<button
-											on:click={() => takeAllMissing(dateGroup.dateObj, timeSlot.time, timeSlot.scheduledMedicines || [])}
-											class="btn btn-primary"
-										>
-											Take All (Missing)
-										</button>
-									</td>
-								</tr>
-							{:else}
-								{#each timeSlot.histories as history, historyIndex}
-									{@const medicine = medicines.find(m => m.id === history.medicineId)}
-									<tr class="border-b border-gray-100 hover:bg-gray-50">
-										{#if timeIndex === 0 && historyIndex === 0}
-											<td class="py-2 px-4 align-top text-sm border-r border-gray-200" rowspan={totalDateRows}>
-												{dateGroup.date}
-											</td>
-										{/if}
-										{#if historyIndex === 0}
-											<td class="py-2 px-4 align-top text-sm text-gray-700 border-r border-gray-200" rowspan={timeSlot.histories.length}>
-												{timeSlot.time}
-											</td>
-										{/if}
-										<td class="py-2 px-4">
-											<span class="text-sm">
-												{history.amount}x {getMedicineName(history.medicineId)}
+								<div class="bg-yellow-50 border border-yellow-200 rounded p-3">
+									<div class="flex justify-between items-center mb-2">
+										<span class="font-semibold text-gray-700">{timeSlot.time}</span>
+										<span class="text-xs text-yellow-700 bg-yellow-100 px-2 py-1 rounded">Missed</span>
+									</div>
+									<div class="text-sm text-yellow-800 mb-2">
+										{#each timeSlot.scheduledMedicines || [] as med}
+											<div>{med.amount}x {getMedicineName(med.medicineId)}</div>
+										{/each}
+									</div>
+									<button
+										on:click={() => takeAllMissing(dateGroup.dateObj, timeSlot.time, timeSlot.scheduledMedicines || [])}
+										class="btn btn-primary w-full text-sm"
+									>
+										Take All
+									</button>
+								</div>
+							{:else if timeSlot.histories.length > 0}
+								<div class="bg-gray-50 rounded p-3">
+									<div class="font-semibold text-gray-700 mb-2">{timeSlot.time}</div>
+									<div class="space-y-2">
+										{#each timeSlot.histories as history}
+											{@const medicine = medicines.find(m => m.id === history.medicineId)}
+											<div class="text-sm">
+												<span class="font-medium">{history.amount}x {getMedicineName(history.medicineId)}</span>
 												{#if medicine}
 													<span class="text-gray-600">({medicine.dose}{medicine.unit})</span>
 												{/if}
-											</span>
-										</td>
-									</tr>
-								{/each}
+											</div>
+										{/each}
+									</div>
+								</div>
 							{/if}
 						{/each}
-					{/each}
-				</tbody>
-			</table>
+					</div>
+				</div>
+			{/each}
 		</div>
 	{:else}
 		<div class="card text-center py-12">

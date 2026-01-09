@@ -315,12 +315,12 @@
 				<p class="text-gray-600">Loading schedules...</p>
 			</div>
 		{:else if schedules.length > 0}
-			<div class="grid gap-6">
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 				{#each groupSchedules() as group}
 					<div class="card">
 						<div class="mb-4 pb-3 border-b border-gray-200">
-							<h3 class="text-2xl font-bold">{group.time}</h3>
-							<p class="text-gray-600">{formatDaysOfWeek(group.daysOfWeek)}</p>
+							<h3 class="text-xl font-bold">{group.time}</h3>
+							<p class="text-sm text-gray-600">{formatDaysOfWeek(group.daysOfWeek)}</p>
 						</div>
 						<div class="space-y-3">
 							{#each group.schedules as schedule}

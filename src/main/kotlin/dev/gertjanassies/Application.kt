@@ -1,5 +1,6 @@
 package dev.gertjanassies
 
+import dev.gertjanassies.routes.adherenceRoutes
 import dev.gertjanassies.routes.dailyRoutes
 import dev.gertjanassies.routes.dosageHistoryRoutes
 import dev.gertjanassies.routes.healthRoutes
@@ -91,6 +92,7 @@ fun Application.module() {
             scheduleRoutes(redisService)
             dailyRoutes(redisService)
             dosageHistoryRoutes(redisService)
+            adherenceRoutes(redisService)
         }
 
         // Serve static files if enabled
