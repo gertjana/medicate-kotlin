@@ -542,7 +542,14 @@ class RedisService private constructor(
 
     /**
      * Get dosage histories within a date range (inclusive)
-     * This is more efficient than getAllDosageHistories when you only need a subset
+     * 
+     * Note: Due to Redis key-value structure, this method still scans all dosage history keys
+     * and retrieves all values, but filters them immediately after deserialization to only
+     * return entries within the specified date range. This reduces memory usage for the caller
+     * compared to getAllDosageHistories, though it doesn't reduce Redis I/O.
+     * 
+     * For true query-time filtering, consider migrating to Redis Sorted Sets with timestamps
+     * as scores or a time-series data structure.
      */
     suspend fun getDosageHistoriesInDateRange(
         startDate: java.time.LocalDate,
