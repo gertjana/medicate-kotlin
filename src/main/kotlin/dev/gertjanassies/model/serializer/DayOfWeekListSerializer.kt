@@ -1,5 +1,6 @@
-package dev.gertjanassies.model
+package dev.gertjanassies.model.serializer
 
+import dev.gertjanassies.model.DayOfWeek
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor

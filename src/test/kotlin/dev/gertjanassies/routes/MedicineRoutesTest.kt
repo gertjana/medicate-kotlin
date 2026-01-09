@@ -2,11 +2,11 @@ package dev.gertjanassies.routes
 
 import arrow.core.left
 import arrow.core.right
-import dev.gertjanassies.model.AddStockRequest
 import dev.gertjanassies.model.DosageHistory
-import dev.gertjanassies.model.DosageHistoryRequest
 import dev.gertjanassies.model.Medicine
-import dev.gertjanassies.model.MedicineRequest
+import dev.gertjanassies.model.request.AddStockRequest
+import dev.gertjanassies.model.request.DosageHistoryRequest
+import dev.gertjanassies.model.request.MedicineRequest
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
 import io.kotest.core.spec.style.FunSpec

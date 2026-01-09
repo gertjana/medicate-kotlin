@@ -5,6 +5,7 @@ import arrow.core.left
 import arrow.core.right
 import arrow.core.raise.either
 import dev.gertjanassies.model.*
+import dev.gertjanassies.model.request.*
 import io.lettuce.core.RedisClient
 import io.lettuce.core.ScanArgs
 import io.lettuce.core.api.StatefulRedisConnection
@@ -542,12 +543,12 @@ class RedisService private constructor(
 
     /**
      * Get dosage histories within a date range (inclusive)
-     * 
+     *
      * Note: Due to Redis key-value structure, this method still scans all dosage history keys
      * and retrieves all values, but filters them immediately after deserialization to only
      * return entries within the specified date range. This reduces memory usage for the caller
      * compared to getAllDosageHistories, though it doesn't reduce Redis I/O.
-     * 
+     *
      * For true query-time filtering, consider migrating to Redis Sorted Sets with timestamps
      * as scores or a time-series data structure.
      */
@@ -593,7 +594,7 @@ class RedisService private constructor(
     suspend fun getWeeklyAdherence(): Either<RedisError, WeeklyAdherence> {
         return either {
             val allSchedules = getAllSchedules().bind()
-            
+
             // Only load dosage histories from the last 7 days for efficiency
             val endDate = java.time.LocalDate.now()
             val startDate = endDate.minusDays(6)

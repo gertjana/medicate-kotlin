@@ -1,4 +1,4 @@
-package dev.gertjanassies.model
+package dev.gertjanassies.model.serializer
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind

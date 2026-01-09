@@ -1,10 +1,10 @@
 package dev.gertjanassies.routes
 
 import arrow.core.raise.either
-import dev.gertjanassies.model.AddStockRequest
-import dev.gertjanassies.model.DosageHistoryRequest
 import dev.gertjanassies.model.Medicine
-import dev.gertjanassies.model.MedicineRequest
+import dev.gertjanassies.model.request.AddStockRequest
+import dev.gertjanassies.model.request.DosageHistoryRequest
+import dev.gertjanassies.model.request.MedicineRequest
 import dev.gertjanassies.service.RedisService
 import io.ktor.http.*
 import io.ktor.server.application.*

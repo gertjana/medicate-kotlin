@@ -1,5 +1,6 @@
-package dev.gertjanassies.model
+package dev.gertjanassies.model.request
 
+import dev.gertjanassies.model.serializer.UUIDSerializer
 import kotlinx.serialization.Serializable
 import java.util.*
 

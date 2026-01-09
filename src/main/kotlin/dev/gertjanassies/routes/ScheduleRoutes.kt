@@ -2,7 +2,7 @@ package dev.gertjanassies.routes
 
 import arrow.core.raise.either
 import dev.gertjanassies.model.Schedule
-import dev.gertjanassies.model.ScheduleRequest
+import dev.gertjanassies.model.request.ScheduleRequest
 import dev.gertjanassies.service.RedisService
 import io.ktor.http.*
 import io.ktor.server.application.*
