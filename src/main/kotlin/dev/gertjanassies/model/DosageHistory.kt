@@ -1,5 +1,7 @@
 package dev.gertjanassies.model
 
+import dev.gertjanassies.model.serializer.LocalDateTimeSerializer
+import dev.gertjanassies.model.serializer.UUIDSerializer
 import kotlinx.serialization.Serializable
 import java.time.LocalDateTime
 import java.util.*

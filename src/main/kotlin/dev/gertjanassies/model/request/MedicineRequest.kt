@@ -1,4 +1,4 @@
-package dev.gertjanassies.model
+package dev.gertjanassies.model.request
 
 import kotlinx.serialization.Serializable
 

@@ -1,5 +1,8 @@
-package dev.gertjanassies.model
+package dev.gertjanassies.model.request
 
+import dev.gertjanassies.model.DayOfWeek
+import dev.gertjanassies.model.serializer.DayOfWeekListSerializer
+import dev.gertjanassies.model.serializer.UUIDSerializer
 import kotlinx.serialization.Serializable
 import java.util.UUID
 

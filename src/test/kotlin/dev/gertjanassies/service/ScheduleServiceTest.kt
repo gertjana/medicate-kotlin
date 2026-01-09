@@ -1,6 +1,7 @@
 package dev.gertjanassies.service
 
 import dev.gertjanassies.model.*
+import dev.gertjanassies.model.request.*
 import dev.gertjanassies.util.createFailedRedisFutureMock
 import dev.gertjanassies.util.createRedisFutureMock
 import io.kotest.core.spec.style.FunSpec

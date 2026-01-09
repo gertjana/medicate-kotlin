@@ -3,7 +3,7 @@ package dev.gertjanassies.routes
 import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.Schedule
-import dev.gertjanassies.model.ScheduleRequest
+import dev.gertjanassies.model.request.ScheduleRequest
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
 import io.kotest.core.spec.style.FunSpec

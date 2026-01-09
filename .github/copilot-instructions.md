@@ -14,3 +14,7 @@ This is a Kotlin project using Ktor framework with Arrow for functional programm
 - Use Arrow's IO for side effects
 - Follow immutable data patterns
 - Use Mocks for testing services
+
+## Agent guidelines
+- re-use existing terminal instead of opening new ones
+- Don't suggest terminal commands, instead show me the code changes directly
