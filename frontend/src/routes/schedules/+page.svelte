@@ -222,10 +222,15 @@
 			});
 	}
 
-	onMount(loadData);
+	let hasLoadedOnce = false;
 
-	// Reload data when user logs in or out
-	$: if (browser && $userStore) {
+	onMount(async () => {
+		await loadData();
+		hasLoadedOnce = true;
+	});
+
+	// Reload data when user logs in or out, but avoid duplicate load on initial mount
+	$: if (browser && $userStore && hasLoadedOnce) {
 		loadData();
 	}
 </script>
