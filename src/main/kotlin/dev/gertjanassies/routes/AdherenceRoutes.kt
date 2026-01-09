@@ -4,8 +4,16 @@ import arrow.core.raise.either
 import dev.gertjanassies.service.RedisService
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+
+/**
+ * Helper function to extract username from request header
+ */
+private suspend fun ApplicationCall.getUsername(): String? {
+    return request.header("X-Username")
+}
 
 /**
  * Adherence and analytics routes
@@ -13,8 +21,13 @@ import io.ktor.server.routing.*
 fun Route.adherenceRoutes(redisService: RedisService) {
     // Get weekly adherence
     get("/adherence") {
+        val username = call.getUsername() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+            return@get
+        }
+
         either {
-            val weeklyAdherence = redisService.getWeeklyAdherence().bind()
+            val weeklyAdherence = redisService.getWeeklyAdherence(username).bind()
             call.respond(HttpStatusCode.OK, weeklyAdherence)
         }.onLeft { error ->
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
@@ -23,6 +36,11 @@ fun Route.adherenceRoutes(redisService: RedisService) {
 
     // Get low stock medicines
     get("/lowstock") {
+        val username = call.getUsername() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+            return@get
+        }
+
         val thresholdParam = call.request.queryParameters["threshold"]
 
         val threshold = if (thresholdParam == null) {
@@ -46,7 +64,7 @@ fun Route.adherenceRoutes(redisService: RedisService) {
             parsed
         }
         either {
-            val lowStockMedicines = redisService.getLowStockMedicines(threshold).bind()
+            val lowStockMedicines = redisService.getLowStockMedicines(username, threshold).bind()
             call.respond(HttpStatusCode.OK, lowStockMedicines)
         }.onLeft { error ->
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))

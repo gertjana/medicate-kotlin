@@ -7,5 +7,6 @@ data class MedicineRequest(
     val name: String,
     val dose: Double,
     val unit: String,
-    val stock: Double
+    val stock: Double,
+    val description: String? = null
 )

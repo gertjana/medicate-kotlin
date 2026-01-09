@@ -6,6 +6,7 @@ import dev.gertjanassies.routes.dosageHistoryRoutes
 import dev.gertjanassies.routes.healthRoutes
 import dev.gertjanassies.routes.medicineRoutes
 import dev.gertjanassies.routes.scheduleRoutes
+import dev.gertjanassies.routes.userRoutes
 import dev.gertjanassies.service.RedisService
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -93,6 +94,7 @@ fun Application.module() {
             dailyRoutes(redisService)
             dosageHistoryRoutes(redisService)
             adherenceRoutes(redisService)
+            userRoutes(redisService)
         }
 
         // Serve static files if enabled

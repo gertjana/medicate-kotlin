@@ -21,6 +21,7 @@ import java.util.*
 
 class DailyRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
+    val testUsername = "testuser"
 
     beforeEach {
         mockRedisService = mockk()
@@ -55,7 +56,7 @@ class DailyRoutesTest : FunSpec({
                 )
             )
 
-            coEvery { mockRedisService.getDailySchedule() } returns dailySchedule.right()
+            coEvery { mockRedisService.getDailySchedule(testUsername) } returns dailySchedule.right()
 
             testApplication {
                 environment {
@@ -65,7 +66,9 @@ class DailyRoutesTest : FunSpec({
                 routing { dailyRoutes(mockRedisService) }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
-                val response = client.get("/daily")
+                val response = client.get("/daily") {
+                    header("X-Username", testUsername)
+                }
 
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<DailySchedule>()
@@ -74,12 +77,12 @@ class DailyRoutesTest : FunSpec({
                 body.schedule[0].medicines.size shouldBe 2
                 body.schedule[1].time shouldBe "12:00"
                 body.schedule[1].medicines.size shouldBe 1
-                coVerify { mockRedisService.getDailySchedule() }
+                coVerify { mockRedisService.getDailySchedule(testUsername) }
             }
         }
 
         test("should return 500 on error") {
-            coEvery { mockRedisService.getDailySchedule() } returns
+            coEvery { mockRedisService.getDailySchedule(testUsername) } returns
                 RedisError.OperationError("Failed to retrieve schedule").left()
 
             testApplication {
@@ -89,7 +92,9 @@ class DailyRoutesTest : FunSpec({
                 install(ContentNegotiation) { json() }
                 routing { dailyRoutes(mockRedisService) }
 
-                val response = client.get("/daily")
+                val response = client.get("/daily") {
+                    header("X-Username", testUsername)
+                }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
             }

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { userStore } from '$lib/stores/user';
 	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, getLowStockMedicines, takeDose, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine } from '$lib/api';
 
 	// SvelteKit props - using const since they're not used internally
@@ -70,6 +71,10 @@
 
 	async function loadSchedule() {
 		if (!browser) return;
+		if (!$userStore) {
+			loading = false;
+			return;
+		}
 		loading = true;
 		error = '';
 		try {
@@ -151,12 +156,42 @@
 
 	onMount(loadSchedule);
 	onMount(loadSuppressedIds);
+
+	// Reload data when user logs in or out
+	$: if (browser && $userStore) {
+		loadSchedule();
+	}
 </script>
 
 <svelte:head>
 	<title>Dashboard - Medicine Scheduler</title>
 </svelte:head>
 
+{#if !$userStore}
+	<!-- Not logged in message -->
+	<div class="max-w-2xl mx-auto mt-12">
+		<div class="card text-center py-12">
+			<div class="mb-6">
+				<svg class="w-24 h-24 mx-auto text-[steelblue]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+				</svg>
+			</div>
+			<h2 class="text-3xl font-bold mb-4">Welcome to Medicate</h2>
+			<p class="text-gray-600 mb-6 text-lg">
+				Your personal medicine tracking assistant
+			</p>
+			<p class="text-gray-700 mb-8">
+				Please <strong>login</strong> or <strong>register</strong> to start tracking your medicines, schedules, and adherence.
+			</p>
+			<div class="text-sm text-gray-500">
+				<p class="mb-2">✓ Track your medicines and dosages</p>
+				<p class="mb-2">✓ Create medication schedules</p>
+				<p class="mb-2">✓ Monitor adherence and history</p>
+				<p>✓ Get low stock alerts</p>
+			</div>
+		</div>
+	</div>
+{:else}
 <div class="max-w-4xl">
 	<!-- Low Stock Warning Banner -->
 	{#if !loading && visibleLowStockMedicines.length > 0}
@@ -313,6 +348,7 @@
 		</div>
 	{/if}
 </div>
+{/if}
 
 {#if showToast}
 	<div class="fixed top-4 right-4 bg-[steelblue] text-white px-6 py-3 rounded-tr-lg rounded-bl-lg shadow-lg transition-opacity z-50">

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { userStore } from '$lib/stores/user';
 	import { getDosageHistories, getMedicines, getSchedules, takeDose, type DosageHistory, type Medicine, type Schedule } from '$lib/api';
 
 	// SvelteKit props - using const since they're not used internally
@@ -38,6 +39,10 @@
 
 	async function loadData() {
 		if (!browser) return;
+		if (!$userStore) {
+			loading = false;
+			return;
+		}
 		loading = true;
 		error = '';
 		try {
@@ -149,12 +154,28 @@
 	}
 
 	onMount(loadData);
+
+	// Reload data when user logs in or out
+	$: if (browser && $userStore) {
+		loadData();
+	}
 </script>
 
 <svelte:head>
 	<title>History - Medicine Scheduler</title>
 </svelte:head>
 
+{#if !$userStore}
+	<!-- Not logged in message -->
+	<div class="max-w-2xl mx-auto mt-12">
+		<div class="card text-center py-12">
+			<h2 class="text-2xl font-bold mb-4">Authentication Required</h2>
+			<p class="text-gray-600 mb-6">
+				Please login or register to view your dosage history.
+			</p>
+		</div>
+	</div>
+{:else}
 <div class="max-w-6xl">
 	<div class="flex justify-between items-center mb-6">
 		<h2 class="text-3xl font-bold">Dosage History</h2>
@@ -228,6 +249,7 @@
 		</div>
 	{/if}
 </div>
+{/if}
 
 {#if showToast}
 	<div class="fixed top-4 right-4 bg-[steelblue] text-white px-6 py-3 rounded-tr-lg rounded-bl-lg shadow-lg transition-opacity z-50">
