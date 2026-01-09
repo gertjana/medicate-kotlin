@@ -4,6 +4,7 @@ export interface Medicine {
 	dose: number;
 	unit: string;
 	stock: number;
+	description?: string;
 }
 
 export interface Schedule {
