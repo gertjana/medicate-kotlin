@@ -32,6 +32,7 @@ class ScheduleServiceTest : FunSpec({
 
     val json = Json { ignoreUnknownKeys = true }
     val environment = "test"
+    val testUsername = "testuser"
 
     beforeEach {
         mockConnection = mockk()
@@ -55,12 +56,12 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = emptyList()
             )
             val scheduleJson = json.encodeToString(schedule)
-            val key = "$environment:schedule:$scheduleId"
+            val key = "$environment:user:$testUsername:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(scheduleJson)
 
-            val result = redisService.getSchedule(scheduleId.toString())
+            val result = redisService.getSchedule(testUsername, scheduleId.toString())
 
             result.isRight() shouldBe true
             result.getOrNull()?.id shouldBe scheduleId
@@ -72,12 +73,12 @@ class ScheduleServiceTest : FunSpec({
 
         test("should return NotFound when schedule doesn't exist") {
             val scheduleId = UUID.randomUUID()
-            val key = "$environment:schedule:$scheduleId"
+            val key = "$environment:user:$testUsername:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(null as String?)
 
-            val result = redisService.getSchedule(scheduleId.toString())
+            val result = redisService.getSchedule(testUsername, scheduleId.toString())
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
@@ -86,12 +87,12 @@ class ScheduleServiceTest : FunSpec({
         test("should handle invalid schedule JSON") {
             val scheduleId = UUID.randomUUID()
             val invalidJson = """{"invalid": "json"}"""
-            val key = "$environment:schedule:$scheduleId"
+            val key = "$environment:user:$testUsername:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(invalidJson)
 
-            val result = redisService.getSchedule(scheduleId.toString())
+            val result = redisService.getSchedule(testUsername, scheduleId.toString())
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.SerializationError>()
@@ -111,7 +112,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.set(any(), any()) } returns createRedisFutureMock("OK")
 
-            val result = redisService.createSchedule(scheduleRequest)
+            val result = redisService.createSchedule(testUsername, scheduleRequest)
 
             result.isRight() shouldBe true
             val created = result.getOrNull()!!
@@ -134,7 +135,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.set(any(), any()) } returns createFailedRedisFutureMock(RuntimeException("Create failed"))
 
-            val result = redisService.createSchedule(scheduleRequest)
+            val result = redisService.createSchedule(testUsername, scheduleRequest)
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
@@ -153,7 +154,7 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = emptyList()
             )
             val updatedSchedule = originalSchedule.copy(time = "09:00", amount = 2.0)
-            val key = "$environment:schedule:$scheduleId"
+            val key = "$environment:user:$testUsername:schedule:$scheduleId"
             val originalJson = json.encodeToString(originalSchedule)
             val updatedJson = json.encodeToString(updatedSchedule)
 
@@ -161,7 +162,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(originalJson)
             every { mockAsyncCommands.set(key, updatedJson) } returns createRedisFutureMock("OK")
 
-            val result = redisService.updateSchedule(scheduleId.toString(), updatedSchedule)
+            val result = redisService.updateSchedule(testUsername, scheduleId.toString(), updatedSchedule)
 
             result.isRight() shouldBe true
             result.getOrNull()?.time shouldBe "09:00"
@@ -177,12 +178,12 @@ class ScheduleServiceTest : FunSpec({
                 amount = 1.0,
                 daysOfWeek = emptyList()
             )
-            val key = "$environment:schedule:$scheduleId"
+            val key = "$environment:user:$testUsername:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(null as String?)
 
-            val result = redisService.updateSchedule(scheduleId.toString(), schedule)
+            val result = redisService.updateSchedule(testUsername, scheduleId.toString(), schedule)
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
@@ -192,12 +193,12 @@ class ScheduleServiceTest : FunSpec({
     context("deleteSchedule") {
         test("should successfully delete an existing schedule") {
             val scheduleId = UUID.randomUUID()
-            val key = "$environment:schedule:$scheduleId"
+            val key = "$environment:user:$testUsername:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.del(key) } returns createRedisFutureMock(1L)
 
-            val result = redisService.deleteSchedule(scheduleId.toString())
+            val result = redisService.deleteSchedule(testUsername, scheduleId.toString())
 
             result.isRight() shouldBe true
 
@@ -206,12 +207,12 @@ class ScheduleServiceTest : FunSpec({
 
         test("should return NotFound when deleting non-existent schedule") {
             val scheduleId = UUID.randomUUID()
-            val key = "$environment:schedule:$scheduleId"
+            val key = "$environment:user:$testUsername:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.del(key) } returns createRedisFutureMock(0L)
 
-            val result = redisService.deleteSchedule(scheduleId.toString())
+            val result = redisService.deleteSchedule(testUsername, scheduleId.toString())
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
@@ -235,8 +236,8 @@ class ScheduleServiceTest : FunSpec({
                 amount = 1.0,
                 daysOfWeek = emptyList()
             )
-            val key1 = "$environment:schedule:${schedule1.id}"
-            val key2 = "$environment:schedule:${schedule2.id}"
+            val key1 = "$environment:user:$testUsername:schedule:${schedule1.id}"
+            val key2 = "$environment:user:$testUsername:schedule:${schedule2.id}"
             val json1 = json.encodeToString(schedule1)
             val json2 = json.encodeToString(schedule2)
 
@@ -250,7 +251,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockAsyncCommands.get(key1) } returns createRedisFutureMock(json1)
             every { mockAsyncCommands.get(key2) } returns createRedisFutureMock(json2)
 
-            val result = redisService.getAllSchedules()
+            val result = redisService.getAllSchedules(testUsername)
 
             result.isRight() shouldBe true
             val schedules = result.getOrNull()!!
@@ -269,7 +270,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockScanCursor.isFinished } returns true
             every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor)
 
-            val result = redisService.getAllSchedules()
+            val result = redisService.getAllSchedules(testUsername)
 
             result.isRight() shouldBe true
             result.getOrNull()!!.size shouldBe 0
@@ -283,8 +284,8 @@ class ScheduleServiceTest : FunSpec({
                 amount = 1.0,
                 daysOfWeek = emptyList()
             )
-            val keyValid = "$environment:schedule:${validSchedule.id}"
-            val keyInvalid = "$environment:schedule:invalid"
+            val keyValid = "$environment:user:$testUsername:schedule:${validSchedule.id}"
+            val keyInvalid = "$environment:user:$testUsername:schedule:invalid"
             val validJson = json.encodeToString(validSchedule)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -297,7 +298,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockAsyncCommands.get(keyValid) } returns createRedisFutureMock(validJson)
             every { mockAsyncCommands.get(keyInvalid) } returns createRedisFutureMock("""invalid json""")
 
-            val result = redisService.getAllSchedules()
+            val result = redisService.getAllSchedules(testUsername)
 
             result.isRight() shouldBe true
             result.getOrNull()!!.size shouldBe 1
@@ -343,10 +344,10 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(todayDayOfWeek)
             )
 
-            val scheduleKey1 = "$environment:schedule:${schedule1.id}"
-            val scheduleKey2 = "$environment:schedule:${schedule2.id}"
-            val medicineKey1 = "$environment:medicine:$medicineId1"
-            val medicineKey2 = "$environment:medicine:$medicineId2"
+            val scheduleKey1 = "$environment:user:$testUsername:schedule:${schedule1.id}"
+            val scheduleKey2 = "$environment:user:$testUsername:schedule:${schedule2.id}"
+            val medicineKey1 = "$environment:user:$testUsername:medicine:$medicineId1"
+            val medicineKey2 = "$environment:user:$testUsername:medicine:$medicineId2"
 
             val scheduleJson1 = json.encodeToString(schedule1)
             val scheduleJson2 = json.encodeToString(schedule2)
@@ -369,7 +370,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockAsyncCommands.get(medicineKey1) } returns createRedisFutureMock(medicineJson1)
             every { mockAsyncCommands.get(medicineKey2) } returns createRedisFutureMock(medicineJson2)
 
-            val result = redisService.getDailySchedule()
+            val result = redisService.getDailySchedule(testUsername)
 
             result.isRight() shouldBe true
             val dailySchedule = result.getOrNull()!!
@@ -413,9 +414,9 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(tomorrowDayOfWeek)
             )
 
-            val scheduleKeyToday = "$environment:schedule:${scheduleToday.id}"
-            val scheduleKeyTomorrow = "$environment:schedule:${scheduleTomorrow.id}"
-            val medicineKey = "$environment:medicine:$medicineId"
+            val scheduleKeyToday = "$environment:user:$testUsername:schedule:${scheduleToday.id}"
+            val scheduleKeyTomorrow = "$environment:user:$testUsername:schedule:${scheduleTomorrow.id}"
+            val medicineKey = "$environment:user:$testUsername:medicine:$medicineId"
 
             val scheduleTodayJson = json.encodeToString(scheduleToday)
             val scheduleTomorrowJson = json.encodeToString(scheduleTomorrow)
@@ -432,7 +433,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockAsyncCommands.get(scheduleKeyTomorrow) } returns createRedisFutureMock(scheduleTomorrowJson)
             every { mockAsyncCommands.get(medicineKey) } returns createRedisFutureMock(medicineJson)
 
-            val result = redisService.getDailySchedule()
+            val result = redisService.getDailySchedule(testUsername)
 
             result.isRight() shouldBe true
             val dailySchedule = result.getOrNull()!!
@@ -458,8 +459,8 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = emptyList()  // Empty means everyday
             )
 
-            val scheduleKey = "$environment:schedule:${schedule.id}"
-            val medicineKey = "$environment:medicine:$medicineId"
+            val scheduleKey = "$environment:user:$testUsername:schedule:${schedule.id}"
+            val medicineKey = "$environment:user:$testUsername:medicine:$medicineId"
 
             val scheduleJson = json.encodeToString(schedule)
             val medicineJson = json.encodeToString(medicine)
@@ -474,7 +475,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockAsyncCommands.get(scheduleKey) } returns createRedisFutureMock(scheduleJson)
             every { mockAsyncCommands.get(medicineKey) } returns createRedisFutureMock(medicineJson)
 
-            val result = redisService.getDailySchedule()
+            val result = redisService.getDailySchedule(testUsername)
 
             result.isRight() shouldBe true
             val dailySchedule = result.getOrNull()!!
@@ -519,10 +520,10 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(todayDayOfWeek)
             )
 
-            val scheduleKey1 = "$environment:schedule:${schedule1.id}"
-            val scheduleKey2 = "$environment:schedule:${schedule2.id}"
-            val medicineKey1 = "$environment:medicine:$medicineId1"
-            val medicineKey2 = "$environment:medicine:$medicineId2"
+            val scheduleKey1 = "$environment:user:$testUsername:schedule:${schedule1.id}"
+            val scheduleKey2 = "$environment:user:$testUsername:schedule:${schedule2.id}"
+            val medicineKey1 = "$environment:user:$testUsername:medicine:$medicineId1"
+            val medicineKey2 = "$environment:user:$testUsername:medicine:$medicineId2"
 
             val scheduleJson1 = json.encodeToString(schedule1)
             val scheduleJson2 = json.encodeToString(schedule2)
@@ -541,7 +542,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockAsyncCommands.get(medicineKey1) } returns createRedisFutureMock(medicineJson1)
             every { mockAsyncCommands.get(medicineKey2) } returns createRedisFutureMock(medicineJson2)
 
-            val result = redisService.getDailySchedule()
+            val result = redisService.getDailySchedule(testUsername)
 
             result.isRight() shouldBe true
             val dailySchedule = result.getOrNull()!!
@@ -580,10 +581,10 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(todayDayOfWeek)
             )
 
-            val scheduleKey1 = "$environment:schedule:${schedule1.id}"
-            val scheduleKey2 = "$environment:schedule:${schedule2.id}"
-            val medicineKey1 = "$environment:medicine:$medicineId1"
-            val medicineKey2 = "$environment:medicine:$medicineId2"
+            val scheduleKey1 = "$environment:user:$testUsername:schedule:${schedule1.id}"
+            val scheduleKey2 = "$environment:user:$testUsername:schedule:${schedule2.id}"
+            val medicineKey1 = "$environment:user:$testUsername:medicine:$medicineId1"
+            val medicineKey2 = "$environment:user:$testUsername:medicine:$medicineId2"
 
             val scheduleJson1 = json.encodeToString(schedule1)
             val scheduleJson2 = json.encodeToString(schedule2)
@@ -601,7 +602,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockAsyncCommands.get(medicineKey1) } returns createRedisFutureMock(medicineJson1)
             every { mockAsyncCommands.get(medicineKey2) } returns createRedisFutureMock(null as String?)  // Not found
 
-            val result = redisService.getDailySchedule()
+            val result = redisService.getDailySchedule(testUsername)
 
             result.isRight() shouldBe true
             val dailySchedule = result.getOrNull()!!
@@ -624,7 +625,7 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(tomorrowDayOfWeek)  // Only tomorrow
             )
 
-            val scheduleKey = "$environment:schedule:${schedule.id}"
+            val scheduleKey = "$environment:user:$testUsername:schedule:${schedule.id}"
             val scheduleJson = json.encodeToString(schedule)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -636,7 +637,7 @@ class ScheduleServiceTest : FunSpec({
 
             every { mockAsyncCommands.get(scheduleKey) } returns createRedisFutureMock(scheduleJson)
 
-            val result = redisService.getDailySchedule()
+            val result = redisService.getDailySchedule(testUsername)
 
             result.isRight() shouldBe true
             val dailySchedule = result.getOrNull()!!
@@ -678,10 +679,10 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(todayDayOfWeek)
             )
 
-            val scheduleKey1 = "$environment:schedule:${schedule1.id}"
-            val scheduleKey2 = "$environment:schedule:${schedule2.id}"
-            val scheduleKey3 = "$environment:schedule:${schedule3.id}"
-            val medicineKey = "$environment:medicine:$medicineId"
+            val scheduleKey1 = "$environment:user:$testUsername:schedule:${schedule1.id}"
+            val scheduleKey2 = "$environment:user:$testUsername:schedule:${schedule2.id}"
+            val scheduleKey3 = "$environment:user:$testUsername:schedule:${schedule3.id}"
+            val medicineKey = "$environment:user:$testUsername:medicine:$medicineId"
 
             val scheduleJson1 = json.encodeToString(schedule1)
             val scheduleJson2 = json.encodeToString(schedule2)
@@ -700,7 +701,7 @@ class ScheduleServiceTest : FunSpec({
             every { mockAsyncCommands.get(scheduleKey3) } returns createRedisFutureMock(scheduleJson3)
             every { mockAsyncCommands.get(medicineKey) } returns createRedisFutureMock(medicineJson)
 
-            val result = redisService.getDailySchedule()
+            val result = redisService.getDailySchedule(testUsername)
 
             result.isRight() shouldBe true
             val dailySchedule = result.getOrNull()!!

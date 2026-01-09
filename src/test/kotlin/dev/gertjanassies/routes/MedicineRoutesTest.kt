@@ -27,6 +27,7 @@ import java.util.*
 
 class MedicineRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
+    val testUsername = "testuser"
 
     beforeEach {
         mockRedisService = mockk()
@@ -42,7 +43,7 @@ class MedicineRoutesTest : FunSpec({
                 Medicine(UUID.randomUUID(), "Medicine A", 100.0, "mg", 50.0),
                 Medicine(UUID.randomUUID(), "Medicine B", 200.0, "mg", 75.0)
             )
-            coEvery { mockRedisService.getAllMedicines() } returns medicines.right()
+            coEvery { mockRedisService.getAllMedicines(testUsername) } returns medicines.right()
 
             testApplication {
                 environment {
@@ -51,15 +52,17 @@ class MedicineRoutesTest : FunSpec({
                 install(ContentNegotiation) { json() }
                 routing { medicineRoutes(mockRedisService) }
 
-                val response = client.get("/medicine")
+                val response = client.get("/medicine") {
+                    header("X-Username", testUsername)
+                }
 
                 response.status shouldBe HttpStatusCode.OK
-                coVerify { mockRedisService.getAllMedicines() }
+                coVerify { mockRedisService.getAllMedicines(testUsername) }
             }
         }
 
         test("should return 500 on error") {
-            coEvery { mockRedisService.getAllMedicines() } returns RedisError.OperationError("Error").left()
+            coEvery { mockRedisService.getAllMedicines(testUsername) } returns RedisError.OperationError("Error").left()
 
             testApplication {
                 environment {
@@ -68,7 +71,9 @@ class MedicineRoutesTest : FunSpec({
                 install(ContentNegotiation) { json() }
                 routing { medicineRoutes(mockRedisService) }
 
-                val response = client.get("/medicine")
+                val response = client.get("/medicine") {
+                    header("X-Username", testUsername)
+                }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
             }
@@ -79,7 +84,7 @@ class MedicineRoutesTest : FunSpec({
         test("should return medicine by id") {
             val medicineId = UUID.randomUUID()
             val medicine = Medicine(medicineId, "Test Medicine", 500.0, "mg", 100.0)
-            coEvery { mockRedisService.getMedicine(medicineId.toString()) } returns medicine.right()
+            coEvery { mockRedisService.getMedicine(testUsername, medicineId.toString()) } returns medicine.right()
 
             testApplication {
                 environment {
@@ -89,18 +94,20 @@ class MedicineRoutesTest : FunSpec({
                 routing { medicineRoutes(mockRedisService) }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
-                val response = client.get("/medicine/$medicineId")
+                val response = client.get("/medicine/$medicineId") {
+                    header("X-Username", testUsername)
+                }
 
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Medicine>()
                 body.id shouldBe medicineId
-                coVerify { mockRedisService.getMedicine(medicineId.toString()) }
+                coVerify { mockRedisService.getMedicine(testUsername, medicineId.toString()) }
             }
         }
 
         test("should return 404 when medicine not found") {
             val medicineId = UUID.randomUUID()
-            coEvery { mockRedisService.getMedicine(medicineId.toString()) } returns
+            coEvery { mockRedisService.getMedicine(testUsername, medicineId.toString()) } returns
                 RedisError.NotFound("Medicine not found").left()
 
             testApplication {
@@ -110,7 +117,9 @@ class MedicineRoutesTest : FunSpec({
                 install(ContentNegotiation) { json() }
                 routing { medicineRoutes(mockRedisService) }
 
-                val response = client.get("/medicine/$medicineId")
+                val response = client.get("/medicine/$medicineId") {
+                    header("X-Username", testUsername)
+                }
 
                 response.status shouldBe HttpStatusCode.NotFound
             }
@@ -121,7 +130,7 @@ class MedicineRoutesTest : FunSpec({
         test("should create medicine") {
             val createdMedicine = Medicine(UUID.randomUUID(), "New Medicine", 250.0, "mg", 60.0)
             val request = MedicineRequest("New Medicine", 250.0, "mg", 60.0)
-            coEvery { mockRedisService.createMedicine(any()) } returns createdMedicine.right()
+            coEvery { mockRedisService.createMedicine(testUsername, any()) } returns createdMedicine.right()
 
             testApplication {
                 environment {
@@ -132,6 +141,7 @@ class MedicineRoutesTest : FunSpec({
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/medicine") {
+                    header("X-Username", testUsername)
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -139,13 +149,13 @@ class MedicineRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.Created
                 val body = response.body<Medicine>()
                 body.name shouldBe "New Medicine"
-                coVerify { mockRedisService.createMedicine(any()) }
+                coVerify { mockRedisService.createMedicine(testUsername, any()) }
             }
         }
 
         test("should return 500 on create error") {
             val request = MedicineRequest("New Medicine", 250.0, "mg", 60.0)
-            coEvery { mockRedisService.createMedicine(any()) } returns
+            coEvery { mockRedisService.createMedicine(testUsername, any()) } returns
                 RedisError.OperationError("Failed to create").left()
 
             testApplication {
@@ -157,6 +167,7 @@ class MedicineRoutesTest : FunSpec({
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/medicine") {
+                    header("X-Username", testUsername)
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -170,7 +181,7 @@ class MedicineRoutesTest : FunSpec({
         test("should update medicine") {
             val medicineId = UUID.randomUUID()
             val medicine = Medicine(medicineId, "Updated Medicine", 750.0, "mg", 150.0)
-            coEvery { mockRedisService.updateMedicine(medicineId.toString(), any()) } returns medicine.right()
+            coEvery { mockRedisService.updateMedicine(testUsername, medicineId.toString(), any()) } returns medicine.right()
 
             testApplication {
                 environment {
@@ -181,19 +192,20 @@ class MedicineRoutesTest : FunSpec({
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.put("/medicine/$medicineId") {
+                    header("X-Username", testUsername)
                     contentType(ContentType.Application.Json)
                     setBody(medicine)
                 }
 
                 response.status shouldBe HttpStatusCode.OK
-                coVerify { mockRedisService.updateMedicine(medicineId.toString(), any()) }
+                coVerify { mockRedisService.updateMedicine(testUsername, medicineId.toString(), any()) }
             }
         }
 
         test("should return 404 when medicine not found") {
             val medicineId = UUID.randomUUID()
             val medicine = Medicine(medicineId, "Updated Medicine", 750.0, "mg", 150.0)
-            coEvery { mockRedisService.updateMedicine(medicineId.toString(), any()) } returns
+            coEvery { mockRedisService.updateMedicine(testUsername, medicineId.toString(), any()) } returns
                 RedisError.NotFound("Medicine not found").left()
 
             testApplication {
@@ -205,6 +217,7 @@ class MedicineRoutesTest : FunSpec({
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.put("/medicine/$medicineId") {
+                    header("X-Username", testUsername)
                     contentType(ContentType.Application.Json)
                     setBody(medicine)
                 }
@@ -217,7 +230,7 @@ class MedicineRoutesTest : FunSpec({
     context("DELETE /medicine/{id}") {
         test("should delete medicine") {
             val medicineId = UUID.randomUUID()
-            coEvery { mockRedisService.deleteMedicine(medicineId.toString()) } returns Unit.right()
+            coEvery { mockRedisService.deleteMedicine(testUsername, medicineId.toString()) } returns Unit.right()
 
             testApplication {
                 environment {
@@ -226,16 +239,18 @@ class MedicineRoutesTest : FunSpec({
                 install(ContentNegotiation) { json() }
                 routing { medicineRoutes(mockRedisService) }
 
-                val response = client.delete("/medicine/$medicineId")
+                val response = client.delete("/medicine/$medicineId") {
+                    header("X-Username", testUsername)
+                }
 
                 response.status shouldBe HttpStatusCode.NoContent
-                coVerify { mockRedisService.deleteMedicine(medicineId.toString()) }
+                coVerify { mockRedisService.deleteMedicine(testUsername, medicineId.toString()) }
             }
         }
 
         test("should return 404 when medicine not found") {
             val medicineId = UUID.randomUUID()
-            coEvery { mockRedisService.deleteMedicine(medicineId.toString()) } returns
+            coEvery { mockRedisService.deleteMedicine(testUsername, medicineId.toString()) } returns
                 RedisError.NotFound("Medicine not found").left()
 
             testApplication {
@@ -245,7 +260,9 @@ class MedicineRoutesTest : FunSpec({
                 install(ContentNegotiation) { json() }
                 routing { medicineRoutes(mockRedisService) }
 
-                val response = client.delete("/medicine/$medicineId")
+                val response = client.delete("/medicine/$medicineId") {
+                    header("X-Username", testUsername)
+                }
 
                 response.status shouldBe HttpStatusCode.NotFound
             }
@@ -262,7 +279,7 @@ class MedicineRoutesTest : FunSpec({
                 amount = 1.0
             )
             val request = DosageHistoryRequest(medicineId, 1.0)
-            coEvery { mockRedisService.createDosageHistory(medicineId, 1.0) } returns dosageHistory.right()
+            coEvery { mockRedisService.createDosageHistory(testUsername, medicineId, 1.0, null, null) } returns dosageHistory.right()
 
             testApplication {
                 environment {
@@ -273,6 +290,7 @@ class MedicineRoutesTest : FunSpec({
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/takedose") {
+                    header("X-Username", testUsername)
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -281,14 +299,14 @@ class MedicineRoutesTest : FunSpec({
                 val body = response.body<DosageHistory>()
                 body.medicineId shouldBe medicineId
                 body.amount shouldBe 1.0
-                coVerify { mockRedisService.createDosageHistory(medicineId, 1.0) }
+                coVerify { mockRedisService.createDosageHistory(testUsername, medicineId, 1.0, null, null) }
             }
         }
 
         test("should return 404 when medicine not found") {
             val medicineId = UUID.randomUUID()
             val request = DosageHistoryRequest(medicineId, 1.0)
-            coEvery { mockRedisService.createDosageHistory(medicineId, 1.0) } returns
+            coEvery { mockRedisService.createDosageHistory(testUsername, medicineId, 1.0, null, null) } returns
                 RedisError.NotFound("Medicine with id $medicineId not found").left()
 
             testApplication {
@@ -300,6 +318,7 @@ class MedicineRoutesTest : FunSpec({
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/takedose") {
+                    header("X-Username", testUsername)
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -311,7 +330,7 @@ class MedicineRoutesTest : FunSpec({
         test("should return 500 on error") {
             val medicineId = UUID.randomUUID()
             val request = DosageHistoryRequest(medicineId, 1.0)
-            coEvery { mockRedisService.createDosageHistory(medicineId, 1.0) } returns
+            coEvery { mockRedisService.createDosageHistory(testUsername, medicineId, 1.0, null, null) } returns
                 RedisError.OperationError("Failed to create dosage history").left()
 
             testApplication {
@@ -323,6 +342,7 @@ class MedicineRoutesTest : FunSpec({
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/takedose") {
+                    header("X-Username", testUsername)
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -337,7 +357,7 @@ class MedicineRoutesTest : FunSpec({
             val medicineId = UUID.randomUUID()
             val updatedMedicine = Medicine(medicineId, "Test Medicine", 500.0, "mg", 110.0)
             val request = AddStockRequest(medicineId, 10.0)
-            coEvery { mockRedisService.addStock(medicineId, 10.0) } returns updatedMedicine.right()
+            coEvery { mockRedisService.addStock(testUsername, medicineId, 10.0) } returns updatedMedicine.right()
 
             testApplication {
                 environment {
@@ -348,6 +368,7 @@ class MedicineRoutesTest : FunSpec({
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/addstock") {
+                    header("X-Username", testUsername)
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -355,14 +376,14 @@ class MedicineRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Medicine>()
                 body.stock shouldBe 110.0
-                coVerify { mockRedisService.addStock(medicineId, 10.0) }
+                coVerify { mockRedisService.addStock(testUsername, medicineId, 10.0) }
             }
         }
 
         test("should return 404 when medicine not found") {
             val medicineId = UUID.randomUUID()
             val request = AddStockRequest(medicineId, 10.0)
-            coEvery { mockRedisService.addStock(medicineId, 10.0) } returns
+            coEvery { mockRedisService.addStock(testUsername, medicineId, 10.0) } returns
                 RedisError.NotFound("Medicine with id $medicineId not found").left()
 
             testApplication {
@@ -374,6 +395,7 @@ class MedicineRoutesTest : FunSpec({
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/addstock") {
+                    header("X-Username", testUsername)
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -385,7 +407,7 @@ class MedicineRoutesTest : FunSpec({
         test("should return 500 on error") {
             val medicineId = UUID.randomUUID()
             val request = AddStockRequest(medicineId, 10.0)
-            coEvery { mockRedisService.addStock(medicineId, 10.0) } returns
+            coEvery { mockRedisService.addStock(testUsername, medicineId, 10.0) } returns
                 RedisError.OperationError("Failed to add stock").left()
 
             testApplication {
@@ -397,6 +419,7 @@ class MedicineRoutesTest : FunSpec({
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/addstock") {
+                    header("X-Username", testUsername)
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }

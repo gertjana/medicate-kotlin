@@ -30,6 +30,7 @@ class AdherenceServiceTest : FunSpec({
 
     val json = Json { ignoreUnknownKeys = true }
     val environment = "test"
+    val testUsername = "testuser"
 
     beforeEach {
         mockConnection = mockk()
@@ -128,7 +129,7 @@ class AdherenceServiceTest : FunSpec({
                 every { mockAsyncCommands.get(dosageKeys[index]) } returns createRedisFutureMock(json.encodeToString(dosage))
             }
 
-            val result = redisService.getWeeklyAdherence()
+            val result = redisService.getWeeklyAdherence(testUsername)
 
             result.isRight() shouldBe true
             val weeklyAdherence = result.getOrNull()!!
@@ -192,7 +193,7 @@ class AdherenceServiceTest : FunSpec({
             every { mockAsyncCommands.get(scheduleKey2) } returns createRedisFutureMock(json.encodeToString(schedule2))
             every { mockAsyncCommands.get(dosageKey) } returns createRedisFutureMock(json.encodeToString(dosageHistory))
 
-            val result = redisService.getWeeklyAdherence()
+            val result = redisService.getWeeklyAdherence(testUsername)
 
             result.isRight() shouldBe true
             val weeklyAdherence = result.getOrNull()!!
@@ -233,7 +234,7 @@ class AdherenceServiceTest : FunSpec({
 
             every { mockAsyncCommands.get(scheduleKey) } returns createRedisFutureMock(json.encodeToString(schedule))
 
-            val result = redisService.getWeeklyAdherence()
+            val result = redisService.getWeeklyAdherence(testUsername)
 
             result.isRight() shouldBe true
             val weeklyAdherence = result.getOrNull()!!
@@ -278,7 +279,7 @@ class AdherenceServiceTest : FunSpec({
 
             every { mockAsyncCommands.get(scheduleKey) } returns createRedisFutureMock(json.encodeToString(schedule))
 
-            val result = redisService.getWeeklyAdherence()
+            val result = redisService.getWeeklyAdherence(testUsername)
 
             result.isRight() shouldBe true
             val weeklyAdherence = result.getOrNull()!!
@@ -332,7 +333,7 @@ class AdherenceServiceTest : FunSpec({
                 every { mockAsyncCommands.get(keys[index]) } returns createRedisFutureMock(json.encodeToString(medicine))
             }
 
-            val result = redisService.getLowStockMedicines()
+            val result = redisService.getLowStockMedicines(testUsername)
 
             result.isRight() shouldBe true
             val lowStock = result.getOrNull()!!
@@ -371,7 +372,7 @@ class AdherenceServiceTest : FunSpec({
                 every { mockAsyncCommands.get(keys[index]) } returns createRedisFutureMock(json.encodeToString(medicine))
             }
 
-            val result = redisService.getLowStockMedicines(threshold = 20.0)
+            val result = redisService.getLowStockMedicines(testUsername, threshold = 20.0)
 
             result.isRight() shouldBe true
             val lowStock = result.getOrNull()!!
@@ -399,7 +400,7 @@ class AdherenceServiceTest : FunSpec({
             every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(scanCursor)
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(json.encodeToString(medicine))
 
-            val result = redisService.getLowStockMedicines()
+            val result = redisService.getLowStockMedicines(testUsername)
 
             result.isRight() shouldBe true
             val lowStock = result.getOrNull()!!
@@ -425,7 +426,7 @@ class AdherenceServiceTest : FunSpec({
             every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(scanCursor)
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(json.encodeToString(outOfStock))
 
-            val result = redisService.getLowStockMedicines()
+            val result = redisService.getLowStockMedicines(testUsername)
 
             result.isRight() shouldBe true
             val lowStock = result.getOrNull()!!

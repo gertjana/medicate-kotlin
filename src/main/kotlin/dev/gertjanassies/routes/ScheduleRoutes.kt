@@ -11,28 +11,45 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
 /**
+ * Helper function to extract username from request header
+ */
+private suspend fun ApplicationCall.getUsername(): String? {
+    return request.header("X-Username")
+}
+
+/**
  * Schedule routes
  */
 fun Route.scheduleRoutes(redisService: RedisService) {
     // Get all schedules
     get("/schedule") {
+        val username = call.getUsername() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+            return@get
+        }
+
         either {
-            val schedules = redisService.getAllSchedules().bind()
+            val schedules = redisService.getAllSchedules(username).bind()
             call.respond(HttpStatusCode.OK, schedules)
         }.onLeft { error ->
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
 
-    // Get schedule by ID
+    // Get schedule by id
     get("/schedule/{id}") {
+        val username = call.getUsername() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+            return@get
+        }
+
         val id = call.parameters["id"] ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing id parameter"))
             return@get
         }
 
         either {
-            val schedule = redisService.getSchedule(id).bind()
+            val schedule = redisService.getSchedule(username, id).bind()
             call.respond(HttpStatusCode.OK, schedule)
         }.onLeft { error ->
             when (error) {
@@ -46,10 +63,15 @@ fun Route.scheduleRoutes(redisService: RedisService) {
 
     // Create new schedule
     post("/schedule") {
+        val username = call.getUsername() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+            return@post
+        }
+
         val request = call.receive<ScheduleRequest>()
 
         either {
-            val created = redisService.createSchedule(request).bind()
+            val created = redisService.createSchedule(username, request).bind()
             call.respond(HttpStatusCode.Created, created)
         }.onLeft { error ->
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
@@ -58,6 +80,11 @@ fun Route.scheduleRoutes(redisService: RedisService) {
 
     // Update existing schedule
     put("/schedule/{id}") {
+        val username = call.getUsername() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+            return@put
+        }
+
         val id = call.parameters["id"] ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing id parameter"))
             return@put
@@ -66,7 +93,7 @@ fun Route.scheduleRoutes(redisService: RedisService) {
         val schedule = call.receive<Schedule>()
 
         either {
-            val updated = redisService.updateSchedule(id, schedule).bind()
+            val updated = redisService.updateSchedule(username, id, schedule).bind()
             call.respond(HttpStatusCode.OK, updated)
         }.onLeft { error ->
             when (error) {
@@ -80,13 +107,18 @@ fun Route.scheduleRoutes(redisService: RedisService) {
 
     // Delete schedule
     delete("/schedule/{id}") {
+        val username = call.getUsername() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+            return@delete
+        }
+
         val id = call.parameters["id"] ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing id parameter"))
             return@delete
         }
 
         either {
-            redisService.deleteSchedule(id).bind()
+            redisService.deleteSchedule(username, id).bind()
             call.respond(HttpStatusCode.NoContent)
         }.onLeft { error ->
             when (error) {

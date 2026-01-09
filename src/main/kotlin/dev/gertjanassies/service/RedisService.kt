@@ -74,10 +74,10 @@ class RedisService private constructor(
     }.mapLeft { RedisError.OperationError(it.message ?: "Unknown error") }
 
     /**
-     * Get a Medicine object from Redis by ID asynchronously
+     * Get a Medicine object from Redis by ID asynchronously for a specific user
      */
-    suspend fun getMedicine(id: String): Either<RedisError, Medicine> {
-        val key = "$environment:medicine:$id"
+    suspend fun getMedicine(username: String, id: String): Either<RedisError, Medicine> {
+        val key = "$environment:user:$username:medicine:$id"
         val jsonString = get(key).getOrNull()
 
         return when (jsonString) {
@@ -96,7 +96,7 @@ class RedisService private constructor(
     /**
      * Create a new Medicine in Redis asynchronously
      */
-    suspend fun createMedicine(request: MedicineRequest): Either<RedisError, Medicine> {
+    suspend fun createMedicine(username: String, request: MedicineRequest): Either<RedisError, Medicine> {
         val medicine = Medicine(
             id = UUID.randomUUID(),
             name = request.name,
@@ -105,7 +105,7 @@ class RedisService private constructor(
             stock = request.stock,
             description = request.description
         )
-        val key = "$environment:medicine:${medicine.id}"
+        val key = "$environment:user:$username:medicine:${medicine.id}"
 
         return Either.catch {
             val jsonString = json.encodeToString(medicine)
@@ -122,8 +122,8 @@ class RedisService private constructor(
     /**
      * Update an existing Medicine in Redis asynchronously
      */
-    suspend fun updateMedicine(id: String, medicine: Medicine): Either<RedisError, Medicine> {
-        val key = "$environment:medicine:$id"
+    suspend fun updateMedicine(username: String, id: String, medicine: Medicine): Either<RedisError, Medicine> {
+        val key = "$environment:user:$username:medicine:$id"
 
         // Check if medicine exists
         val existing = get(key).getOrNull()
@@ -149,8 +149,8 @@ class RedisService private constructor(
     /**
      * Delete a Medicine from Redis asynchronously
      */
-    suspend fun deleteMedicine(id: String): Either<RedisError, Unit> {
-        val key = "$environment:medicine:$id"
+    suspend fun deleteMedicine(username: String, id: String): Either<RedisError, Unit> {
+        val key = "$environment:user:$username:medicine:$id"
 
         return Either.catch {
             val deleted = connection?.async()?.del(key)?.await() ?: throw IllegalStateException("Not connected")
@@ -166,11 +166,11 @@ class RedisService private constructor(
     }
 
     /**
-     * Get all Medicines from Redis asynchronously
+     * Get all Medicines from Redis asynchronously for a specific user
      */
-    suspend fun getAllMedicines(): Either<RedisError, List<Medicine>> {
+    suspend fun getAllMedicines(username: String): Either<RedisError, List<Medicine>> {
         return Either.catch {
-            val pattern = "$environment:medicine:*"
+            val pattern = "$environment:user:$username:medicine:*"
             val keys = mutableListOf<String>()
 
             val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
@@ -201,10 +201,10 @@ class RedisService private constructor(
     // Schedule operations
 
     /**
-     * Get a Schedule object from Redis by ID asynchronously
+     * Get a Schedule object from Redis by ID asynchronously for a specific user
      */
-    suspend fun getSchedule(id: String): Either<RedisError, Schedule> {
-        val key = "$environment:schedule:$id"
+    suspend fun getSchedule(username: String, id: String): Either<RedisError, Schedule> {
+        val key = "$environment:user:$username:schedule:$id"
         val jsonString = get(key).getOrNull()
 
         return when (jsonString) {
@@ -223,7 +223,7 @@ class RedisService private constructor(
     /**
      * Create a new Schedule in Redis asynchronously
      */
-    suspend fun createSchedule(request: ScheduleRequest): Either<RedisError, Schedule> {
+    suspend fun createSchedule(username: String, request: ScheduleRequest): Either<RedisError, Schedule> {
         val schedule = Schedule(
             id = UUID.randomUUID(),
             medicineId = request.medicineId,
@@ -231,7 +231,7 @@ class RedisService private constructor(
             amount = request.amount,
             daysOfWeek = request.daysOfWeek
         )
-        val key = "$environment:schedule:${schedule.id}"
+        val key = "$environment:user:$username:schedule:${schedule.id}"
 
         return Either.catch {
             val jsonString = json.encodeToString(schedule)
@@ -248,8 +248,8 @@ class RedisService private constructor(
     /**
      * Update an existing Schedule in Redis asynchronously
      */
-    suspend fun updateSchedule(id: String, schedule: Schedule): Either<RedisError, Schedule> {
-        val key = "$environment:schedule:$id"
+    suspend fun updateSchedule(username: String, id: String, schedule: Schedule): Either<RedisError, Schedule> {
+        val key = "$environment:user:$username:schedule:$id"
 
         // Check if schedule exists
         val existing = get(key).getOrNull()
@@ -275,8 +275,8 @@ class RedisService private constructor(
     /**
      * Delete a Schedule from Redis asynchronously
      */
-    suspend fun deleteSchedule(id: String): Either<RedisError, Unit> {
-        val key = "$environment:schedule:$id"
+    suspend fun deleteSchedule(username: String, id: String): Either<RedisError, Unit> {
+        val key = "$environment:user:$username:schedule:$id"
 
         return Either.catch {
             val deleted = connection?.async()?.del(key)?.await() ?: throw IllegalStateException("Not connected")
@@ -292,11 +292,11 @@ class RedisService private constructor(
     }
 
     /**
-     * Get all Schedules from Redis asynchronously
+     * Get all Schedules from Redis asynchronously for a specific user
      */
-    suspend fun getAllSchedules(): Either<RedisError, List<Schedule>> {
+    suspend fun getAllSchedules(username: String): Either<RedisError, List<Schedule>> {
         return Either.catch {
-            val pattern = "$environment:schedule:*"
+            val pattern = "$environment:user:$username:schedule:*"
             val keys = mutableListOf<String>()
 
             val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
@@ -325,11 +325,11 @@ class RedisService private constructor(
     }
 
     /**
-     * Get daily schedule with medicines grouped by time asynchronously
+     * Get daily schedule with medicines grouped by time asynchronously for a specific user
      */
-    suspend fun getDailySchedule(): Either<RedisError, DailySchedule> {
+    suspend fun getDailySchedule(username: String): Either<RedisError, DailySchedule> {
         return either {
-            val allSchedules = getAllSchedules().bind()
+            val allSchedules = getAllSchedules(username).bind()
 
             // Get current day of week as enum
             val today = java.time.LocalDate.now()
@@ -346,7 +346,7 @@ class RedisService private constructor(
             // For each time slot, get the medicines
             val timeSlots = groupedByTime.map { (time, schedulesAtTime) ->
                 val medicineItems = schedulesAtTime.mapNotNull { schedule ->
-                    getMedicine(schedule.medicineId.toString()).getOrNull()?.let { medicine ->
+                    getMedicine(username, schedule.medicineId.toString()).getOrNull()?.let { medicine ->
                         MedicineScheduleItem(medicine, schedule.amount)
                     }
                 }
@@ -375,10 +375,10 @@ class RedisService private constructor(
      *       - [RedisError.OperationError] if persisting the dosage history or updating the medicine fails
      *         (e.g. connection issues or an invalid Redis state).
      */
-    suspend fun createDosageHistory(medicineId: UUID, amount: Double, scheduledTime: String? = null, datetime: java.time.LocalDateTime? = null): Either<RedisError, DosageHistory> {
+    suspend fun createDosageHistory(username: String, medicineId: UUID, amount: Double, scheduledTime: String? = null, datetime: java.time.LocalDateTime? = null): Either<RedisError, DosageHistory> {
         return either {
             val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-            val medicineKey = "$environment:medicine:$medicineId"
+            val medicineKey = "$environment:user:$username:medicine:$medicineId"
 
             // Retry loop for optimistic locking with WATCH
             var retryCount = 0
@@ -404,7 +404,7 @@ class RedisService private constructor(
                         scheduledTime = scheduledTime
                     )
 
-                    val dosageKey = "$environment:dosagehistory:${dosageHistory.id}"
+                    val dosageKey = "$environment:user:$username:dosagehistory:${dosageHistory.id}"
                     val updatedMedicine = medicine.copy(stock = medicine.stock - amount)
 
                     // Start transaction
@@ -451,10 +451,10 @@ class RedisService private constructor(
     /**
      * Add stock to a medicine using Redis WATCH for optimistic locking asynchronously
      */
-    suspend fun addStock(medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
+    suspend fun addStock(username: String, medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
         return either {
             val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-            val medicineKey = "$environment:medicine:$medicineId"
+            val medicineKey = "$environment:user:$username:medicine:$medicineId"
 
             // Retry loop for optimistic locking with WATCH
             var retryCount = 0
@@ -510,11 +510,11 @@ class RedisService private constructor(
     }
 
     /**
-     * Get all DosageHistory entries from Redis asynchronously
+     * Get all DosageHistory entries from Redis asynchronously for a specific user
      */
-    suspend fun getAllDosageHistories(): Either<RedisError, List<DosageHistory>> {
+    suspend fun getAllDosageHistories(username: String): Either<RedisError, List<DosageHistory>> {
         return Either.catch {
-            val pattern = "$environment:dosagehistory:*"
+            val pattern = "$environment:user:$username:dosagehistory:*"
             val keys = mutableListOf<String>()
 
             val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
@@ -554,11 +554,12 @@ class RedisService private constructor(
      * as scores or a time-series data structure.
      */
     suspend fun getDosageHistoriesInDateRange(
+        username: String,
         startDate: java.time.LocalDate,
         endDate: java.time.LocalDate
     ): Either<RedisError, List<DosageHistory>> {
         return Either.catch {
-            val pattern = "$environment:dosagehistory:*"
+            val pattern = "$environment:user:$username:dosagehistory:*"
             val keys = mutableListOf<String>()
 
             val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
@@ -590,16 +591,16 @@ class RedisService private constructor(
     }
 
     /**
-     * Get weekly adherence (last 7 days)
+     * Get weekly adherence (last 7 days) for a specific user
      */
-    suspend fun getWeeklyAdherence(): Either<RedisError, WeeklyAdherence> {
+    suspend fun getWeeklyAdherence(username: String): Either<RedisError, WeeklyAdherence> {
         return either {
-            val allSchedules = getAllSchedules().bind()
+            val allSchedules = getAllSchedules(username).bind()
 
             // Only load dosage histories from the last 7 days for efficiency
             val endDate = java.time.LocalDate.now()
             val startDate = endDate.minusDays(6)
-            val dosageHistories = getDosageHistoriesInDateRange(startDate, endDate).bind()
+            val dosageHistories = getDosageHistoriesInDateRange(username, startDate, endDate).bind()
 
             val days = (6 downTo 0).map { daysAgo ->
                 val date = java.time.LocalDate.now().minusDays(daysAgo.toLong())
@@ -644,13 +645,67 @@ class RedisService private constructor(
     }
 
     /**
-     * Get medicines with low stock (< threshold)
+     * Get medicines with low stock (< threshold) for a specific user
      */
-    suspend fun getLowStockMedicines(threshold: Double = 10.0): Either<RedisError, List<Medicine>> {
+    suspend fun getLowStockMedicines(username: String, threshold: Double = 10.0): Either<RedisError, List<Medicine>> {
         return either {
-            val allMedicines = getAllMedicines().bind()
+            val allMedicines = getAllMedicines(username).bind()
             allMedicines.filter { it.stock < threshold }
         }
+    }
+
+    /**
+     * Register a new user
+     * For now, we just store the username (no password yet)
+     */
+    suspend fun registerUser(username: String): Either<RedisError, User> {
+        val key = "$environment:user:$username"
+
+        // Check if user already exists
+        val existing = get(key).getOrNull()
+
+        return when (existing) {
+            null -> {
+                // Create new user
+                val user = User(username = username)
+                Either.catch {
+                    val jsonString = json.encodeToString(user)
+                    connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
+                    user
+                }.mapLeft { e ->
+                    when (e) {
+                        is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
+                        else -> RedisError.OperationError("Failed to register user: ${e.message}")
+                    }
+                }
+            }
+            else -> RedisError.OperationError("Username already exists").left()
+        }
+    }
+
+    /**
+     * Login user (for now just checks if user exists)
+     * Default password for all users - no actual password check yet
+     */
+    suspend fun loginUser(username: String): Either<RedisError, User> {
+        val key = "$environment:user:$username"
+
+        return get(key).fold(
+            { error -> error.left() },
+            { jsonString ->
+                when (jsonString) {
+                    null -> RedisError.NotFound("User not found").left()
+                    else -> Either.catch {
+                        json.decodeFromString<User>(jsonString)
+                    }.mapLeft { e ->
+                        when (e) {
+                            is SerializationException -> RedisError.SerializationError("Failed to deserialize user: ${e.message}")
+                            else -> RedisError.OperationError("Failed to login: ${e.message}")
+                        }
+                    }
+                }
+            }
+        )
     }
 
     /**

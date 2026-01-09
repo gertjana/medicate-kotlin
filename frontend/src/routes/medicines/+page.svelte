@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { userStore } from '$lib/stores/user';
 	import {
 		getMedicines,
 		createMedicine,
@@ -50,6 +51,10 @@
 
 	async function loadMedicines() {
 		if (!browser) return;
+		if (!$userStore) {
+			loading = false;
+			return;
+		}
 		loading = true;
 		error = '';
 		try {
@@ -148,12 +153,28 @@
 	}
 
 	onMount(loadMedicines);
+
+	// Reload data when user logs in or out
+	$: if (browser && $userStore) {
+		loadMedicines();
+	}
 </script>
 
 <svelte:head>
 	<title>Medicines - Medicine Scheduler</title>
 </svelte:head>
 
+{#if !$userStore}
+	<!-- Not logged in message -->
+	<div class="max-w-2xl mx-auto mt-12">
+		<div class="card text-center py-12">
+			<h2 class="text-2xl font-bold mb-4">Authentication Required</h2>
+			<p class="text-gray-600 mb-6">
+				Please login or register to view and manage your medicines.
+			</p>
+		</div>
+	</div>
+{:else}
 <div class="max-w-6xl">
 	<div class="flex justify-between items-center mb-6">
 		<h2 class="text-3xl font-bold">Medicines</h2>
@@ -294,6 +315,7 @@
 			</form>
 		</div>
 	</div>
+{/if}
 {/if}
 
 {#if showToast}

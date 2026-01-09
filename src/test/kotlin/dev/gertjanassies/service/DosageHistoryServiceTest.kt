@@ -53,7 +53,7 @@ class DosageHistoryServiceTest : FunSpec({
                 unit = "mg",
                 stock = 100.0
             )
-            val medicineKey = "$environment:medicine:$medicineId"
+            val medicineKey = "$environment:user:testuser:medicine:$medicineId"
             val medicineJson = json.encodeToString(medicine)
             val amount = 50.0
             val datetime = LocalDateTime.now()
@@ -71,7 +71,7 @@ class DosageHistoryServiceTest : FunSpec({
 
             every { mockAsyncCommands.unwatch() } returns createRedisFutureMock("OK")
 
-            val result = redisService.createDosageHistory(medicineId, amount, datetime = datetime)
+            val result = redisService.createDosageHistory("testuser", medicineId, amount, scheduledTime = "08:00", datetime = datetime)
 
             result.isRight() shouldBe true
             val dosage = result.getOrNull()!!
@@ -88,13 +88,13 @@ class DosageHistoryServiceTest : FunSpec({
 
         test("should return NotFound when medicine doesn't exist during dosage creation") {
             val medicineId = UUID.randomUUID()
-            val medicineKey = "$environment:medicine:$medicineId"
+            val medicineKey = "$environment:user:testuser:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.watch(medicineKey) } returns createRedisFutureMock("OK")
             every { mockAsyncCommands.get(medicineKey) } returns createRedisFutureMock(null as String?)
 
-            val result = redisService.createDosageHistory(medicineId, 50.0)
+            val result = redisService.createDosageHistory("testuser", medicineId, 50.0, scheduledTime = "08:00")
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
@@ -111,7 +111,7 @@ class DosageHistoryServiceTest : FunSpec({
                 unit = "mg",
                 stock = 100.0
             )
-            val medicineKey = "$environment:medicine:$medicineId"
+            val medicineKey = "$environment:user:testuser:medicine:$medicineId"
             val medicineJson = json.encodeToString(medicine)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -129,7 +129,7 @@ class DosageHistoryServiceTest : FunSpec({
             every { mockAsyncCommands.exec() } returns createRedisFutureMock(discardedResult) andThen createRedisFutureMock(successResult)
             every { mockAsyncCommands.unwatch() } returns createRedisFutureMock("OK")
 
-            val result = redisService.createDosageHistory(medicineId, 50.0)
+            val result = redisService.createDosageHistory("testuser", medicineId, 50.0, scheduledTime = "08:00")
 
             result.isRight() shouldBe true
 
@@ -147,7 +147,7 @@ class DosageHistoryServiceTest : FunSpec({
                 unit = "mg",
                 stock = 100.0
             )
-            val medicineKey = "$environment:medicine:$medicineId"
+            val medicineKey = "$environment:user:testuser:medicine:$medicineId"
             val medicineJson = json.encodeToString(medicine)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -161,7 +161,7 @@ class DosageHistoryServiceTest : FunSpec({
             every { mockAsyncCommands.exec() } returns createRedisFutureMock(discardedResult)
             every { mockAsyncCommands.unwatch() } returns createRedisFutureMock("OK")
 
-            val result = redisService.createDosageHistory(medicineId, 50.0)
+            val result = redisService.createDosageHistory("testuser", medicineId, 50.0, scheduledTime = "08:00")
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
@@ -181,7 +181,7 @@ class DosageHistoryServiceTest : FunSpec({
                 unit = "mg",
                 stock = 100.0
             )
-            val medicineKey = "$environment:medicine:$medicineId"
+            val medicineKey = "$environment:user:testuser:medicine:$medicineId"
             val medicineJson = json.encodeToString(medicine)
             val amountToAdd = 50.0
 
@@ -198,7 +198,7 @@ class DosageHistoryServiceTest : FunSpec({
 
             every { mockAsyncCommands.unwatch() } returns createRedisFutureMock("OK")
 
-            val result = redisService.addStock(medicineId, amountToAdd)
+            val result = redisService.addStock("testuser", medicineId, amountToAdd)
 
             result.isRight() shouldBe true
             result.getOrNull()?.stock shouldBe 150.0
@@ -212,13 +212,13 @@ class DosageHistoryServiceTest : FunSpec({
 
         test("should return NotFound when medicine doesn't exist for addStock") {
             val medicineId = UUID.randomUUID()
-            val medicineKey = "$environment:medicine:$medicineId"
+            val medicineKey = "$environment:user:testuser:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.watch(medicineKey) } returns createRedisFutureMock("OK")
             every { mockAsyncCommands.get(medicineKey) } returns createRedisFutureMock(null as String?)
 
-            val result = redisService.addStock(medicineId, 50.0)
+            val result = redisService.addStock("testuser", medicineId, 50.0)
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
@@ -233,7 +233,7 @@ class DosageHistoryServiceTest : FunSpec({
                 unit = "mg",
                 stock = 100.0
             )
-            val medicineKey = "$environment:medicine:$medicineId"
+            val medicineKey = "$environment:user:testuser:medicine:$medicineId"
             val medicineJson = json.encodeToString(medicine)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -251,7 +251,7 @@ class DosageHistoryServiceTest : FunSpec({
             every { mockAsyncCommands.exec() } returns createRedisFutureMock(discardedResult) andThen createRedisFutureMock(successResult)
             every { mockAsyncCommands.unwatch() } returns createRedisFutureMock("OK")
 
-            val result = redisService.addStock(medicineId, 50.0)
+            val result = redisService.addStock("testuser", medicineId, 50.0)
 
             result.isRight() shouldBe true
 
@@ -280,8 +280,8 @@ class DosageHistoryServiceTest : FunSpec({
                 amount = 100.0,
                 scheduledTime = "20:00"
             )
-            val key1 = "$environment:dosagehistory:${dosage1.id}"
-            val key2 = "$environment:dosagehistory:${dosage2.id}"
+            val key1 = "$environment:user:testuser:dosagehistory:${dosage1.id}"
+            val key2 = "$environment:user:testuser:dosagehistory:${dosage2.id}"
             val json1 = json.encodeToString(dosage1)
             val json2 = json.encodeToString(dosage2)
 
@@ -295,7 +295,7 @@ class DosageHistoryServiceTest : FunSpec({
             every { mockAsyncCommands.get(key1) } returns createRedisFutureMock(json1)
             every { mockAsyncCommands.get(key2) } returns createRedisFutureMock(json2)
 
-            val result = redisService.getAllDosageHistories()
+            val result = redisService.getAllDosageHistories("testuser")
 
             result.isRight() shouldBe true
             val dosages = result.getOrNull()!!
@@ -314,7 +314,7 @@ class DosageHistoryServiceTest : FunSpec({
             every { mockScanCursor.isFinished } returns true
             every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor)
 
-            val result = redisService.getAllDosageHistories()
+            val result = redisService.getAllDosageHistories("testuser")
 
             result.isRight() shouldBe true
             result.getOrNull()!!.size shouldBe 0
@@ -328,8 +328,8 @@ class DosageHistoryServiceTest : FunSpec({
                 amount = 50.0,
                 scheduledTime = "08:00"
             )
-            val keyValid = "$environment:dosagehistory:${validDosage.id}"
-            val keyInvalid = "$environment:dosagehistory:invalid"
+            val keyValid = "$environment:user:testuser:dosagehistory:${validDosage.id}"
+            val keyInvalid = "$environment:user:testuser:dosagehistory:invalid"
             val validJson = json.encodeToString(validDosage)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -342,7 +342,7 @@ class DosageHistoryServiceTest : FunSpec({
             every { mockAsyncCommands.get(keyValid) } returns createRedisFutureMock(validJson)
             every { mockAsyncCommands.get(keyInvalid) } returns createRedisFutureMock("""completely invalid""")
 
-            val result = redisService.getAllDosageHistories()
+            val result = redisService.getAllDosageHistories("testuser")
 
             result.isRight() shouldBe true
             result.getOrNull()!!.size shouldBe 1
@@ -353,7 +353,7 @@ class DosageHistoryServiceTest : FunSpec({
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createFailedRedisFutureMock(RuntimeException("Scan error"))
 
-            val result = redisService.getAllDosageHistories()
+            val result = redisService.getAllDosageHistories("testuser")
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()

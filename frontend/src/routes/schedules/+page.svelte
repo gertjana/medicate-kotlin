@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { userStore } from '$lib/stores/user';
 	import {
 		getSchedules,
 		getMedicines,
@@ -100,6 +101,10 @@
 
 	async function loadData() {
 		if (!browser) return;
+		if (!$userStore) {
+			loading = false;
+			return;
+		}
 		loading = true;
 		error = '';
 		try {
@@ -217,13 +222,34 @@
 			});
 	}
 
-	onMount(loadData);
+	let hasLoadedOnce = false;
+
+	onMount(async () => {
+		await loadData();
+		hasLoadedOnce = true;
+	});
+
+	// Reload data when user logs in or out, but avoid duplicate load on initial mount
+	$: if (browser && $userStore && hasLoadedOnce) {
+		loadData();
+	}
 </script>
 
 <svelte:head>
 	<title>Schedules - Medicine Scheduler</title>
 </svelte:head>
 
+{#if !$userStore}
+	<!-- Not logged in message -->
+	<div class="max-w-2xl mx-auto mt-12">
+		<div class="card text-center py-12">
+			<h2 class="text-2xl font-bold mb-4">Authentication Required</h2>
+			<p class="text-gray-600 mb-6">
+				Please login or register to view and manage your schedules.
+			</p>
+		</div>
+	</div>
+{:else}
 <div class="max-w-6xl">
 	<div class="flex justify-between items-center mb-6">
 		<h2 class="text-3xl font-bold">Schedules</h2>
@@ -347,6 +373,7 @@
 		{/if}
 	{/if}
 </div>
+{/if}
 
 {#if showToast}
 	<div class="fixed top-4 right-4 bg-[steelblue] text-white px-6 py-3 rounded-tr-lg rounded-bl-lg shadow-lg transition-opacity z-50">
