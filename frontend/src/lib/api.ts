@@ -66,9 +66,17 @@ function getHeaders(includeContentType: boolean = false): HeadersInit {
 	if (userJson) {
 		try {
 			const user = JSON.parse(userJson);
-			headers['X-Username'] = user.username;
+			if (user && typeof user.username === 'string' && user.username.trim().length > 0) {
+				headers['X-Username'] = user.username;
+			} else {
+				console.error('Invalid user data in localStorage for key "medicate_user"', user);
+				localStorage.removeItem('medicate_user');
+				throw new Error('Stored user session is corrupted. Please reload the page and sign in again.');
+			}
 		} catch (e) {
-			console.error('Failed to parse user from localStorage', e);
+			console.error('Failed to parse user from localStorage for key "medicate_user"', e);
+			localStorage.removeItem('medicate_user');
+			throw new Error('Stored user session is corrupted. Please reload the page and sign in again.');
 		}
 	}
 
