@@ -23,7 +23,28 @@ fun Route.adherenceRoutes(redisService: RedisService) {
 
     // Get low stock medicines
     get("/lowstock") {
-        val threshold = call.request.queryParameters["threshold"]?.toDoubleOrNull() ?: 10.0
+        val thresholdParam = call.request.queryParameters["threshold"]
+
+        val threshold = if (thresholdParam == null) {
+            10.0
+        } else {
+            val parsed = thresholdParam.toDoubleOrNull()
+            if (parsed == null) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Invalid threshold value. It must be a positive number.")
+                )
+                return@get
+            }
+            if (parsed <= 0.0) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Threshold must be greater than 0.")
+                )
+                return@get
+            }
+            parsed
+        }
         either {
             val lowStockMedicines = redisService.getLowStockMedicines(threshold).bind()
             call.respond(HttpStatusCode.OK, lowStockMedicines)
