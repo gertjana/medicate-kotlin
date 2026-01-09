@@ -212,32 +212,34 @@
 			<p class="text-gray-600">Loading medicines...</p>
 		</div>
 	{:else if medicines.length > 0}
-		<div class="grid gap-4">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 			{#each medicines as medicine}
-				<div class="card">
-					<div class="flex justify-between items-start">
-						<div class="flex-1">
-							<h3 class="text-xl font-bold">{medicine.name}</h3>
-							<p class="text-gray-600 mt-1">
-								{medicine.dose}{medicine.unit} per dose
-							</p>
-							<p class="mt-2">
-								<span class="font-semibold">Stock:</span>
-								<span class={medicine.stock <= 10 ? 'text-red-600 font-semibold' : ''}>
-									{medicine.stock}
-								</span>
-								{#if medicine.stock <= 10}
-									<span class="text-red-600 ml-2">⚠ Low stock</span>
-								{/if}
-							</p>
-						</div>
-						<div class="flex gap-2">
-							<button on:click={() => openStockModal(medicine.id)} class="btn">Add Stock</button>
-							<button on:click={() => startEdit(medicine)} class="btn">Edit</button>
-							<button on:click={() => handleDelete(medicine.id, medicine.name)} class="btn">
-								Delete
-							</button>
-						</div>
+				<div class="card flex flex-col">
+					<div class="flex justify-between items-start mb-4">
+						<h3 class="text-xl font-bold">{medicine.name}</h3>
+						<button on:click={() => openStockModal(medicine.id)} class="btn btn-primary text-sm px-3 py-1">
+							+ Stock
+						</button>
+					</div>
+					<div class="flex-1">
+						<p class="text-gray-600">
+							{medicine.dose}{medicine.unit} per dose
+						</p>
+						<p class="mt-2">
+							<span class="font-semibold">Stock:</span>
+							<span class={medicine.stock <= 10 ? 'text-red-600 font-semibold' : ''}>
+								{medicine.stock}
+							</span>
+							{#if medicine.stock <= 10}
+								<span class="text-red-600 ml-2">⚠ Low stock</span>
+							{/if}
+						</p>
+					</div>
+					<div class="flex gap-2 mt-4">
+						<button on:click={() => startEdit(medicine)} class="btn flex-1">Edit</button>
+						<button on:click={() => handleDelete(medicine.id, medicine.name)} class="btn flex-1">
+							Delete
+						</button>
 					</div>
 				</div>
 			{/each}

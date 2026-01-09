@@ -11,11 +11,11 @@
 
 @layer components {
 	.btn {
-		@apply px-2 py-1 text-xs border border-black bg-white text-black hover:bg-black hover:text-white transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-lg rounded-bl-lg;
+		@apply px-2 py-1 text-xs border border-[steelblue] bg-[steelblue] text-white hover:bg-[#5a9fd4] transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-lg rounded-bl-lg;
 	}
 
 	.btn-primary {
-		@apply bg-[steelblue] text-white border-[steelblue] hover:bg-[#4682b4]/80;
+		@apply bg-[steelblue] text-white border-[steelblue] hover:bg-[#5a9fd4];
 	}
 
 	.input {
