@@ -85,9 +85,9 @@ class WeeklyAdherenceTest : FunSpec({
         }
 
         test("should serialize DayAdherence with different statuses") {
-            val noneDay = DayAdherence("2026-01-01", "Monday", 1, 1, AdherenceStatus.NONE, 3, 0)
-            val partialDay = DayAdherence("2026-01-02", "Tuesday", 2, 1, AdherenceStatus.PARTIAL, 3, 2)
-            val completeDay = DayAdherence("2026-01-03", "Wednesday", 3, 1, AdherenceStatus.COMPLETE, 3, 3)
+            val noneDay = DayAdherence("2026-01-01", "Thursday", 1, 1, AdherenceStatus.NONE, 3, 0)
+            val partialDay = DayAdherence("2026-01-02", "Friday", 2, 1, AdherenceStatus.PARTIAL, 3, 2)
+            val completeDay = DayAdherence("2026-01-03", "Saturday", 3, 1, AdherenceStatus.COMPLETE, 3, 3)
 
             val noneJson = json.encodeToString(noneDay)
             val partialJson = json.encodeToString(partialDay)
