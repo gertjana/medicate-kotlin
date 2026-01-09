@@ -5,7 +5,7 @@ import type { User } from '$lib/api';
 const STORAGE_KEY = 'medicate_user';
 
 function createUserStore() {
-	const { subscribe, set, update } = writable<User | null>(null);
+	const { subscribe, set } = writable<User | null>(null);
 
 	return {
 		subscribe,
