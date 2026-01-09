@@ -11,7 +11,7 @@ export interface Schedule {
 	medicineId: string;
 	time: string;
 	amount: number;
-	daysOfWeek?: string;
+	daysOfWeek?: string; // Comma-separated day codes like "MO,WE,FR"
 }
 
 export interface DosageHistory {
@@ -36,17 +36,35 @@ export interface DailySchedule {
 	schedule: TimeSlot[];
 }
 
+export interface DayAdherence {
+	date: string;
+	dayOfWeek: string;
+	dayNumber: number;
+	month: number;
+	status: 'NONE' | 'PARTIAL' | 'COMPLETE';
+	expectedCount: number;
+	takenCount: number;
+}
+
+export interface WeeklyAdherence {
+	days: DayAdherence[];
+}
+
 const API_BASE = '/api';
 
 // Medicine API
 export async function getMedicines(): Promise<Medicine[]> {
-	const response = await fetch(`${API_BASE}/medicine`);
+	const response = await fetch(`${API_BASE}/medicine`, {
+		cache: 'no-store'
+	});
 	if (!response.ok) throw new Error('Failed to fetch medicines');
 	return response.json();
 }
 
 export async function getMedicine(id: string): Promise<Medicine> {
-	const response = await fetch(`${API_BASE}/medicine/${id}`);
+	const response = await fetch(`${API_BASE}/medicine/${id}`, {
+		cache: 'no-store'
+	});
 	if (!response.ok) throw new Error('Failed to fetch medicine');
 	return response.json();
 }
@@ -90,13 +108,17 @@ export async function addStock(medicineId: string, amount: number): Promise<Medi
 
 // Schedule API
 export async function getSchedules(): Promise<Schedule[]> {
-	const response = await fetch(`${API_BASE}/schedule`);
+	const response = await fetch(`${API_BASE}/schedule`, {
+		cache: 'no-store'
+	});
 	if (!response.ok) throw new Error('Failed to fetch schedules');
 	return response.json();
 }
 
 export async function getSchedule(id: string): Promise<Schedule> {
-	const response = await fetch(`${API_BASE}/schedule/${id}`);
+	const response = await fetch(`${API_BASE}/schedule/${id}`, {
+		cache: 'no-store'
+	});
 	if (!response.ok) throw new Error('Failed to fetch schedule');
 	return response.json();
 }
@@ -130,7 +152,9 @@ export async function deleteSchedule(id: string): Promise<void> {
 
 // Daily schedule
 export async function getDailySchedule(): Promise<DailySchedule> {
-	const response = await fetch(`${API_BASE}/daily`);
+	const response = await fetch(`${API_BASE}/daily`, {
+		cache: 'no-store'
+	});
 	if (!response.ok) throw new Error('Failed to fetch daily schedule');
 	return response.json();
 }
@@ -147,7 +171,26 @@ export async function takeDose(medicineId: string, amount: number, scheduledTime
 }
 
 export async function getDosageHistories(): Promise<DosageHistory[]> {
-	const response = await fetch(`${API_BASE}/history`);
+	const response = await fetch(`${API_BASE}/history`, {
+		cache: 'no-store'
+	});
 	if (!response.ok) throw new Error('Failed to fetch dosage history');
+	return response.json();
+}
+
+// Adherence and analytics
+export async function getWeeklyAdherence(): Promise<WeeklyAdherence> {
+	const response = await fetch(`${API_BASE}/adherence`, {
+		cache: 'no-store'
+	});
+	if (!response.ok) throw new Error('Failed to fetch weekly adherence');
+	return response.json();
+}
+
+export async function getLowStockMedicines(threshold: number = 10): Promise<Medicine[]> {
+	const response = await fetch(`${API_BASE}/lowstock?threshold=${threshold}`, {
+		cache: 'no-store'
+	});
+	if (!response.ok) throw new Error('Failed to fetch low stock medicines');
 	return response.json();
 }

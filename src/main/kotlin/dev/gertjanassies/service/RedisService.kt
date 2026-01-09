@@ -541,6 +541,117 @@ class RedisService private constructor(
     }
 
     /**
+     * Get dosage histories within a date range (inclusive)
+     * 
+     * Note: Due to Redis key-value structure, this method still scans all dosage history keys
+     * and retrieves all values, but filters them immediately after deserialization to only
+     * return entries within the specified date range. This reduces memory usage for the caller
+     * compared to getAllDosageHistories, though it doesn't reduce Redis I/O.
+     * 
+     * For true query-time filtering, consider migrating to Redis Sorted Sets with timestamps
+     * as scores or a time-series data structure.
+     */
+    suspend fun getDosageHistoriesInDateRange(
+        startDate: java.time.LocalDate,
+        endDate: java.time.LocalDate
+    ): Either<RedisError, List<DosageHistory>> {
+        return Either.catch {
+            val pattern = "$environment:dosagehistory:*"
+            val keys = mutableListOf<String>()
+
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
+
+            // Iterate through all cursor pages
+            while (true) {
+                keys.addAll(scanCursor.keys)
+                if (scanCursor.isFinished) break
+                scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
+            }
+
+            // Get values for the keys, filter by date range, and sort by datetime descending
+            keys.mapNotNull { key ->
+                asyncCommands.get(key).await()?.let { jsonString ->
+                    try {
+                        json.decodeFromString<DosageHistory>(jsonString)
+                    } catch (e: Exception) {
+                        null // Skip invalid entries
+                    }
+                }
+            }.filter { history ->
+                val historyDate = history.datetime.toLocalDate()
+                !historyDate.isBefore(startDate) && !historyDate.isAfter(endDate)
+            }.sortedByDescending { it.datetime }
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to retrieve dosage histories in date range: ${e.message}")
+        }
+    }
+
+    /**
+     * Get weekly adherence (last 7 days)
+     */
+    suspend fun getWeeklyAdherence(): Either<RedisError, WeeklyAdherence> {
+        return either {
+            val allSchedules = getAllSchedules().bind()
+            
+            // Only load dosage histories from the last 7 days for efficiency
+            val endDate = java.time.LocalDate.now()
+            val startDate = endDate.minusDays(6)
+            val dosageHistories = getDosageHistoriesInDateRange(startDate, endDate).bind()
+
+            val days = (6 downTo 0).map { daysAgo ->
+                val date = java.time.LocalDate.now().minusDays(daysAgo.toLong())
+                val dayOfWeek = DayOfWeek.fromJavaDay(date.dayOfWeek)
+
+                // Calculate expected medications for this day
+                val expectedSchedules = allSchedules.filter { schedule ->
+                    schedule.daysOfWeek.isEmpty() || schedule.daysOfWeek.contains(dayOfWeek)
+                }
+                val expectedCount = expectedSchedules.size
+
+                // Precompute medicine IDs that are expected for this day
+                val expectedMedicineIds = expectedSchedules.map { it.medicineId }.toSet()
+
+                // Count how many expected medicines were actually taken
+                val takenCount = dosageHistories.count { history ->
+                    val historyDate = history.datetime.toLocalDate()
+                    historyDate.isEqual(date) && expectedMedicineIds.contains(history.medicineId)
+                }
+
+                // Determine status
+                val status = when {
+                    expectedCount == 0 -> AdherenceStatus.NONE
+                    takenCount == 0 -> AdherenceStatus.NONE
+                    takenCount >= expectedCount -> AdherenceStatus.COMPLETE
+                    else -> AdherenceStatus.PARTIAL
+                }
+
+                DayAdherence(
+                    date = date.toString(), // Convert to ISO string format
+                    dayOfWeek = dayOfWeek.name,
+                    dayNumber = date.dayOfMonth,
+                    month = date.monthValue,
+                    status = status,
+                    expectedCount = expectedCount,
+                    takenCount = takenCount
+                )
+            }
+
+            WeeklyAdherence(days)
+        }
+    }
+
+    /**
+     * Get medicines with low stock (< threshold)
+     */
+    suspend fun getLowStockMedicines(threshold: Double = 10.0): Either<RedisError, List<Medicine>> {
+        return either {
+            val allMedicines = getAllMedicines().bind()
+            allMedicines.filter { it.stock < threshold }
+        }
+    }
+
+    /**
      * Close the connection
      * Only closes the connection if it was created by this service (not injected for testing)
      */
