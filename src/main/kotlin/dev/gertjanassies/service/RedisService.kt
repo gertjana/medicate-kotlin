@@ -541,12 +541,56 @@ class RedisService private constructor(
     }
 
     /**
+     * Get dosage histories within a date range (inclusive)
+     * This is more efficient than getAllDosageHistories when you only need a subset
+     */
+    suspend fun getDosageHistoriesInDateRange(
+        startDate: java.time.LocalDate,
+        endDate: java.time.LocalDate
+    ): Either<RedisError, List<DosageHistory>> {
+        return Either.catch {
+            val pattern = "$environment:dosagehistory:*"
+            val keys = mutableListOf<String>()
+
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
+
+            // Iterate through all cursor pages
+            while (true) {
+                keys.addAll(scanCursor.keys)
+                if (scanCursor.isFinished) break
+                scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
+            }
+
+            // Get values for the keys, filter by date range, and sort by datetime descending
+            keys.mapNotNull { key ->
+                asyncCommands.get(key).await()?.let { jsonString ->
+                    try {
+                        json.decodeFromString<DosageHistory>(jsonString)
+                    } catch (e: Exception) {
+                        null // Skip invalid entries
+                    }
+                }
+            }.filter { history ->
+                val historyDate = history.datetime.toLocalDate()
+                !historyDate.isBefore(startDate) && !historyDate.isAfter(endDate)
+            }.sortedByDescending { it.datetime }
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to retrieve dosage histories in date range: ${e.message}")
+        }
+    }
+
+    /**
      * Get weekly adherence (last 7 days)
      */
     suspend fun getWeeklyAdherence(): Either<RedisError, WeeklyAdherence> {
         return either {
             val allSchedules = getAllSchedules().bind()
-            val dosageHistories = getAllDosageHistories().bind()
+            
+            // Only load dosage histories from the last 7 days for efficiency
+            val endDate = java.time.LocalDate.now()
+            val startDate = endDate.minusDays(6)
+            val dosageHistories = getDosageHistoriesInDateRange(startDate, endDate).bind()
 
             val days = (6 downTo 0).map { daysAgo ->
                 val date = java.time.LocalDate.now().minusDays(daysAgo.toLong())
