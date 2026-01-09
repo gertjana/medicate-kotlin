@@ -558,10 +558,13 @@ class RedisService private constructor(
                 }
                 val expectedCount = expectedSchedules.size
 
-                // Count how many were actually taken
+                // Precompute medicine IDs that are expected for this day
+                val expectedMedicineIds = expectedSchedules.map { it.medicineId }.toSet()
+
+                // Count how many expected medicines were actually taken
                 val takenCount = dosageHistories.count { history ->
                     val historyDate = history.datetime.toLocalDate()
-                    historyDate.isEqual(date)
+                    historyDate.isEqual(date) && expectedMedicineIds.contains(history.medicineId)
                 }
 
                 // Determine status
