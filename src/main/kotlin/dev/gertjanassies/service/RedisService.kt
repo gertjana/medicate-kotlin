@@ -14,6 +14,7 @@ import kotlinx.coroutines.future.await
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
+import org.mindrot.jbcrypt.BCrypt
 import java.util.*
 
 /**
@@ -655,10 +656,9 @@ class RedisService private constructor(
     }
 
     /**
-     * Register a new user
-     * For now, we just store the username (no password yet)
+     * Register a new user with password hashing
      */
-    suspend fun registerUser(username: String): Either<RedisError, User> {
+    suspend fun registerUser(username: String, password: String): Either<RedisError, User> {
         val key = "$environment:user:$username"
 
         // Check if user already exists
@@ -666,8 +666,11 @@ class RedisService private constructor(
 
         return when (existing) {
             null -> {
+                // Hash the password using BCrypt
+                val passwordHash = BCrypt.hashpw(password, BCrypt.gensalt())
+
                 // Create new user
-                val user = User(username = username)
+                val user = User(username = username, passwordHash = passwordHash)
                 Either.catch {
                     val jsonString = json.encodeToString(user)
                     connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
@@ -684,10 +687,9 @@ class RedisService private constructor(
     }
 
     /**
-     * Login user (for now just checks if user exists)
-     * Default password for all users - no actual password check yet
+     * Login user by verifying password hash
      */
-    suspend fun loginUser(username: String): Either<RedisError, User> {
+    suspend fun loginUser(username: String, password: String): Either<RedisError, User> {
         val key = "$environment:user:$username"
 
         return get(key).fold(
@@ -696,10 +698,18 @@ class RedisService private constructor(
                 when (jsonString) {
                     null -> RedisError.NotFound("User not found").left()
                     else -> Either.catch {
-                        json.decodeFromString<User>(jsonString)
+                        val user = json.decodeFromString<User>(jsonString)
+
+                        // Verify password against stored hash
+                        if (BCrypt.checkpw(password, user.passwordHash)) {
+                            user
+                        } else {
+                            throw IllegalArgumentException("Invalid password")
+                        }
                     }.mapLeft { e ->
                         when (e) {
                             is SerializationException -> RedisError.SerializationError("Failed to deserialize user: ${e.message}")
+                            is IllegalArgumentException -> RedisError.OperationError("Invalid credentials")
                             else -> RedisError.OperationError("Failed to login: ${e.message}")
                         }
                     }

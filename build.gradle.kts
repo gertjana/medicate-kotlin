@@ -28,6 +28,9 @@ dependencies {
     // Redis client (Lettuce)
     implementation("io.lettuce:lettuce-core:6.3.0.RELEASE")
 
+    // Password hashing
+    implementation("org.mindrot:jbcrypt:0.4")
+
     // Logging
     implementation("ch.qos.logback:logback-classic:1.4.14")
 

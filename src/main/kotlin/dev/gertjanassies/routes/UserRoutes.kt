@@ -1,6 +1,7 @@
 package dev.gertjanassies.routes
 
 import dev.gertjanassies.model.request.UserRequest
+import dev.gertjanassies.model.response.toResponse
 import dev.gertjanassies.service.RedisService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -12,7 +13,7 @@ fun Route.userRoutes(redisService: RedisService) {
     route("/user") {
         /**
          * POST /api/user/register
-         * Register a new user
+         * Register a new user with username and password
          */
         post("/register") {
             val request = call.receive<UserRequest>()
@@ -22,15 +23,25 @@ fun Route.userRoutes(redisService: RedisService) {
                 return@post
             }
 
-            redisService.registerUser(request.username).fold(
+            if (request.password.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password cannot be empty"))
+                return@post
+            }
+
+            if (request.password.length < 6) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 6 characters"))
+                return@post
+            }
+
+            redisService.registerUser(request.username, request.password).fold(
                 { error -> call.respond(HttpStatusCode.BadRequest, mapOf("error" to error.message)) },
-                { user -> call.respond(HttpStatusCode.Created, user) }
+                { user -> call.respond(HttpStatusCode.Created, user.toResponse()) }
             )
         }
 
         /**
          * POST /api/user/login
-         * Login user (for now just checks if user exists)
+         * Login user by verifying username and password
          */
         post("/login") {
             val request = call.receive<UserRequest>()
@@ -40,9 +51,14 @@ fun Route.userRoutes(redisService: RedisService) {
                 return@post
             }
 
-            redisService.loginUser(request.username).fold(
+            if (request.password.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password cannot be empty"))
+                return@post
+            }
+
+            redisService.loginUser(request.username, request.password).fold(
                 { _ -> call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid credentials")) },
-                { user -> call.respond(HttpStatusCode.OK, user) }
+                { user -> call.respond(HttpStatusCode.OK, user.toResponse()) }
             )
         }
     }
