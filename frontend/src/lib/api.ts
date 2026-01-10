@@ -241,21 +241,21 @@ export async function getLowStockMedicines(threshold: number = 10): Promise<Medi
 }
 
 // User authentication API
-export async function registerUser(username: string): Promise<User> {
+export async function registerUser(username: string, password: string): Promise<User> {
 	const response = await fetch(`${API_BASE}/user/register`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ username })
+		body: JSON.stringify({ username, password })
 	});
 	if (!response.ok) throw new Error('Failed to register user');
 	return response.json();
 }
 
-export async function loginUser(username: string): Promise<User> {
+export async function loginUser(username: string, password: string): Promise<User> {
 	const response = await fetch(`${API_BASE}/user/login`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ username })
+		body: JSON.stringify({ username, password })
 	});
 	if (!response.ok) throw new Error('Failed to login');
 	return response.json();

@@ -39,19 +39,21 @@ class UserServiceTest : FunSpec({
     }
 
     context("registerUser") {
-        test("should successfully register a new user") {
+        test("should successfully register a new user with hashed password") {
             val username = "newuser"
+            val password = "password123"
             val userKey = "$environment:user:$username"
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(null as String?)
             every { mockAsyncCommands.set(userKey, any()) } returns createRedisFutureMock("OK")
 
-            val result = redisService.registerUser(username)
+            val result = redisService.registerUser(username, password)
 
             result.isRight() shouldBe true
             val user = result.getOrNull()!!
             user.username shouldBe username
+            user.passwordHash.isNotEmpty() shouldBe true
 
             verify(exactly = 1) { mockAsyncCommands.get(userKey) }
             verify(exactly = 1) { mockAsyncCommands.set(userKey, any()) }
@@ -59,14 +61,15 @@ class UserServiceTest : FunSpec({
 
         test("should return error when username already exists") {
             val username = "existinguser"
+            val password = "password123"
             val userKey = "$environment:user:$username"
-            val existingUser = User(username = username)
+            val existingUser = User(username = username, passwordHash = "hashedpassword")
             val existingUserJson = json.encodeToString(existingUser)
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(existingUserJson)
 
-            val result = redisService.registerUser(username)
+            val result = redisService.registerUser(username, password)
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
@@ -78,6 +81,7 @@ class UserServiceTest : FunSpec({
 
         test("should return error when registration fails") {
             val username = "testuser"
+            val password = "password123"
             val userKey = "$environment:user:$username"
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -85,7 +89,7 @@ class UserServiceTest : FunSpec({
             every { mockAsyncCommands.set(userKey, any()) } returns
                 createFailedRedisFutureMock(RuntimeException("Redis connection error"))
 
-            val result = redisService.registerUser(username)
+            val result = redisService.registerUser(username, password)
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
@@ -96,6 +100,7 @@ class UserServiceTest : FunSpec({
 
         test("should proceed with registration when checking existing user fails") {
             val username = "testuser"
+            val password = "password123"
             val userKey = "$environment:user:$username"
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -104,7 +109,7 @@ class UserServiceTest : FunSpec({
                 createFailedRedisFutureMock(RuntimeException("Connection error"))
             every { mockAsyncCommands.set(userKey, any()) } returns createRedisFutureMock("OK")
 
-            val result = redisService.registerUser(username)
+            val result = redisService.registerUser(username, password)
 
             // Due to getOrNull(), the error is swallowed and registration proceeds
             result.isRight() shouldBe true
@@ -117,16 +122,19 @@ class UserServiceTest : FunSpec({
     }
 
     context("loginUser") {
-        test("should successfully login existing user") {
+        test("should successfully login existing user with correct password") {
             val username = "testuser"
+            val password = "password123"
             val userKey = "$environment:user:$username"
-            val user = User(username = username)
+            // Hash the password using BCrypt to simulate stored user
+            val passwordHash = org.mindrot.jbcrypt.BCrypt.hashpw(password, org.mindrot.jbcrypt.BCrypt.gensalt())
+            val user = User(username = username, passwordHash = passwordHash)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
 
-            val result = redisService.loginUser(username)
+            val result = redisService.loginUser(username, password)
 
             result.isRight() shouldBe true
             val loggedInUser = result.getOrNull()!!
@@ -135,14 +143,36 @@ class UserServiceTest : FunSpec({
             verify(exactly = 1) { mockAsyncCommands.get(userKey) }
         }
 
+        test("should return error when password is incorrect") {
+            val username = "testuser"
+            val correctPassword = "password123"
+            val wrongPassword = "wrongpassword"
+            val userKey = "$environment:user:$username"
+            val passwordHash = org.mindrot.jbcrypt.BCrypt.hashpw(correctPassword, org.mindrot.jbcrypt.BCrypt.gensalt())
+            val user = User(username = username, passwordHash = passwordHash)
+            val userJson = json.encodeToString(user)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+
+            val result = redisService.loginUser(username, wrongPassword)
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
+            result.leftOrNull()?.message shouldBe "Invalid credentials"
+
+            verify(exactly = 1) { mockAsyncCommands.get(userKey) }
+        }
+
         test("should return NotFound when user does not exist") {
             val username = "nonexistent"
+            val password = "password123"
             val userKey = "$environment:user:$username"
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(null as String?)
 
-            val result = redisService.loginUser(username)
+            val result = redisService.loginUser(username, password)
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
@@ -153,13 +183,14 @@ class UserServiceTest : FunSpec({
 
         test("should return error when Redis operation fails") {
             val username = "testuser"
+            val password = "password123"
             val userKey = "$environment:user:$username"
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.get(userKey) } returns
                 createFailedRedisFutureMock(RuntimeException("Connection error"))
 
-            val result = redisService.loginUser(username)
+            val result = redisService.loginUser(username, password)
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
@@ -169,13 +200,15 @@ class UserServiceTest : FunSpec({
 
         test("should return error when user JSON is invalid") {
             val username = "testuser"
+            val password = "password123"
             val userKey = "$environment:user:$username"
-            val invalidJson = """{"invalid": "json"}"""
+            // Use completely malformed JSON that will fail to parse
+            val invalidJson = """not valid json at all"""
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(invalidJson)
 
-            val result = redisService.loginUser(username)
+            val result = redisService.loginUser(username, password)
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.SerializationError>()

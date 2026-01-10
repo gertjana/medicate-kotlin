@@ -40,11 +40,13 @@ fun Application.module() {
             allowMethod(HttpMethod.Patch)
             allowHeader(HttpHeaders.Authorization)
             allowHeader(HttpHeaders.ContentType)
-            // Only allow localhost origins in development
+            // Allow localhost origins and file:// protocol in development
             allowHost("localhost:5173") // Vite dev server
             allowHost("localhost:3000") // Alternative dev port
             allowHost("127.0.0.1:5173")
             allowHost("127.0.0.1:3000")
+            // Allow any localhost port for development tools
+            anyHost() // This allows file:// protocol and any localhost
         }
     }
 

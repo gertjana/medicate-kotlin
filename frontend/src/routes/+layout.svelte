@@ -19,6 +19,7 @@
 	let showAuthModal = false;
 	let authMode: 'login' | 'register' = 'login';
 	let username = '';
+	let password = '';
 	let authError = '';
 
 	onMount(() => {
@@ -31,15 +32,24 @@
 			authError = 'Username is required';
 			return;
 		}
+		if (!password) {
+			authError = 'Password is required';
+			return;
+		}
+		if (authMode === 'register' && password.length < 6) {
+			authError = 'Password must be at least 6 characters';
+			return;
+		}
 
 		try {
 			const user = authMode === 'register'
-				? await registerUser(username.trim())
-				: await loginUser(username.trim());
+				? await registerUser(username.trim(), password)
+				: await loginUser(username.trim(), password);
 
 			userStore.login(user);
 			showAuthModal = false;
 			username = '';
+			password = '';
 		} catch (e) {
 			authError = e instanceof Error ? e.message : 'Authentication failed';
 		}
@@ -52,6 +62,7 @@
 	function openAuthModal(mode: 'login' | 'register') {
 		authMode = mode;
 		username = '';
+		password = '';
 		authError = '';
 		showAuthModal = true;
 	}
@@ -121,6 +132,21 @@
 						autofocus
 					/>
 				</div>
+				<div class="mb-4">
+					<label for="auth-password" class="block mb-1 font-semibold">Password</label>
+					<input
+						id="auth-password"
+						type="password"
+						bind:value={password}
+						class="input w-full"
+						placeholder="Enter your password"
+						required
+						minlength="6"
+					/>
+					{#if authMode === 'register'}
+						<p class="text-xs text-gray-600 mt-1">Minimum 6 characters</p>
+					{/if}
+				</div>
 				{#if authError}
 					<div class="mb-4 p-3 bg-red-50 border border-red-300 text-red-800 text-sm rounded">
 						{authError}
@@ -138,7 +164,7 @@
 					{#if authMode === 'login'}
 						<button
 							type="button"
-							on:click={() => { authMode = 'register'; authError = ''; }}
+							on:click={() => { authMode = 'register'; authError = ''; password = ''; }}
 							class="text-[steelblue] hover:underline"
 						>
 							Don't have an account? Register
@@ -146,7 +172,7 @@
 					{:else}
 						<button
 							type="button"
-							on:click={() => { authMode = 'login'; authError = ''; }}
+							on:click={() => { authMode = 'login'; authError = ''; password = ''; }}
 							class="text-[steelblue] hover:underline"
 						>
 							Already have an account? Login
