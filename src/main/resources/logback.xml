@@ -5,10 +5,12 @@
         </encoder>
     </appender>
 
-    <root level="INFO">
+    <root level="DEBUG">
         <appender-ref ref="STDOUT"/>
     </root>
-
+can
     <logger name="io.ktor" level="INFO"/>
     <logger name="io.netty" level="INFO"/>
+    <logger name="io.lettuce" level="INFO"/>
+    <logger name="dev.gertjanassies" level="DEBUG"/>
 </configuration>

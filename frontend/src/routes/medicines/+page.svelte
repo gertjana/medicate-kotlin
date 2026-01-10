@@ -158,6 +158,8 @@
 	$: if (browser && $userStore) {
 		loadMedicines();
 	}
+
+	$: sortedMedicines = [...medicines].sort((a, b) => a.name.localeCompare(b.name));
 </script>
 
 <svelte:head>
@@ -245,9 +247,9 @@
 		<div class="text-center py-12">
 			<p class="text-gray-600">Loading medicines...</p>
 		</div>
-	{:else if medicines.length > 0}
+	{:else if sortedMedicines.length > 0}
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-			{#each medicines as medicine}
+			{#each sortedMedicines as medicine}
 				<div class="card flex flex-col">
 					<div class="flex justify-between items-start mb-4">
 						<h3 class="text-xl font-bold">{medicine.name}</h3>

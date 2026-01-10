@@ -350,10 +350,18 @@
 						</div>
 						<div class="space-y-3">
 							{#each group.schedules as schedule}
+								{@const med = medicines.find(m => m.id === schedule.medicineId)}
 								<div class="flex justify-between items-center bg-gray-50 p-3 rounded">
 									<div class="flex-1">
-										<p class="font-semibold">{getMedicineName(schedule.medicineId)}</p>
-										<p class="text-sm text-gray-600">{schedule.amount} dose(s)</p>
+										<p class="font-semibold">
+											{med ? med.name : 'Unknown medicine'}
+											{med ? ` (${med.dose}${med.unit})` : ''}
+										</p>
+										<p class="text-sm text-gray-600">
+											{schedule.amount} dose(s)
+											{med ? ` = ${schedule.amount * med.dose} ${med.unit}` : ''}
+											{!med ? ' ⚠️ Medicine not found' : ''}
+										</p>
 									</div>
 									<div class="flex gap-2">
 										<button on:click={() => startEdit(schedule)} class="btn text-sm">Edit</button>
