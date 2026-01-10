@@ -21,7 +21,7 @@ class ApplicationTest {
             module()
         }
 
-        val response = client.options("/api/health") {
+        val response = client.get("/api/health") {
             header(HttpHeaders.Origin, "http://localhost:5173")
             header(HttpHeaders.AccessControlRequestMethod, "GET")
         }

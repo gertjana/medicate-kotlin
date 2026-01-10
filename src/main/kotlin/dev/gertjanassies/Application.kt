@@ -40,24 +40,9 @@ fun Application.module() {
             allowMethod(HttpMethod.Patch)
             allowHeader(HttpHeaders.Authorization)
             allowHeader(HttpHeaders.ContentType)
-            // Allow localhost origins and file:// protocol in development
-            allowHost("localhost:5173") // Vite dev server
-            allowHost("localhost:3000") // Alternative dev port
-            allowHost("127.0.0.1:5173")
-            allowHost("127.0.0.1:3000")
-            // Allow any localhost port for development tools
-            anyHost() // This allows file:// protocol and any localhost
-        }
-    }
-
-    // Configure compression for static files
-    install(Compression) {
-        gzip {
-            priority = 1.0
-        }
-        deflate {
-            priority = 10.0
-            minimumSize(1024)
+            // Allow requests from localhost:5173 for local development
+            allowHost("localhost:5173", schemes = listOf("http", "https"))
+            allowHost("127.0.0.1:5173", schemes = listOf("http", "https"))
         }
     }
 
@@ -86,10 +71,17 @@ fun Application.module() {
         }
     )
 
+    log.info("Configuring routing...")
     // Configure routing
     routing {
         // API routes under /api prefix
         route("/api") {
+            get("/health") {
+                if (!serveStatic) {
+                    call.response.headers.append("X-CORS-ENABLED", "true")
+                }
+                call.respondText("OK")
+            }
             healthRoutes()
             medicineRoutes(redisService)
             scheduleRoutes(redisService)
