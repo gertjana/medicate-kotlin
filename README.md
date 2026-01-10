@@ -38,37 +38,6 @@ npm run dev
 ### 4. Access Application
 Open http://localhost:5173 in your browser
 
-## Multi-User Support
-
-### New Users
-1. Click "Register" in top-right corner
-2. Enter a username
-3. Start adding medicines and schedules
-
-### Existing Users
-1. Click "Login"
-2. Enter your username
-3. Access your data
-
-### Migrating Existing Data
-If you have existing data from before multi-user support:
-
-```bash
-# Make script executable
-chmod +x migrate-to-multiuser.sh
-
-# Run migration (assigns all data to "admin" user)
-./migrate-to-multiuser.sh test admin
-```
-
-See `MIGRATION-GUIDE.md` for detailed instructions.
-
-## Documentation
-
-- **[IMPLEMENTATION-SUMMARY.md](IMPLEMENTATION-SUMMARY.md)** - Complete implementation overview
-- **[MULTIUSER.md](MULTIUSER.md)** - Multi-user architecture details
-- **[MIGRATION-GUIDE.md](MIGRATION-GUIDE.md)** - Data migration instructions
-
 ## Configuration
 
 The application can be configured via `src/main/resources/application.conf` or environment variables:
