@@ -72,3 +72,6 @@ test-results/
 
 # asdf
 .tool-versions
+
+# Generated binaries (ignore at repo root)
+/bin/

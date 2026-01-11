@@ -5,7 +5,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class UserResponse(
-    val username: String
+    val username: String,
+    val email: String
 )
 
-fun User.toResponse() = UserResponse(username = username)
+fun User.toResponse() = UserResponse(username = username, email = email)

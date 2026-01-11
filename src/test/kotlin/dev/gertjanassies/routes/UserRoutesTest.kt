@@ -10,13 +10,12 @@ import dev.gertjanassies.service.RedisService
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.config.*
-import io.ktor.server.plugins.contentnegotiation.*
-import io.ktor.server.routing.*
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 import io.ktor.server.testing.*
 import io.mockk.*
 
@@ -34,19 +33,20 @@ class UserRoutesTest : FunSpec({
     context("POST /user/register") {
         test("should register a new user successfully") {
             val username = "testuser"
+            val email = "testuser@example.com"
             val password = "password123"
-            val request = UserRequest(username, password)
-            val user = User(username, passwordHash = "hashedpassword")
-            coEvery { mockRedisService.registerUser(username, password) } returns user.right()
+            val request = UserRequest(username, email, password)
+            val user = User(username, email = email, passwordHash = "hashedpassword")
+            coEvery { mockRedisService.registerUser(username, email, password) } returns user.right()
 
             testApplication {
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
+                install(ServerContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService) }
 
-                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
@@ -55,78 +55,80 @@ class UserRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.Created
                 val body = response.body<UserResponse>()
                 body.username shouldBe username
-                coVerify { mockRedisService.registerUser(username, password) }
+                body.email shouldBe email
+                coVerify { mockRedisService.registerUser(username, email, password) }
             }
         }
 
         test("should return 400 when username is blank") {
-            val request = UserRequest("", "password123")
+            val request = UserRequest("", "test@example.com", "password123")
 
             testApplication {
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
+                install(ServerContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService) }
 
-                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
 
                 response.status shouldBe HttpStatusCode.BadRequest
-                coVerify(exactly = 0) { mockRedisService.registerUser(any(), any()) }
+                coVerify(exactly = 0) { mockRedisService.registerUser(any(), any(), any()) }
             }
         }
 
         test("should return 400 when password is blank") {
-            val request = UserRequest("testuser", "")
+            val request = UserRequest("testuser", "test@example.com", "")
 
             testApplication {
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
+                install(ServerContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService) }
 
-                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
 
                 response.status shouldBe HttpStatusCode.BadRequest
-                coVerify(exactly = 0) { mockRedisService.registerUser(any(), any()) }
+                coVerify(exactly = 0) { mockRedisService.registerUser(any(), any(), any()) }
             }
         }
 
         test("should return 400 when password is too short") {
-            val request = UserRequest("testuser", "12345")
+            val request = UserRequest("testuser", "test@example.com", "12345")
 
             testApplication {
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
+                install(ServerContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService) }
 
-                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
 
                 response.status shouldBe HttpStatusCode.BadRequest
-                coVerify(exactly = 0) { mockRedisService.registerUser(any(), any()) }
+                coVerify(exactly = 0) { mockRedisService.registerUser(any(), any(), any()) }
             }
         }
 
         test("should return 400 on registration error") {
             val username = "existinguser"
+            val email = "existing@example.com"
             val password = "password123"
-            val request = UserRequest(username, password)
-            coEvery { mockRedisService.registerUser(username, password) } returns
+            val request = UserRequest(username, email, password)
+            coEvery { mockRedisService.registerUser(username, email, password) } returns
                 RedisError.OperationError("User already exists").left()
 
 
@@ -134,17 +136,17 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
+                install(ServerContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService) }
 
-                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
 
                 response.status shouldBe HttpStatusCode.BadRequest
-                coVerify { mockRedisService.registerUser(username, password) }
+                coVerify { mockRedisService.registerUser(username, email, password) }
             }
         }
     }
@@ -153,18 +155,18 @@ class UserRoutesTest : FunSpec({
         test("should login user successfully") {
             val username = "testuser"
             val password = "password123"
-            val request = UserRequest(username, password)
-            val user = User(username, passwordHash = "hashedpassword")
+            val request = UserRequest(username, "", password)
+            val user = User(username, email = "", passwordHash = "hashedpassword")
             coEvery { mockRedisService.loginUser(username, password) } returns user.right()
 
             testApplication {
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
+                install(ServerContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService) }
 
-                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
@@ -178,16 +180,16 @@ class UserRoutesTest : FunSpec({
         }
 
         test("should return 400 when username is blank") {
-            val request = UserRequest("", "password123")
+            val request = UserRequest("", "", "password123")
 
             testApplication {
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
+                install(ServerContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService) }
 
-                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
@@ -199,16 +201,16 @@ class UserRoutesTest : FunSpec({
         }
 
         test("should return 400 when password is blank") {
-            val request = UserRequest("testuser", "")
+            val request = UserRequest("testuser", "", "")
 
             testApplication {
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
+                install(ServerContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService) }
 
-                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
@@ -222,7 +224,7 @@ class UserRoutesTest : FunSpec({
         test("should return 401 on login error") {
             val username = "nonexistent"
             val password = "wrongpassword"
-            val request = UserRequest(username, password)
+            val request = UserRequest(username, "", password)
             coEvery { mockRedisService.loginUser(username, password) } returns
                 RedisError.NotFound("User not found").left()
 
@@ -231,10 +233,10 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
+                install(ServerContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService) }
 
-                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
                     contentType(ContentType.Application.Json)
                     setBody(request)

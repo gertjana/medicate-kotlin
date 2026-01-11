@@ -16,6 +16,8 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import org.mindrot.jbcrypt.BCrypt
 import java.util.*
+import java.security.SecureRandom
+
 
 /**
  * Redis service using functional programming patterns with Arrow and async coroutines
@@ -45,18 +47,18 @@ class RedisService private constructor(
      * If connection is already set (for testing), returns it
      */
     fun connect(): Either<RedisError, RedisAsyncCommands<String, String>> = Either.catch {
-        connection?.let { conn ->
-            // Connection already provided (test mode)
-            conn.async()
-        } ?: run {
-            // Connect to Redis (production mode)
-            requireNotNull(host) { "Host must be provided for production mode" }
-            requireNotNull(port) { "Port must be provided for production mode" }
-            val redisClient = RedisClient.create("redis://$host:$port")
-            val conn = redisClient.connect()
-            client = redisClient
-            connection = conn
-            conn.async()
+        // If connection is already provided (test mode), return its async commands
+        if (connection != null) {
+            connection!!.async()
+        } else {
+             // Connect to Redis (production mode)
+             requireNotNull(host) { "Host must be provided for production mode" }
+             requireNotNull(port) { "Port must be provided for production mode" }
+             val redisClient = RedisClient.create("redis://$host:$port")
+             val conn = redisClient.connect()
+             client = redisClient
+             connection = conn
+             conn.async()
         }
     }.mapLeft { RedisError.ConnectionError(it.message ?: "Unknown error") }
 
@@ -189,7 +191,7 @@ class RedisService private constructor(
                 asyncCommands.get(key).await()?.let { jsonString ->
                     try {
                         json.decodeFromString<Medicine>(jsonString)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         null // Skip invalid entries
                     }
                 }
@@ -315,7 +317,7 @@ class RedisService private constructor(
                 asyncCommands.get(key).await()?.let { jsonString ->
                     try {
                         json.decodeFromString<Schedule>(jsonString)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         null // Skip invalid entries
                     }
                 }
@@ -529,15 +531,17 @@ class RedisService private constructor(
             }
 
             // Get all values for the keys and sort by datetime descending
-            keys.mapNotNull { key ->
+            val list = keys.mapNotNull { key ->
                 asyncCommands.get(key).await()?.let { jsonString ->
                     try {
                         json.decodeFromString<DosageHistory>(jsonString)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         null // Skip invalid entries
                     }
                 }
-            }.sortedByDescending { it.datetime }
+            }
+
+            list.sortedByDescending { it.datetime }
         }.mapLeft { e ->
             RedisError.OperationError("Failed to retrieve dosage histories: ${e.message}")
         }
@@ -574,15 +578,17 @@ class RedisService private constructor(
             }
 
             // Get values for the keys, filter by date range, and sort by datetime descending
-            keys.mapNotNull { key ->
+            val list = keys.mapNotNull { key ->
                 asyncCommands.get(key).await()?.let { jsonString ->
                     try {
                         json.decodeFromString<DosageHistory>(jsonString)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         null // Skip invalid entries
                     }
                 }
-            }.filter { history ->
+            }
+
+            list.filter { history ->
                 val historyDate = history.datetime.toLocalDate()
                 !historyDate.isBefore(startDate) && !historyDate.isAfter(endDate)
             }.sortedByDescending { it.datetime }
@@ -658,7 +664,7 @@ class RedisService private constructor(
     /**
      * Register a new user with password hashing
      */
-    suspend fun registerUser(username: String, password: String): Either<RedisError, User> {
+    suspend fun registerUser(username: String, email: String, password: String): Either<RedisError, User> {
         val key = "$environment:user:$username"
 
         // Check if user already exists
@@ -669,8 +675,8 @@ class RedisService private constructor(
                 // Hash the password using BCrypt
                 val passwordHash = BCrypt.hashpw(password, BCrypt.gensalt())
 
-                // Create new user
-                val user = User(username = username, passwordHash = passwordHash)
+                // Create new user including email
+                val user = User(username = username, email = email, passwordHash = passwordHash)
                 Either.catch {
                     val jsonString = json.encodeToString(user)
                     connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
@@ -718,6 +724,37 @@ class RedisService private constructor(
         )
     }
 
+    suspend fun validateToken(username: String, token: String): Either<RedisError, Boolean> {
+        val key = "$environment:user:$username:token:$token"
+
+        return get(key).fold(
+            { error -> error.left() },
+            { value ->
+                when (value) {
+                    null -> RedisError.NotFound("Token not found or expired").left()
+                    "valid" -> true.right()
+                    else -> false.right()
+                }
+            }
+        )
+    }
+
+
+    suspend fun generateTokenAndStore(username: String, tokenExpirySeconds: Long = 3600): Either<RedisError, String> {
+        val secureRandom = SecureRandom()
+        val code = secureRandom.nextInt(900000) + 100000 // Range: 100000-999999
+        val token = code.toString()
+
+        val key = "$environment:user:$username:token:$token"
+
+        return Either.catch {
+            connection?.async()?.setex(key, tokenExpirySeconds, "valid")?.await() ?: throw IllegalStateException("Not connected")
+            token
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to generate and store token: ${e.message}")
+        }
+    }
+
     /**
      * Close the connection
      * Only closes the connection if it was created by this service (not injected for testing)
@@ -728,6 +765,8 @@ class RedisService private constructor(
             client?.shutdown()
         }
     }
+
+    // end of RedisService class
 }
 
 /**
