@@ -13,13 +13,18 @@ fun Route.userRoutes(redisService: RedisService) {
     route("/user") {
         /**
          * POST /api/user/register
-         * Register a new user with username and password
+         * Register a new user with username, email and password
          */
         post("/register") {
             val request = call.receive<UserRequest>()
 
             if (request.username.isBlank()) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Username cannot be empty"))
+                return@post
+            }
+
+            if (request.email.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Email cannot be empty"))
                 return@post
             }
 
@@ -33,10 +38,16 @@ fun Route.userRoutes(redisService: RedisService) {
                 return@post
             }
 
-            redisService.registerUser(request.username, request.password).fold(
-                { error -> call.respond(HttpStatusCode.BadRequest, mapOf("error" to error.message)) },
-                { user -> call.respond(HttpStatusCode.Created, user.toResponse()) }
-            )
+            val result = redisService.registerUser(request.username, request.email, request.password)
+
+            val left = result.leftOrNull()
+            if (left != null) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to left.message))
+                return@post
+            }
+
+            val user = result.getOrNull()!!
+            call.respond(HttpStatusCode.Created, user.toResponse())
         }
 
         /**
@@ -56,10 +67,16 @@ fun Route.userRoutes(redisService: RedisService) {
                 return@post
             }
 
-            redisService.loginUser(request.username, request.password).fold(
-                { _ -> call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid credentials")) },
-                { user -> call.respond(HttpStatusCode.OK, user.toResponse()) }
-            )
+            val loginResult = redisService.loginUser(request.username, request.password)
+
+            val leftLogin = loginResult.leftOrNull()
+            if (leftLogin != null) {
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid credentials"))
+                return@post
+            }
+
+            val user = loginResult.getOrNull()!!
+            call.respond(HttpStatusCode.OK, user.toResponse())
         }
     }
 }

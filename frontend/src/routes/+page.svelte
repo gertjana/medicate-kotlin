@@ -207,7 +207,7 @@
 					<div class="text-sm text-yellow-700 mt-1">
 						{#each visibleLowStockMedicines as medicine, i}
 							<span>
-								<strong>{medicine.name}</strong> ({medicine.stock} {medicine.unit} remaining){#if i < visibleLowStockMedicines.length - 1}, {/if}
+								<strong>{medicine.name}</strong> {medicine.dose} {medicine.unit} ({medicine.stock} remaining){#if i < visibleLowStockMedicines.length - 1}, {/if}
 							</span>
 						{/each}
 					</div>

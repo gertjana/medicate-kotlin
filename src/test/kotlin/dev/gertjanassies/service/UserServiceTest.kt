@@ -41,6 +41,7 @@ class UserServiceTest : FunSpec({
     context("registerUser") {
         test("should successfully register a new user with hashed password") {
             val username = "newuser"
+            val email = "newuser@example.com"
             val password = "password123"
             val userKey = "$environment:user:$username"
 
@@ -48,11 +49,12 @@ class UserServiceTest : FunSpec({
             every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(null as String?)
             every { mockAsyncCommands.set(userKey, any()) } returns createRedisFutureMock("OK")
 
-            val result = redisService.registerUser(username, password)
+            val result = redisService.registerUser(username, email, password)
 
             result.isRight() shouldBe true
             val user = result.getOrNull()!!
             user.username shouldBe username
+            user.email shouldBe email
             user.passwordHash.isNotEmpty() shouldBe true
 
             verify(exactly = 1) { mockAsyncCommands.get(userKey) }
@@ -61,15 +63,16 @@ class UserServiceTest : FunSpec({
 
         test("should return error when username already exists") {
             val username = "existinguser"
+            val email = "existing@example.com"
             val password = "password123"
             val userKey = "$environment:user:$username"
-            val existingUser = User(username = username, passwordHash = "hashedpassword")
+            val existingUser = User(username = username, email = email, passwordHash = "hashedpassword")
             val existingUserJson = json.encodeToString(existingUser)
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(existingUserJson)
 
-            val result = redisService.registerUser(username, password)
+            val result = redisService.registerUser(username, email, password)
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
@@ -81,6 +84,7 @@ class UserServiceTest : FunSpec({
 
         test("should return error when registration fails") {
             val username = "testuser"
+            val email = "test@example.com"
             val password = "password123"
             val userKey = "$environment:user:$username"
 
@@ -89,7 +93,7 @@ class UserServiceTest : FunSpec({
             every { mockAsyncCommands.set(userKey, any()) } returns
                 createFailedRedisFutureMock(RuntimeException("Redis connection error"))
 
-            val result = redisService.registerUser(username, password)
+            val result = redisService.registerUser(username, email, password)
 
             result.isLeft() shouldBe true
             result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
@@ -100,6 +104,7 @@ class UserServiceTest : FunSpec({
 
         test("should proceed with registration when checking existing user fails") {
             val username = "testuser"
+            val email = "test@example.com"
             val password = "password123"
             val userKey = "$environment:user:$username"
 
@@ -109,7 +114,7 @@ class UserServiceTest : FunSpec({
                 createFailedRedisFutureMock(RuntimeException("Connection error"))
             every { mockAsyncCommands.set(userKey, any()) } returns createRedisFutureMock("OK")
 
-            val result = redisService.registerUser(username, password)
+            val result = redisService.registerUser(username, email, password)
 
             // Due to getOrNull(), the error is swallowed and registration proceeds
             result.isRight() shouldBe true
@@ -128,7 +133,7 @@ class UserServiceTest : FunSpec({
             val userKey = "$environment:user:$username"
             // Hash the password using BCrypt to simulate stored user
             val passwordHash = org.mindrot.jbcrypt.BCrypt.hashpw(password, org.mindrot.jbcrypt.BCrypt.gensalt())
-            val user = User(username = username, passwordHash = passwordHash)
+            val user = User(username = username, email = "test@example.com", passwordHash = passwordHash)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -149,7 +154,7 @@ class UserServiceTest : FunSpec({
             val wrongPassword = "wrongpassword"
             val userKey = "$environment:user:$username"
             val passwordHash = org.mindrot.jbcrypt.BCrypt.hashpw(correctPassword, org.mindrot.jbcrypt.BCrypt.gensalt())
-            val user = User(username = username, passwordHash = passwordHash)
+            val user = User(username = username, email = "test@example.com", passwordHash = passwordHash)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands

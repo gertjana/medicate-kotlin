@@ -51,7 +51,7 @@ fun Application.module() {
         json()
     }
 
-    // Initialize Redis service (optional, for demonstration)
+    // Initialize Redis service
     val redisHost = environment.config.propertyOrNull("redis.host")?.getString()
         ?: System.getenv("REDIS_HOST") ?: "localhost"
     val redisPort = environment.config.propertyOrNull("redis.port")?.getString()?.toInt()
