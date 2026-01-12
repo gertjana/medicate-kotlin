@@ -4,35 +4,34 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-    - 8080:8080
+    - 80:80
     environment:
-    - REDIS_HOST=redis
+    - REDIS_HOST=host.docker.internal
     - REDIS_PORT=6379
     - APP_ENV=production
-    - SERVE_STATIC=true
-    depends_on:
-      redis:
-        condition: service_healthy
+#    depends_on:
+#      redis:
+#        condition: service_healthy
     healthcheck:
-      test: [CMD, curl, -f, http://localhost:8080/api/health]
+      test: [CMD, curl, -f, http://localhost/api/health]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 40s
     restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    ports:
-    - 6379:6379
-    volumes:
-    - redis-data:/data
-    healthcheck:
-      test: [CMD, redis-cli, ping]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    restart: unless-stopped
-
-volumes:
-  redis-data:
+#  redis:
+#    image: redis:7-alpine
+#    ports:
+#      - 6379:6379
+#    volumes:
+#      - redis-data:/data
+#    healthcheck:
+#      test: [CMD, redis-cli, ping]
+#      interval: 5s
+#      timeout: 3s
+#      retries: 5
+#    restart: unless-stopped
+#
+#volumes:
+#  redis-data:

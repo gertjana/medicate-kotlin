@@ -1,0 +1,54 @@
+#!/bin/sh
+set -e
+
+# Start backend in background
+java -jar /app/app.jar &
+BACKEND_PID=$!
+
+# Start SvelteKit SSR frontend in background (Node app)
+cd /app/frontend && node build/index.js &
+FRONTEND_PID=$!
+cd /
+
+# Wait for backend to become healthy (max 60s)
+MAX_WAIT=60
+SLEPT=0
+while [ $SLEPT -lt $MAX_WAIT ]; do
+  if curl -sSf http://127.0.0.1:8080/api/health >/dev/null 2>&1; then
+    echo "Backend is up"
+    break
+  fi
+  sleep 1
+  SLEPT=$((SLEPT+1))
+done
+
+if [ $SLEPT -ge $MAX_WAIT ]; then
+  echo "Warning: Backend did not become ready within ${MAX_WAIT}s — continuing to start nginx (requests to /api may fail until backend is ready)"
+else
+  echo "Backend became ready after ${SLEPT}s"
+fi
+
+# Wait for frontend SSR to be ready (max 60s)
+SLEPT=0
+while [ $SLEPT -lt $MAX_WAIT ]; do
+  if curl -sSf http://127.0.0.1:3000 >/dev/null 2>&1; then
+    echo "Frontend SSR is up"
+    break
+  fi
+  sleep 1
+  SLEPT=$((SLEPT+1))
+done
+
+if [ $SLEPT -ge $MAX_WAIT ]; then
+  echo "Warning: Frontend SSR did not become ready within ${MAX_WAIT}s — continuing to start nginx (requests to / may fail until frontend is ready)"
+else
+  echo "Frontend SSR became ready after ${SLEPT}s"
+fi
+
+# Start nginx (foreground)
+echo "Starting nginx..."
+nginx -g 'daemon off;'
+
+# Wait for backend and frontend if nginx exits
+wait $BACKEND_PID
+wait $FRONTEND_PID
