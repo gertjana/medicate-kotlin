@@ -1,17 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+	html {
+		font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+	}
+
 	body {
 		@apply bg-white text-black antialiased;
-		font-family: 'Roboto Mono', monospace;
+		/* Use Inter for UI text */
+		font-family: inherit;
+	}
+
+	/* Use Poppins for headings to give a friendlier / modern feel */
+	h1, h2, h3, h4, h5, h6 {
+		font-family: 'Poppins', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 	}
 }
 
 @layer components {
 	.btn {
-		@apply px-2 py-1 text-xs border border-[steelblue] bg-[steelblue] text-white hover:bg-[#5a9fd4] transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed rounded-tr-lg rounded-bl-lg;
+		@apply px-2 py-1 text-xs border rounded-tr-lg rounded-bl-lg transition-colors duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
+	}
+
+	/* Nav, Refresh, Login/Logout */
+	.btn-nav {
+		@apply bg-[#2b6cb0] border-[#2b6cb0] text-white hover:bg-[#2f79c6];
+	}
+
+	/* Edit / Delete */
+	.btn-edit {
+		/* darker steel-blue */
+		@apply bg-[#1f4f78] border-[#1f4f78] text-white hover:bg-[#376b9a];
+	}
+
+	/* Take / Take All / + Stock */
+	.btn-action {
+		@apply bg-[#0ea5e9] border-[#0ea5e9] text-white hover:bg-[#26b7ff];
+	}
+
+	/* Taken / All Taken - muted button with light blue border */
+	.btn-taken {
+		@apply px-2 py-1 text-xs border rounded-tr-lg rounded-bl-lg transition-colors duration-200 cursor-default;
+		/* light grey background, light-blue border to match action color */
+		background-color: #f3f4f6; /* gray-100 */
+		border-color: #0ea5e9; /* same as btn-action border */
+		color: #0ea5e9; /* accent color for the checkmark/text */
+	}
+
+	.btn-taken:hover {
+		/* keep hover stable */
+		background-color: #f3f4f6;
+	}
+
+	.btn-taken:disabled {
+		@apply cursor-not-allowed opacity-100;
 	}
 
 	.btn-primary {

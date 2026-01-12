@@ -179,9 +179,6 @@
 <div class="max-w-6xl">
 	<div class="flex justify-between items-center mb-6">
 		<h2 class="text-3xl font-bold">Dosage History</h2>
-		<button on:click={loadData} class="btn" disabled={loading}>
-			{loading ? 'Loading...' : 'Refresh'}
-		</button>
 	</div>
 
 	{#if error}
@@ -198,7 +195,7 @@
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 			{#each groupedHistories as dateGroup}
 				<div class="card">
-					<div class="mb-4 pb-3 border-b border-gray-200">
+					<div class="mb-4 pb-0 border-b border-gray-200">
 						<h3 class="text-xl font-bold">{dateGroup.date}</h3>
 					</div>
 					<div class="space-y-4">
@@ -216,7 +213,7 @@
 									</div>
 									<button
 										on:click={() => takeAllMissing(dateGroup.dateObj, timeSlot.time, timeSlot.scheduledMedicines || [])}
-										class="btn btn-primary w-full text-sm"
+										class="btn btn-action w-full text-sm"
 									>
 										Take All
 									</button>
