@@ -136,7 +136,7 @@
 </script>
 
 <div class="min-h-screen flex flex-col">
-	<header class="border-b border-black">
+	<header class="border-b border-black" style="margin-bottom: 2em;">
 			<div class="pr-4 pt-4 pb-0">
 					<div class="flex items-start gap-6">
 						<img src="/medication.svg" alt="Medicine Scheduler Logo" class="h-12 w-12 flex-shrink-0 ml-4" style="filter: invert(48%) sepia(79%) saturate(2476%) hue-rotate(184deg) brightness(91%) contrast(87%);" />
