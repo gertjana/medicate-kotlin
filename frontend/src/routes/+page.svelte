@@ -227,7 +227,7 @@
 
 	<!-- Weekly Adherence Tracker -->
 	{#if !loading && weeklyAdherence && weeklyAdherence.days.length > 0}
-		<div class="card mb-6">
+		<div class="mb-6 bg-white p-4">
 			<div class="flex justify-between items-center gap-2">
 				{#each weeklyAdherence.days as day}
 					<div class="flex flex-col items-center flex-1">
@@ -265,9 +265,6 @@
 
 	<div class="flex justify-between items-center mb-6">
 		<h2 class="text-2xl font-bold">Today's Schedule</h2>
-		<button on:click={loadSchedule} class="btn" disabled={loading}>
-			{loading ? 'Loading...' : 'Refresh'}
-		</button>
 	</div>
 
 	{#if error}
@@ -290,13 +287,13 @@
 							{timeSlot.time}
 						</h3>
 						{#if allTaken}
-							<button class="btn opacity-50 cursor-not-allowed" disabled>
+							<button class="btn btn-taken ml-0 cursor-not-allowed" disabled>
 								✓ All Taken
 							</button>
 						{:else}
 							<button
 								on:click={() => takeAllForTimeSlot(timeSlot)}
-								class="btn btn-primary"
+								class="btn btn-action"
 							>
 								Take All
 							</button>
@@ -323,13 +320,13 @@
 									</p>
 								</div>
 								{#if takenToday}
-									<button class="btn ml-4 opacity-50 cursor-not-allowed" disabled>
+									<button class="btn btn-taken ml-4 cursor-not-allowed" disabled>
 										✓ Taken
 									</button>
 								{:else}
 									<button
 										on:click={() => handleTakeDose(item.medicine.id, item.amount, item.medicine.name, timeSlot.time)}
-										class="btn btn-primary ml-4"
+										class="btn btn-action ml-4"
 										disabled={takingDose[key] || item.medicine.stock < item.amount}
 									>
 										{takingDose[key] ? 'Recording...' : 'Take Dose'}

@@ -253,7 +253,7 @@
 				<div class="card flex flex-col">
 					<div class="flex justify-between items-start mb-4">
 						<h3 class="text-xl font-bold">{medicine.name}</h3>
-						<button on:click={() => openStockModal(medicine.id)} class="btn btn-primary text-sm px-3 py-1">
+						<button on:click={() => openStockModal(medicine.id)} class="btn btn-edit text-sm px-3 py-1">
 							+ Stock
 						</button>
 					</div>
@@ -277,8 +277,8 @@
 						</p>
 					</div>
 					<div class="flex gap-2 mt-4">
-						<button on:click={() => startEdit(medicine)} class="btn flex-1">Edit</button>
-						<button on:click={() => handleDelete(medicine.id, medicine.name)} class="btn flex-1">
+						<button on:click={() => startEdit(medicine)} class="btn btn-edit flex-1">Edit</button>
+						<button on:click={() => handleDelete(medicine.id, medicine.name)} class="btn btn-edit flex-1">
 							Delete
 						</button>
 					</div>
@@ -311,7 +311,7 @@
 					/>
 				</div>
 				<div class="flex gap-2">
-					<button type="submit" class="btn btn-primary">Add Stock</button>
+					<button type="submit" class="btn btn-edit">Add Stock</button>
 					<button type="button" on:click={closeStockModal} class="btn">Cancel</button>
 				</div>
 			</form>

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { userStore } from '$lib/stores/user';
 	import { registerUser, loginUser } from '$lib/api';
@@ -76,8 +77,13 @@
 		}
 	}
 
-	function handleLogout() {
+	async function handleLogout() {
+		// Close profile popup to avoid flicker
+		showProfile = false;
+		// Perform logout then redirect to dashboard to avoid "Authentication required" pages
 		userStore.logout();
+		// Navigate to dashboard (root) and replace history so back doesn't return to protected page
+		goto('/', { replaceState: true });
 	}
 
 	function openAuthModal(mode: 'login' | 'register') {
@@ -130,49 +136,51 @@
 </script>
 
 <div class="min-h-screen flex flex-col">
-	<header class="border-b border-black">
-		<div class="pr-4 py-4">
-			<div class="flex items-start gap-6">
-				<img src="/medication.svg" alt="Medicine Scheduler Logo" class="h-24 w-24 flex-shrink-0 ml-4" style="filter: invert(48%) sepia(79%) saturate(2476%) hue-rotate(184deg) brightness(91%) contrast(87%);" />
-				<div class="flex-1">
-					<div class="flex justify-between items-start mb-4">
-						<h1 class="text-2xl font-bold">Medicate</h1>
-						<div class="flex items-center gap-2">
-							{#if $userStore}
-								<div class="relative flex items-center gap-2 overflow-visible">
-									<button on:click={toggleProfile} class="text-sm font-semibold flex items-center gap-2" aria-expanded={showProfile} aria-haspopup="true">
-										<span>👤 {$userStore.username}</span>
-									</button>
-									{#if showProfile}
-										<div on:click|stopPropagation class="absolute bg-white border border-gray-200 shadow-lg rounded p-3 z-50 flex flex-col justify-between" style={profileInlineStyle}>
-											<p class="text-sm font-semibold mb-1">Profile</p>
-											<p class="text-sm text-gray-700">Email: <span class="font-medium" style="display:inline-block; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{$userStore.email}</span></p>
-										</div>
-									{/if}
-									<button on:click={handleLogout} class="btn text-xs">Logout</button>
+	<header class="border-b border-black" style="margin-bottom: 2em;">
+			<div class="pr-4 pt-4 pb-0">
+					<div class="flex items-start gap-6">
+						<img src="/medication.svg" alt="Medicine Scheduler Logo" class="h-12 w-12 flex-shrink-0 ml-4" style="filter: invert(48%) sepia(79%) saturate(2476%) hue-rotate(184deg) brightness(91%) contrast(87%);" />
+						<div class="flex-1">
+							<div class="flex justify-between items-center mb-0">
+								<div class="flex items-center gap-6">
+									<h1 class="text-2xl font-bold">Medicate</h1>
+									<nav class="hidden md:flex items-center gap-2">
+										{#each navItems as item}
+											<a
+												href={item.path}
+												class="nav-link {$page.url.pathname === item.path ? 'nav-link-active' : ''}"
+											>
+												{item.label}
+											</a>
+										{/each}
+									</nav>
 								</div>
-							{:else}
-								<button on:click={() => openAuthModal('login')} class="btn btn-primary text-xs">Login</button>
-								<button on:click={() => openAuthModal('register')} class="btn text-xs">Register</button>
-							{/if}
+								<div class="flex items-center gap-2">
+									{#if $userStore}
+										<div class="relative flex items-center gap-2 overflow-visible">
+											<button on:click={toggleProfile} class="text-sm font-semibold flex items-center gap-2" aria-expanded={showProfile} aria-haspopup="true">
+												<span>👤 {$userStore.username}</span>
+											</button>
+											{#if showProfile}
+												<div on:click|stopPropagation class="absolute bg-white border border-gray-200 shadow-lg rounded p-3 z-50 flex flex-col justify-between" style={profileInlineStyle}>
+													<p class="text-sm font-semibold mb-1">Profile</p>
+													<p class="text-sm text-gray-700">Email: <span class="font-medium" style="display:inline-block; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; vertical-align:bottom;">{$userStore.email}</span></p>
+												</div>
+											{/if}
+											<button on:click={handleLogout} class="btn btn-nav text-xs">Logout</button>
+										</div>
+									{:else}
+										<button on:click={() => openAuthModal('login')} class="btn btn-nav text-xs">Login</button>
+										<button on:click={() => openAuthModal('register')} class="btn btn-nav text-xs">Register</button>
+									{/if}
+								</div>
+							</div>
 						</div>
 					</div>
-					<nav class="flex gap-2">
-						{#each navItems as item}
-							<a
-								href={item.path}
-								class="nav-link {$page.url.pathname === item.path ? 'nav-link-active' : ''}"
-							>
-								{item.label}
-							</a>
-						{/each}
-					</nav>
 				</div>
-			</div>
-		</div>
 	</header>
 
-	<main class="flex-1 container mx-auto px-4 py-8">
+	<main class="flex-1 container mx-auto px-4 pt-0 pb-8">
 		<slot />
 	</main>
 
@@ -230,10 +238,10 @@
 					</div>
 				{/if}
 				<div class="flex gap-2">
-					<button type="submit" class="btn btn-primary flex-1">
+					<button type="submit" class="btn btn-nav flex-1">
 						{authMode === 'register' ? 'Register' : 'Login'}
 					</button>
-					<button type="button" on:click={() => showAuthModal = false} class="btn flex-1">
+					<button type="button" on:click={() => showAuthModal = false} class="btn btn-nav flex-1">
 						Cancel
 					</button>
 				</div>

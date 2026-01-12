@@ -364,8 +364,8 @@
 										</p>
 									</div>
 									<div class="flex gap-2">
-										<button on:click={() => startEdit(schedule)} class="btn text-sm">Edit</button>
-										<button on:click={() => handleDelete(schedule.id)} class="btn text-sm">Delete</button>
+										<button on:click={() => startEdit(schedule)} class="btn btn-edit text-sm">Edit</button>
+										<button on:click={() => handleDelete(schedule.id)} class="btn btn-edit text-sm">Delete</button>
 									</div>
 								</div>
 							{/each}
