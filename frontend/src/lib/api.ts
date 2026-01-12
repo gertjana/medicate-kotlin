@@ -56,6 +56,7 @@ export interface WeeklyAdherence {
 	days: DayAdherence[];
 }
 
+// Update API_BASE to always use the SSR endpoint
 const API_BASE = '/api';
 
 // Helper function to get headers with username
@@ -246,7 +247,8 @@ export async function registerUser(username: string, password: string, email?: s
     const body: any = { username, password };
     if (email) body.email = email;
 
-    const response = await fetch(`${API_BASE}/user/register`, {
+    // Use the correct SSR endpoint for registration
+    const response = await fetch(`/api/user/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
