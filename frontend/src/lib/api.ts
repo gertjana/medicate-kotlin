@@ -56,6 +56,15 @@ export interface WeeklyAdherence {
 	days: DayAdherence[];
 }
 
+export interface MedicineExpiry {
+	id: string;
+	name: string;
+	dose: number;
+	unit: string;
+	stock: number;
+	expiryDate: string;
+}
+
 // Update API_BASE to always use the SSR endpoint
 const API_BASE = '/api';
 
@@ -264,5 +273,14 @@ export async function loginUser(username: string, password: string): Promise<Use
 		body: JSON.stringify({ username, password })
 	});
 	if (!response.ok) throw new Error('Failed to login');
+	return response.json();
+}
+
+export async function getMedicineExpiry(): Promise<MedicineExpiry[]> {
+	const response = await fetch(`${API_BASE}/medicineExpiry`, {
+		cache: 'no-store',
+		headers: getHeaders()
+	});
+	if (!response.ok) throw new Error('Failed to fetch medicine expiry');
 	return response.json();
 }

@@ -437,4 +437,123 @@ class AdherenceServiceTest : FunSpec({
             lowStock[0].stock shouldBe 0.0
         }
     }
+
+    context("medicineExpiry") {
+        test("should calculate expiry date for daily schedule") {
+            val today = LocalDate.of(2026, 1, 13)
+            val medicine = Medicine(
+                id = UUID.randomUUID(),
+                name = "Aspirin",
+                dose = 100.0,
+                unit = "mg",
+                stock = 10.0
+            )
+            val schedule = Schedule(
+                id = UUID.randomUUID(),
+                medicineId = medicine.id,
+                time = "08:00",
+                amount = 2.0,
+                daysOfWeek = emptyList() // every day
+            )
+            every { mockConnection.async() } returns mockAsyncCommands
+            val medKey = "$environment:user:$testUsername:medicine:${medicine.id}"
+            val schedKey = "$environment:user:$testUsername:schedule:${schedule.id}"
+            val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { medScanCursor.keys } returns listOf(medKey)
+            every { medScanCursor.isFinished } returns true
+            val schedScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { schedScanCursor.keys } returns listOf(schedKey)
+            every { schedScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(medScanCursor) andThen createRedisFutureMock(schedScanCursor)
+            every { mockAsyncCommands.get(medKey) } returns createRedisFutureMock(json.encodeToString(medicine))
+            every { mockAsyncCommands.get(schedKey) } returns createRedisFutureMock(json.encodeToString(schedule))
+            val result = redisService.medicineExpiry(testUsername, today.atStartOfDay())
+            result.isRight() shouldBe true
+            val expiry = result.getOrNull()!!
+            expiry.size shouldBe 1
+            expiry[0].name shouldBe "Aspirin"
+            expiry[0].expiryDate shouldBe today.plusDays(5).atStartOfDay() // 10/2 = 5 days left
+        }
+        test("should not include medicine with no schedule") {
+            val medicine = Medicine(
+                id = UUID.randomUUID(),
+                name = "Ibuprofen",
+                dose = 200.0,
+                unit = "mg",
+                stock = 20.0
+            )
+            every { mockConnection.async() } returns mockAsyncCommands
+            val medKey = "$environment:user:$testUsername:medicine:${medicine.id}"
+            val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { medScanCursor.keys } returns listOf(medKey)
+            every { medScanCursor.isFinished } returns true
+            val schedScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { schedScanCursor.keys } returns emptyList()
+            every { schedScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(medScanCursor) andThen createRedisFutureMock(schedScanCursor)
+            every { mockAsyncCommands.get(medKey) } returns createRedisFutureMock(json.encodeToString(medicine))
+            val result = redisService.medicineExpiry(testUsername, LocalDate.of(2026, 1, 13).atStartOfDay())
+            result.isRight() shouldBe true
+            val expiry = result.getOrNull()!!
+            expiry.size shouldBe 0 // Should not include medicine with no schedule
+        }
+        test("should calculate expiry for weekly schedule") {
+            val today = LocalDate.of(2026, 1, 13)
+            val medicine = Medicine(
+                id = UUID.randomUUID(),
+                name = "Vitamin C",
+                dose = 500.0,
+                unit = "mg",
+                stock = 7.0
+            )
+            val schedule = Schedule(
+                id = UUID.randomUUID(),
+                medicineId = medicine.id,
+                time = "09:00",
+                amount = 1.0,
+                daysOfWeek = listOf(DayOfWeek.MONDAY) // once per week
+            )
+            every { mockConnection.async() } returns mockAsyncCommands
+            val medKey = "$environment:user:$testUsername:medicine:${medicine.id}"
+            val schedKey = "$environment:user:$testUsername:schedule:${schedule.id}"
+            val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { medScanCursor.keys } returns listOf(medKey)
+            every { medScanCursor.isFinished } returns true
+            val schedScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { schedScanCursor.keys } returns listOf(schedKey)
+            every { schedScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(medScanCursor) andThen createRedisFutureMock(schedScanCursor)
+            every { mockAsyncCommands.get(medKey) } returns createRedisFutureMock(json.encodeToString(medicine))
+            every { mockAsyncCommands.get(schedKey) } returns createRedisFutureMock(json.encodeToString(schedule))
+            val result = redisService.medicineExpiry(testUsername, today.atStartOfDay())
+            result.isRight() shouldBe true
+            val expiry = result.getOrNull()!!
+            expiry.size shouldBe 1
+            expiry[0].name shouldBe "Vitamin C"
+            expiry[0].expiryDate shouldBe today.plusDays(49).atStartOfDay() // 7/0.142857 = 49 days
+        }
+        test("should not include medicine with zero stock and no schedule") {
+            val medicine = Medicine(
+                id = UUID.randomUUID(),
+                name = "Paracetamol",
+                dose = 500.0,
+                unit = "mg",
+                stock = 0.0
+            )
+            every { mockConnection.async() } returns mockAsyncCommands
+            val medKey = "$environment:user:$testUsername:medicine:${medicine.id}"
+            val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { medScanCursor.keys } returns listOf(medKey)
+            every { medScanCursor.isFinished } returns true
+            val schedScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { schedScanCursor.keys } returns emptyList()
+            every { schedScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(medScanCursor) andThen createRedisFutureMock(schedScanCursor)
+            every { mockAsyncCommands.get(medKey) } returns createRedisFutureMock(json.encodeToString(medicine))
+            val result = redisService.medicineExpiry(testUsername, LocalDate.of(2026, 1, 13).atStartOfDay())
+            result.isRight() shouldBe true
+            val expiry = result.getOrNull()!!
+            expiry.size shouldBe 0 // Should not include medicine with zero stock and no schedule
+        }
+    }
 })

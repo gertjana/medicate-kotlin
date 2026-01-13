@@ -176,4 +176,18 @@ fun Route.medicineRoutes(redisService: RedisService) {
             }
         }
     }
+
+    get("/medicineExpiry") {
+        val username = call.getUsername() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+            return@get
+        }
+
+        either {
+            val expiringMedicines = redisService.medicineExpiry(username).bind()
+            call.respond(HttpStatusCode.OK, expiringMedicines)
+        }.onLeft { error ->
+            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+        }
+    }
 }

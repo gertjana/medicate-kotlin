@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { userStore } from '$lib/stores/user';
-	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, getLowStockMedicines, takeDose, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine } from '$lib/api';
+	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, getLowStockMedicines, takeDose, getMedicineExpiry, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine, type MedicineExpiry } from '$lib/api';
 
 	// SvelteKit props - using const since they're not used internally
 	export const data = {};
@@ -12,9 +12,12 @@
 	let dosageHistories: DosageHistory[] = [];
 	let weeklyAdherence: WeeklyAdherence | null = null;
 	let lowStockMedicines: Medicine[] = [];
+	let medicineExpiry: MedicineExpiry[] = [];
 	let suppressedLowStockIds: Set<string> = new Set();
 	let loading = true;
+	let expiryLoading = false;
 	let error = '';
+	let expiryError = '';
 	let takingDose: { [key: string]: boolean } = {};
 	let toastMessage = '';
 	let showToast = false;
@@ -91,6 +94,18 @@
 		}
 	}
 
+	async function loadMedicineExpiry() {
+		expiryLoading = true;
+		expiryError = '';
+		try {
+			medicineExpiry = await getMedicineExpiry();
+		} catch (e) {
+			expiryError = e instanceof Error ? e.message : 'Failed to load expiry data';
+		} finally {
+			expiryLoading = false;
+		}
+	}
+
 	function isTakenToday(medicineId: string, scheduledTime: string): boolean {
 		const today = new Date();
 		today.setHours(0, 0, 0, 0);
@@ -154,12 +169,16 @@
 		}
 	}
 
-	onMount(loadSchedule);
-	onMount(loadSuppressedIds);
+	onMount(() => {
+		loadSchedule();
+		loadSuppressedIds();
+		loadMedicineExpiry();
+	});
 
 	// Reload data when user logs in or out
 	$: if (browser && $userStore) {
 		loadSchedule();
+		loadMedicineExpiry();
 	}
 </script>
 
@@ -343,6 +362,48 @@
 			<p class="text-gray-600 mb-4">No scheduled medicines for today</p>
 			<a href="/schedules" class="btn btn-primary">Add Schedule</a>
 		</div>
+	{/if}
+
+	<!-- Medicine Expiry Forecast -->
+	{#if !expiryLoading && medicineExpiry.length > 0}
+		<div class="mt-10">
+			<h2 class="text-xl font-bold mb-2">Medicine Expiry Forecast</h2>
+			<div class="overflow-x-auto">
+				<table class="min-w-full bg-white border border-gray-200 rounded-lg">
+					<thead>
+						<tr class="bg-gray-100">
+							<th class="px-4 py-2 text-left">Name</th>
+							<th class="px-4 py-2 text-left">Dose Unit</th>
+							<th class="px-4 py-2 text-left">Stock</th>
+							<th class="px-4 py-2 text-left">Expiry</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each medicineExpiry as med}
+							<tr>
+								<td class="px-4 py-2 font-medium">{med.name}</td>
+								<td class="px-4 py-2">{med.dose} {med.unit}</td>
+								<td class="px-4 py-2">{med.stock}</td>
+								{#if med.expiryDate}
+									{@const expiry = new Date(med.expiryDate)}
+									{@const now = new Date()}
+									{@const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))}
+									<td class="px-4 py-2 {daysLeft < 7 ? 'text-red-600 font-bold' : daysLeft < 14 ? 'text-yellow-600 font-semibold' : ''}">
+										{expiry.toLocaleDateString()}
+									</td>
+								{:else}
+									<td class="px-4 py-2">-</td>
+								{/if}
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	{:else if expiryLoading}
+		<div class="mt-10 text-gray-500">Loading expiry forecast...</div>
+	{:else if expiryError}
+		<div class="mt-10 text-red-600">{expiryError}</div>
 	{/if}
 </div>
 {/if}
