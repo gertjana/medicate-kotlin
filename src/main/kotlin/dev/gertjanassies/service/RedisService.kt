@@ -201,6 +201,16 @@ class RedisService private constructor(
         }
     }
 
+    /**
+     * Get medicines with low stock (< threshold) for a specific user
+     */
+    suspend fun getLowStockMedicines(username: String, threshold: Double = 10.0): Either<RedisError, List<Medicine>> {
+        return either {
+            val allMedicines = getAllMedicines(username).bind()
+            allMedicines.filter { it.stock < threshold }
+        }
+    }
+
     // Schedule operations
 
     /**
@@ -598,19 +608,19 @@ class RedisService private constructor(
     }
 
     /**
-     * Get weekly adherence (last 7 days) for a specific user
+     * Get weekly adherence (last 7 days, excluding today) for a specific user
      */
     suspend fun getWeeklyAdherence(username: String): Either<RedisError, WeeklyAdherence> {
         return either {
             val allSchedules = getAllSchedules(username).bind()
 
-            // Only load dosage histories from the last 7 days for efficiency
-            val endDate = java.time.LocalDate.now()
+            // Only load dosage histories from the last 7 days (excluding today) for efficiency
+            val endDate = java.time.LocalDate.now().minusDays(1)
             val startDate = endDate.minusDays(6)
             val dosageHistories = getDosageHistoriesInDateRange(username, startDate, endDate).bind()
 
             val days = (6 downTo 0).map { daysAgo ->
-                val date = java.time.LocalDate.now().minusDays(daysAgo.toLong())
+                val date = endDate.minusDays(daysAgo.toLong())
                 val dayOfWeek = DayOfWeek.fromJavaDay(date.dayOfWeek)
 
                 // Calculate expected medications for this day
@@ -648,16 +658,6 @@ class RedisService private constructor(
             }
 
             WeeklyAdherence(days)
-        }
-    }
-
-    /**
-     * Get medicines with low stock (< threshold) for a specific user
-     */
-    suspend fun getLowStockMedicines(username: String, threshold: Double = 10.0): Either<RedisError, List<Medicine>> {
-        return either {
-            val allMedicines = getAllMedicines(username).bind()
-            allMedicines.filter { it.stock < threshold }
         }
     }
 

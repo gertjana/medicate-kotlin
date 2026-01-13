@@ -94,8 +94,8 @@ class AdherenceServiceTest : FunSpec({
                 daysOfWeek = emptyList() // Every day
             )
 
-            // Create dosage histories for last 7 days
-            val dosageHistories = (0 until 7).map { daysAgo ->
+            // Create dosage histories for last 7 days (excluding today)
+            val dosageHistories = (1..7).map { daysAgo ->
                 DosageHistory(
                     id = UUID.randomUUID(),
                     datetime = LocalDateTime.now().minusDays(daysAgo.toLong()),
@@ -163,10 +163,10 @@ class AdherenceServiceTest : FunSpec({
                 daysOfWeek = emptyList()
             )
 
-            // Only take medicine1 today (not medicine2)
+            // Only take medicine1 yesterday (not medicine2)
             val dosageHistory = DosageHistory(
                 id = UUID.randomUUID(),
-                datetime = LocalDateTime.now(),
+                datetime = LocalDateTime.now().minusDays(1),
                 medicineId = medicineId1,
                 amount = 1.0,
                 scheduledTime = "08:00"
@@ -198,11 +198,11 @@ class AdherenceServiceTest : FunSpec({
             result.isRight() shouldBe true
             val weeklyAdherence = result.getOrNull()!!
 
-            // Today (last day) should be partial
-            val today = weeklyAdherence.days.last()
-            today.expectedCount shouldBe 2
-            today.takenCount shouldBe 1
-            today.status shouldBe AdherenceStatus.PARTIAL
+            // The most recent day (yesterday) should be partial
+            val yesterday = weeklyAdherence.days.last()
+            yesterday.expectedCount shouldBe 2
+            yesterday.takenCount shouldBe 1
+            yesterday.status shouldBe AdherenceStatus.PARTIAL
         }
 
         test("should respect schedule days of week filtering") {
