@@ -186,7 +186,7 @@
 
 	<footer class="border-t border-black">
 		<div class="container mx-auto px-4 py-4 text-center text-sm text-gray-600">
-			Medicate &copy; {new Date().getFullYear()}
+			<a href="https://gertjanassies.dev">gertjanassies.dev</a> &copy; {new Date().getFullYear()}
 		</div>
 	</footer>
 </div>
