@@ -3,6 +3,8 @@
 	import { browser } from '$app/environment';
 	import { userStore } from '$lib/stores/user';
 	import { getDosageHistories, getMedicines, getSchedules, takeDose, type DosageHistory, type Medicine, type Schedule } from '$lib/api';
+	import { page } from '$app/stores';
+	import { tick } from 'svelte';
 
 	// SvelteKit props - using const since they're not used internally
 	export const data = {};
@@ -153,7 +155,21 @@
 		return date.toLocaleString();
 	}
 
-	onMount(loadData);
+	onMount(async () => {
+		await loadData();
+		// Scroll to the day if ?date=YYYY-MM-DD is present
+		const url = new URL(window.location.href);
+		const dateParam = url.searchParams.get('date');
+		if (dateParam) {
+			await tick();
+			const el = document.getElementById('history-day-' + dateParam);
+			if (el) {
+				el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+				el.classList.add('ring-2', 'ring-blue-400');
+				setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400'), 2000);
+			}
+		}
+	});
 
 	// Reload data when user logs in or out
 	$: if (browser && $userStore) {
@@ -194,7 +210,7 @@
 	{:else if groupedHistories.length > 0}
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 			{#each groupedHistories as dateGroup}
-				<div class="card">
+				<div class="card" id={`history-day-${dateGroup.dateObj.toISOString().slice(0,10)}`}> <!-- add id for scrolling -->
 					<div class="mb-4 pb-0 border-b border-gray-200">
 						<h3 class="text-xl font-bold">{dateGroup.date}</h3>
 					</div>

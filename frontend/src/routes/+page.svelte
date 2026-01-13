@@ -237,26 +237,26 @@
 						<div class="text-xs text-gray-500 mb-2">
 							{day.dayNumber}/{day.month}
 						</div>
-						<div class="relative w-12 h-12" title="{day.takenCount}/{day.expectedCount} medications taken">
+						<a href={`/history?date=${day.date}`} class="relative w-12 h-12 block group" title="{day.takenCount}/{day.expectedCount} medications taken">
 							{#if day.status === 'NONE'}
 								<!-- Empty circle -->
-								<svg class="w-12 h-12" viewBox="0 0 48 48">
+								<svg class="w-12 h-12 group-hover:scale-105 transition-transform" viewBox="0 0 48 48">
 									<circle cx="24" cy="24" r="22" fill="white" stroke="#D1D5DB" stroke-width="2"/>
 								</svg>
 							{:else if day.status === 'PARTIAL'}
 								<!-- Half-filled circle -->
-								<svg class="w-12 h-12" viewBox="0 0 48 48">
+								<svg class="w-12 h-12 group-hover:scale-105 transition-transform" viewBox="0 0 48 48">
 									<circle cx="24" cy="24" r="22" fill="white" stroke="#3B82F6" stroke-width="2"/>
 									<path d="M 2,24 A 22,22 0 0,0 46,24 Z" fill="#3B82F6"/>
 								</svg>
 							{:else if day.status === 'COMPLETE'}
 								<!-- Full circle with checkmark -->
-								<svg class="w-12 h-12" viewBox="0 0 48 48">
+								<svg class="w-12 h-12 group-hover:scale-105 transition-transform" viewBox="0 0 48 48">
 									<circle cx="24" cy="24" r="22" fill="#10B981" stroke="#10B981" stroke-width="2"/>
 									<path d="M 12 24 L 20 32 L 36 16" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
 								</svg>
 							{/if}
-						</div>
+						</a>
 					</div>
 				{/each}
 			</div>
