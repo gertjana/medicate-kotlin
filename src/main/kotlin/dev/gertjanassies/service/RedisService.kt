@@ -14,9 +14,11 @@ import kotlinx.coroutines.future.await
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.Serializable
 import org.mindrot.jbcrypt.BCrypt
 import java.util.*
 import java.security.SecureRandom
+import java.time.LocalDateTime
 
 
 /**
@@ -764,6 +766,47 @@ class RedisService private constructor(
             connection?.close()
             client?.shutdown()
         }
+    }
+
+    /**
+     * Calculate expiry date for each medicine based on schedules and stock
+     */
+    suspend fun medicineExpiry(username: String, now: java.time.LocalDateTime = java.time.LocalDateTime.now()): Either<RedisError, List<MedicineWithExpiry>> = either {
+        val medicines = getAllMedicines(username).bind()
+        val schedules = getAllSchedules(username).bind()
+        medicines
+            .mapNotNull { medicine ->
+                val medSchedules = schedules.filter { it.medicineId == medicine.id }
+                if (medSchedules.isEmpty()) return@mapNotNull null // Exclude medicines not in a schedule
+                val dailyAmount = medSchedules.sumOf { schedule ->
+                    val daysPerWeek = if (schedule.daysOfWeek.isEmpty()) 7 else schedule.daysOfWeek.size
+                    schedule.amount * (daysPerWeek / 7.0)
+                }
+                if (dailyAmount > 0.0) {
+                    val daysLeft = (medicine.stock / dailyAmount).toInt()
+                    val expiryDate = now.plusDays(daysLeft.toLong())
+                    MedicineWithExpiry(
+                        id = medicine.id,
+                        name = medicine.name,
+                        dose = medicine.dose,
+                        unit = medicine.unit,
+                        stock = medicine.stock,
+                        description = medicine.description,
+                        expiryDate = expiryDate
+                    )
+                } else {
+                    MedicineWithExpiry(
+                        id = medicine.id,
+                        name = medicine.name,
+                        dose = medicine.dose,
+                        unit = medicine.unit,
+                        stock = medicine.stock,
+                        description = medicine.description,
+                        expiryDate = null
+                    )
+                }
+            }
+            .sortedBy { it.name }
     }
 
     // end of RedisService class

@@ -42,6 +42,7 @@ dependencies {
     testImplementation("io.kotest:kotest-runner-junit5:5.8.0")
     testImplementation("io.kotest:kotest-assertions-core:5.8.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+    testImplementation("io.arrow-kt:arrow-core:1.2.1")
 }
 
 application {

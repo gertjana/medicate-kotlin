@@ -1,5 +1,7 @@
 package dev.gertjanassies
 
+import dev.gertjanassies.model.serializer.LocalDateTimeSerializer
+import dev.gertjanassies.model.serializer.UUIDSerializer
 import dev.gertjanassies.routes.adherenceRoutes
 import dev.gertjanassies.routes.dailyRoutes
 import dev.gertjanassies.routes.dosageHistoryRoutes
@@ -20,6 +22,9 @@ import io.ktor.server.routing.*
 import io.ktor.server.http.content.*
 import io.ktor.server.request.*
 import java.io.File
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 
 fun main() {
     embeddedServer(Netty, port = 8080, host = "127.0.0.1", module = Application::module)
@@ -47,7 +52,15 @@ fun Application.module() {
 
     // Configure content negotiation
     install(ContentNegotiation) {
-        json()
+        json(
+            Json {
+                serializersModule = SerializersModule {
+                    contextual(java.util.UUID::class, UUIDSerializer)
+                    contextual(java.time.LocalDateTime::class, LocalDateTimeSerializer)
+                }
+                ignoreUnknownKeys = true
+            }
+        )
     }
 
     // Initialize Redis service
