@@ -85,6 +85,9 @@ class AdherenceServiceTest : FunSpec({
             val medicineId = UUID.randomUUID()
             val scheduleId = UUID.randomUUID()
 
+            // Use fixed reference date for today
+            val today = LocalDate.of(2026, 1, 13)
+
             // Create a schedule for every day
             val schedule = Schedule(
                 id = scheduleId,
@@ -94,11 +97,11 @@ class AdherenceServiceTest : FunSpec({
                 daysOfWeek = emptyList() // Every day
             )
 
-            // Create dosage histories for last 7 days (excluding today)
+            // Create dosage histories for last 7 days (Jan 12 to Jan 6)
             val dosageHistories = (1..7).map { daysAgo ->
                 DosageHistory(
                     id = UUID.randomUUID(),
-                    datetime = LocalDateTime.now().minusDays(daysAgo.toLong()),
+                    datetime = today.minusDays(daysAgo.toLong()).atTime(8, 0),
                     medicineId = medicineId,
                     amount = 1.0,
                     scheduledTime = "08:00"

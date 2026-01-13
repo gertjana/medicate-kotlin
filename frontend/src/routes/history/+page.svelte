@@ -57,6 +57,14 @@
 		}
 	}
 
+	function toLocalIsoDate(date: Date): string {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
+
+	// In groupHistories(), set date to ISO string (YYYY-MM-DD)
 	function groupHistories() {
 		// Day of week mapping - JavaScript getDay() returns 0=Sunday, 1=Monday, etc.
 		// Map to two-letter codes that match backend DayOfWeek enum
@@ -65,17 +73,17 @@
 		// Get unique scheduled times
 		const scheduledTimes = Array.from(new Set(schedules.map(s => s.time))).sort((a, b) => b.localeCompare(a));
 
-		// Generate last 7 days (excluding today)
+		// Generate last 7 days (yesterday to 7 days ago)
 		const last7Days: Date[] = [];
 		for (let i = 1; i <= 7; i++) {
 			const date = new Date();
 			date.setDate(date.getDate() - i);
 			date.setHours(0, 0, 0, 0);
-			last7Days.push(date);
+			last7Days.push(new Date(date));
 		}
 
 		groupedHistories = last7Days.map(dateObj => {
-			const dateKey = dateObj.toLocaleDateString();
+			const isoDate = toLocalIsoDate(dateObj); // use local date for card id and matching
 			const dayCode = dayCodeMap[dateObj.getDay()]; // Get two-letter code like "MO"
 
 			// For each scheduled time, check if doses were taken
@@ -112,7 +120,7 @@
 			}).filter(ts => ts.histories.length > 0 || ts.isMissing);
 
 			return {
-				date: dateKey,
+				date: isoDate,
 				dateObj,
 				timeSlots
 			};
@@ -210,7 +218,7 @@
 	{:else if groupedHistories.length > 0}
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 			{#each groupedHistories as dateGroup}
-				<div class="card" id={`history-day-${dateGroup.dateObj.toISOString().slice(0,10)}`}> <!-- add id for scrolling -->
+				<div class="card" id={`history-day-${dateGroup.date}`}> <!-- use local date for id -->
 					<div class="mb-4 pb-0 border-b border-gray-200">
 						<h3 class="text-xl font-bold">{dateGroup.date}</h3>
 					</div>
