@@ -184,4 +184,113 @@ class DosageHistoryRoutesTest : FunSpec({
             }
         }
     }
+
+    context("DELETE /history/{id}") {
+        test("should delete dosage history successfully") {
+            val dosageHistoryId = UUID.randomUUID()
+            coEvery { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) } returns Unit.right()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/api") {
+                        dosageHistoryRoutes(mockRedisService)
+                    }
+                }
+
+                val response = client.delete("/api/history/$dosageHistoryId") {
+                    header("X-Username", testUsername)
+                }
+                response.status shouldBe HttpStatusCode.NoContent
+                coVerify { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) }
+            }
+        }
+
+        test("should return 401 when no username header provided") {
+            val dosageHistoryId = UUID.randomUUID()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/api") {
+                        dosageHistoryRoutes(mockRedisService)
+                    }
+                }
+
+                val response = client.delete("/api/history/$dosageHistoryId")
+                response.status shouldBe HttpStatusCode.Unauthorized
+            }
+        }
+
+        test("should return 400 when id is invalid") {
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/api") {
+                        dosageHistoryRoutes(mockRedisService)
+                    }
+                }
+
+                val response = client.delete("/api/history/invalid-uuid") {
+                    header("X-Username", testUsername)
+                }
+                response.status shouldBe HttpStatusCode.BadRequest
+            }
+        }
+
+        test("should return 404 when dosage history not found") {
+            val dosageHistoryId = UUID.randomUUID()
+            coEvery { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) } returns RedisError.NotFound("Not found").left()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/api") {
+                        dosageHistoryRoutes(mockRedisService)
+                    }
+                }
+
+                val response = client.delete("/api/history/$dosageHistoryId") {
+                    header("X-Username", testUsername)
+                }
+                response.status shouldBe HttpStatusCode.NotFound
+                coVerify { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) }
+            }
+        }
+
+        test("should return 500 on operation error") {
+            val dosageHistoryId = UUID.randomUUID()
+            coEvery { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) } returns RedisError.OperationError("Database error").left()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ContentNegotiation) { json() }
+                routing {
+                    route("/api") {
+                        dosageHistoryRoutes(mockRedisService)
+                    }
+                }
+
+                val response = client.delete("/api/history/$dosageHistoryId") {
+                    header("X-Username", testUsername)
+                }
+                response.status shouldBe HttpStatusCode.InternalServerError
+                coVerify { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) }
+            }
+        }
+    }
 })

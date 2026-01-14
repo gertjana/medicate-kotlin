@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { userStore } from '$lib/stores/user';
-	import { getDosageHistories, getMedicines, getSchedules, takeDose, type DosageHistory, type Medicine, type Schedule } from '$lib/api';
+	import { getDosageHistories, getMedicines, getSchedules, takeDose, deleteDosageHistory, type DosageHistory, type Medicine, type Schedule } from '$lib/api';
 	import { page } from '$app/stores';
 	import { tick } from 'svelte';
 
@@ -154,6 +154,22 @@
 		}
 	}
 
+	async function handleUndoTimeSlot(histories: DosageHistory[]) {
+		if (!confirm(`Are you sure you want to undo ${histories.length} dose(s)? The stock will be restored.`)) {
+			return;
+		}
+
+		try {
+			for (const history of histories) {
+				await deleteDosageHistory(history.id);
+			}
+			showToastNotification(`Undone: ${histories.length} dose(s)`);
+			await loadData();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to undo doses';
+		}
+	}
+
 	function getMedicineName(medicineId: string): string {
 		return medicines.find((m) => m.id === medicineId)?.name || 'Unknown Medicine';
 	}
@@ -244,15 +260,28 @@
 								</div>
 							{:else if timeSlot.histories.length > 0}
 								<div class="bg-gray-50 rounded p-3">
-									<div class="font-semibold text-gray-700 mb-2">{timeSlot.time}</div>
+									<div class="flex justify-between items-center mb-2">
+										<span class="font-semibold text-gray-700">{timeSlot.time}</span>
+										<button
+											on:click={() => handleUndoTimeSlot(timeSlot.histories)}
+											class="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-full transition-colors"
+											title="Undo"
+										>
+											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+											</svg>
+										</button>
+									</div>
 									<div class="space-y-2">
 										{#each timeSlot.histories as history}
 											{@const medicine = medicines.find(m => m.id === history.medicineId)}
-											<div class="text-sm">
-												<span class="font-medium">{history.amount}x {getMedicineName(history.medicineId)}</span>
-												{#if medicine}
-													<span class="text-gray-600">({medicine.dose}{medicine.unit})</span>
-												{/if}
+											<div class="flex items-center justify-between text-sm">
+												<div>
+													<span class="font-medium">{history.amount}x {getMedicineName(history.medicineId)}</span>
+													{#if medicine}
+														<span class="text-gray-600">({medicine.dose}{medicine.unit})</span>
+													{/if}
+												</div>
 											</div>
 										{/each}
 									</div>
