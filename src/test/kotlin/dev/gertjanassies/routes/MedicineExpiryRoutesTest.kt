@@ -1,5 +1,6 @@
 package dev.gertjanassies.routes
 
+import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.MedicineWithExpiry
 import dev.gertjanassies.model.serializer.LocalDateTimeSerializer
@@ -8,11 +9,9 @@ import dev.gertjanassies.service.RedisService
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import io.ktor.server.application.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
@@ -31,42 +30,109 @@ class MedicineExpiryRoutesTest : FunSpec({
     beforeEach { mockRedisService = mockk(relaxed = true) }
     afterEach { clearAllMocks() }
 
-    test("dummy test to avoid empty test suite") {
-        1 + 1 shouldBe 2
-    }
+    context("GET /medicineExpiry") {
+        test("should return expiry list for user") {
+            val now = LocalDateTime.of(2026, 1, 20, 0, 0)
+            val medicines = listOf(
+                MedicineWithExpiry(
+                    id = UUID.randomUUID(),
+                    name = "Aspirin",
+                    dose = 100.0,
+                    unit = "mg",
+                    stock = 10.0,
+                    description = null,
+                    expiryDate = now
+                ),
+                MedicineWithExpiry(
+                    id = UUID.randomUUID(),
+                    name = "Ibuprofen",
+                    dose = 200.0,
+                    unit = "mg",
+                    stock = 5.0,
+                    description = null,
+                    expiryDate = now.plusDays(3)
+                )
+            )
+            coEvery { mockRedisService.medicineExpiry(testUsername, any()) } returns medicines.right()
 
-//    test("GET /medicineExpiry should return expiry list for user") {
-//        val now = LocalDateTime.now()
-//        val med = MedicineWithExpiry(UUID.randomUUID(), "Aspirin", 100.0, "mg", 10.0, null, now)
-//        coEvery { mockRedisService.medicineExpiry(testUsername) } returns listOf(med).right()
-//        val customJson = Json {
-//            serializersModule = SerializersModule {
-//                contextual(UUID::class, UUIDSerializer)
-//                contextual(LocalDateTime::class, LocalDateTimeSerializer)
-//            }
-//            ignoreUnknownKeys = true
-//        }
-//        testApplication {
-//            environment { config = MapApplicationConfig() }
-//            install(ContentNegotiation) { json(customJson) }
-//            routing { medicineRoutes(mockRedisService) }
-//            val response = client.get("/medicineExpiry") {
-//                header("X-Username", testUsername)
-//            }
-//            response.status shouldBe HttpStatusCode.OK
-//            val body = response.body<List<MedicineWithExpiry>>()
-//            body.size shouldBe 1
-//            body[0].name shouldBe "Aspirin"
-//        }
-//    }
-//
-//    test("GET /medicineExpiry should return 401 if no username header") {
-//        testApplication {
-//            environment { config = MapApplicationConfig() }
-//            install(ContentNegotiation) { json() }
-//            routing { medicineRoutes(mockRedisService) }
-//            val response = client.get("/medicineExpiry")
-//            response.status shouldBe HttpStatusCode.Unauthorized
-//        }
-//    }
+            val customJson = Json {
+                serializersModule = SerializersModule {
+                    contextual(UUID::class, UUIDSerializer)
+                    contextual(LocalDateTime::class, LocalDateTimeSerializer)
+                }
+                ignoreUnknownKeys = true
+            }
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                install(ContentNegotiation) { json(customJson) }
+                routing { medicineRoutes(mockRedisService) }
+
+                val client = createClient {
+                    install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
+                        json(customJson)
+                    }
+                }
+
+                val response = client.get("/medicineExpiry") {
+                    header("X-Username", testUsername)
+                }
+
+                response.status shouldBe HttpStatusCode.OK
+                val body = response.body<List<MedicineWithExpiry>>()
+                body.size shouldBe 2
+                body[0].name shouldBe "Aspirin"
+                body[1].name shouldBe "Ibuprofen"
+                coVerify { mockRedisService.medicineExpiry(testUsername, any()) }
+            }
+        }
+
+        test("should return empty list when no medicines expiring") {
+            coEvery { mockRedisService.medicineExpiry(testUsername, any()) } returns emptyList<MedicineWithExpiry>().right()
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                install(ContentNegotiation) { json() }
+                routing { medicineRoutes(mockRedisService) }
+
+                val response = client.get("/medicineExpiry") {
+                    header("X-Username", testUsername)
+                }
+
+                response.status shouldBe HttpStatusCode.OK
+                coVerify { mockRedisService.medicineExpiry(testUsername, any()) }
+            }
+        }
+
+        test("should return 401 if no username header") {
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                install(ContentNegotiation) { json() }
+                routing { medicineRoutes(mockRedisService) }
+
+                val response = client.get("/medicineExpiry")
+
+                response.status shouldBe HttpStatusCode.Unauthorized
+                coVerify(exactly = 0) { mockRedisService.medicineExpiry(any(), any()) }
+            }
+        }
+
+        test("should return 500 on service error") {
+            coEvery { mockRedisService.medicineExpiry(testUsername, any()) } returns
+                dev.gertjanassies.service.RedisError.OperationError("Database error").left()
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                install(ContentNegotiation) { json() }
+                routing { medicineRoutes(mockRedisService) }
+
+                val response = client.get("/medicineExpiry") {
+                    header("X-Username", testUsername)
+                }
+
+                response.status shouldBe HttpStatusCode.InternalServerError
+                coVerify { mockRedisService.medicineExpiry(testUsername, any()) }
+            }
+        }
+    }
 })
