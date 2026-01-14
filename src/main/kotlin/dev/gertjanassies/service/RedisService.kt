@@ -560,6 +560,74 @@ class RedisService private constructor(
     }
 
     /**
+     * Delete a DosageHistory entry and restore the stock to the medicine
+     */
+    suspend fun deleteDosageHistory(username: String, dosageHistoryId: UUID): Either<RedisError, Unit> {
+        return either {
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            val dosageKey = "$environment:user:$username:dosagehistory:$dosageHistoryId"
+
+            // Retry loop for optimistic locking with WATCH
+            var retryCount = 0
+            val maxRetries = 10
+
+            while (retryCount < maxRetries) {
+                Either.catch {
+                    // Get the dosage history first
+                    val dosageJson = asyncCommands.get(dosageKey).await()
+                        ?: throw NoSuchElementException("Dosage history with id $dosageHistoryId not found")
+
+                    val dosageHistory = json.decodeFromString<DosageHistory>(dosageJson)
+                    val medicineKey = "$environment:user:$username:medicine:${dosageHistory.medicineId}"
+
+                    // Watch both keys for changes
+                    asyncCommands.watch(medicineKey, dosageKey).await()
+
+                    // Get medicine
+                    val medicineJson = asyncCommands.get(medicineKey).await()
+                        ?: throw NoSuchElementException("Medicine with id ${dosageHistory.medicineId} not found")
+
+                    val medicine = json.decodeFromString<Medicine>(medicineJson)
+
+                    // Restore stock to medicine
+                    val updatedMedicine = medicine.copy(stock = medicine.stock + dosageHistory.amount)
+
+                    // Start transaction
+                    asyncCommands.multi().await()
+
+                    val updatedMedicineJson = json.encodeToString(updatedMedicine)
+
+                    // Queue commands in the transaction
+                    asyncCommands.set(medicineKey, updatedMedicineJson)
+                    asyncCommands.del(dosageKey)
+
+                    // Execute transaction
+                    val result = asyncCommands.exec().await()
+
+                    if (result.wasDiscarded()) {
+                        // Transaction failed due to concurrent modification, retry
+                        retryCount++
+                        null
+                    } else {
+                        // Success
+                        return@either Unit
+                    }
+                }.mapLeft { e ->
+                    runCatching { asyncCommands.unwatch().await() }
+                    when (e) {
+                        is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Dosage history or medicine not found"))
+                        is SerializationException -> raise(RedisError.SerializationError("Failed to serialize: ${e.message}"))
+                        else -> raise(RedisError.OperationError("Failed to delete dosage history: ${e.message}"))
+                    }
+                }.bind()
+            }
+
+            // Max retries exceeded
+            raise(RedisError.OperationError("Failed to delete dosage history after $maxRetries retries due to concurrent modifications"))
+        }
+    }
+
+    /**
      * Get dosage histories within a date range (inclusive)
      *
      * Note: Due to Redis key-value structure, this method still scans all dosage history keys

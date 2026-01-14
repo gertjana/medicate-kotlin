@@ -360,4 +360,96 @@ class DosageHistoryServiceTest : FunSpec({
             result.leftOrNull()?.message?.contains("Failed to retrieve dosage histories") shouldBe true
         }
     }
+
+    context("deleteDosageHistory") {
+        test("should successfully delete dosage history and restore stock") {
+            val medicineId = UUID.randomUUID()
+            val dosageHistoryId = UUID.randomUUID()
+            val medicine = Medicine(
+                id = medicineId,
+                name = "Aspirin",
+                dose = 500.0,
+                unit = "mg",
+                stock = 50.0
+            )
+            val dosageHistory = DosageHistory(
+                id = dosageHistoryId,
+                datetime = LocalDateTime.now(),
+                medicineId = medicineId,
+                amount = 50.0,
+                scheduledTime = "08:00"
+            )
+            val dosageKey = "$environment:user:testuser:dosagehistory:$dosageHistoryId"
+            val medicineKey = "$environment:user:testuser:medicine:$medicineId"
+            val dosageJson = json.encodeToString(dosageHistory)
+            val medicineJson = json.encodeToString(medicine)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            every { mockAsyncCommands.get(dosageKey) } returns createRedisFutureMock(dosageJson)
+            every { mockAsyncCommands.watch(medicineKey, dosageKey) } returns createRedisFutureMock("OK")
+            every { mockAsyncCommands.get(medicineKey) } returns createRedisFutureMock(medicineJson)
+            every { mockAsyncCommands.multi() } returns createRedisFutureMock("OK")
+            every { mockAsyncCommands.set(any(), any()) } returns createRedisFutureMock("QUEUED")
+            every { mockAsyncCommands.del(dosageKey) } returns createRedisFutureMock(1L)
+
+            val mockTransactionResult = mockk<TransactionResult>()
+            every { mockTransactionResult.wasDiscarded() } returns false
+            every { mockAsyncCommands.exec() } returns createRedisFutureMock(mockTransactionResult)
+
+            every { mockAsyncCommands.unwatch() } returns createRedisFutureMock("OK")
+
+            val result = redisService.deleteDosageHistory("testuser", dosageHistoryId)
+
+            result.isRight() shouldBe true
+
+            verify(exactly = 1) { mockAsyncCommands.get(dosageKey) }
+            verify(exactly = 1) { mockAsyncCommands.watch(medicineKey, dosageKey) }
+            verify(exactly = 1) { mockAsyncCommands.get(medicineKey) }
+            verify(exactly = 1) { mockAsyncCommands.multi() }
+            verify(exactly = 1) { mockAsyncCommands.set(any(), any()) }
+            verify(exactly = 1) { mockAsyncCommands.del(dosageKey) }
+            verify(exactly = 1) { mockAsyncCommands.exec() }
+        }
+
+        test("should return NotFound when dosage history doesn't exist") {
+            val dosageHistoryId = UUID.randomUUID()
+            val dosageKey = "$environment:user:testuser:dosagehistory:$dosageHistoryId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(dosageKey) } returns createRedisFutureMock(null as String?)
+
+            val result = redisService.deleteDosageHistory("testuser", dosageHistoryId)
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
+        }
+
+        test("should return NotFound when medicine doesn't exist during deletion") {
+            val medicineId = UUID.randomUUID()
+            val dosageHistoryId = UUID.randomUUID()
+            val dosageHistory = DosageHistory(
+                id = dosageHistoryId,
+                datetime = LocalDateTime.now(),
+                medicineId = medicineId,
+                amount = 50.0,
+                scheduledTime = "08:00"
+            )
+            val dosageKey = "$environment:user:testuser:dosagehistory:$dosageHistoryId"
+            val medicineKey = "$environment:user:testuser:medicine:$medicineId"
+            val dosageJson = json.encodeToString(dosageHistory)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(dosageKey) } returns createRedisFutureMock(dosageJson)
+            every { mockAsyncCommands.watch(medicineKey, dosageKey) } returns createRedisFutureMock("OK")
+            every { mockAsyncCommands.get(medicineKey) } returns createRedisFutureMock(null as String?)
+            every { mockAsyncCommands.unwatch() } returns createRedisFutureMock("OK")
+
+            val result = redisService.deleteDosageHistory("testuser", dosageHistoryId)
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
+            verify(exactly = 1) { mockAsyncCommands.unwatch() }
+        }
+    }
 })

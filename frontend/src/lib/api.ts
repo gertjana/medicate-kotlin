@@ -232,6 +232,15 @@ export async function getDosageHistories(): Promise<DosageHistory[]> {
 	return response.json();
 }
 
+export async function deleteDosageHistory(id: string): Promise<void> {
+	const response = await fetch(`${API_BASE}/history/${id}`, {
+		method: 'DELETE',
+		headers: getHeaders()
+	});
+	if (!response.ok) throw new Error('Failed to delete dosage history');
+}
+
+
 // Adherence and analytics
 export async function getWeeklyAdherence(): Promise<WeeklyAdherence> {
 	const response = await fetch(`${API_BASE}/adherence`, {

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { userStore } from '$lib/stores/user';
-	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, getLowStockMedicines, takeDose, getMedicineExpiry, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine, type MedicineExpiry } from '$lib/api';
+	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, getLowStockMedicines, takeDose, deleteDosageHistory, getMedicineExpiry, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine, type MedicineExpiry } from '$lib/api';
 
 	// SvelteKit props - using const since they're not used internally
 	export const data = {};
@@ -127,7 +127,7 @@
 		try {
 			await takeDose(medicineId, amount, scheduledTime);
 			showToastNotification(`Recorded: ${amount}x ${medicineName}`);
-			await loadSchedule();
+			await Promise.all([loadSchedule(), loadMedicineExpiry()]);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to record dose';
 		} finally {
@@ -158,7 +158,7 @@
 
 			const medicineNames = medicinesToTake.map(item => item.medicine.name).join(', ');
 			showToastNotification(`Recorded: ${medicineNames}`);
-			await loadSchedule();
+			await Promise.all([loadSchedule(), loadMedicineExpiry()]);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to record doses';
 		} finally {
@@ -166,6 +166,37 @@
 				const key = `${item.medicine.id}-${item.amount}`;
 				takingDose[key] = false;
 			}
+		}
+	}
+
+	async function handleUndoTimeSlot(scheduledTime: string) {
+		try {
+			// Find all dosage history entries for today with this scheduled time
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+
+			const dosageHistoriesToUndo = dosageHistories.filter(history => {
+				const historyDate = new Date(history.datetime);
+				historyDate.setHours(0, 0, 0, 0);
+
+				return historyDate.getTime() === today.getTime() &&
+					history.scheduledTime === scheduledTime;
+			});
+
+			if (dosageHistoriesToUndo.length === 0) {
+				error = 'No doses found for this time slot';
+				return;
+			}
+
+			// Delete all dosage histories for this time slot
+			for (const history of dosageHistoriesToUndo) {
+				await deleteDosageHistory(history.id);
+			}
+
+			showToastNotification(`Undone: ${dosageHistoriesToUndo.length} dose(s) at ${scheduledTime}`);
+			await Promise.all([loadSchedule(), loadMedicineExpiry()]);
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to undo doses';
 		}
 	}
 
@@ -305,18 +336,29 @@
 						<h3 class="text-xl font-bold">
 							{timeSlot.time}
 						</h3>
-						{#if allTaken}
-							<button class="btn btn-taken ml-0 cursor-not-allowed" disabled>
-								✓ All Taken
-							</button>
-						{:else}
-							<button
-								on:click={() => takeAllForTimeSlot(timeSlot)}
-								class="btn btn-action"
-							>
-								Take All
-							</button>
-						{/if}
+						<div class="flex gap-2">
+							{#if allTaken}
+								<button class="btn btn-taken ml-0 cursor-not-allowed" disabled>
+									✓ All Taken
+								</button>
+								<button
+									on:click={() => handleUndoTimeSlot(timeSlot.time)}
+									class="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-full transition-colors"
+									title="Undo"
+								>
+									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+									</svg>
+								</button>
+							{:else}
+								<button
+									on:click={() => takeAllForTimeSlot(timeSlot)}
+									class="btn btn-action"
+								>
+									Take All
+								</button>
+							{/if}
+						</div>
 					</div>
 					<div class="space-y-3">
 						{#each timeSlot.medicines as item}
