@@ -415,7 +415,7 @@
 					<thead>
 						<tr class="bg-gray-100">
 							<th class="px-4 py-2 text-left">Name</th>
-							<th class="px-4 py-2 text-left">Dose Unit</th>
+							<th class="px-4 py-2 text-left">Dose</th>
 							<th class="px-4 py-2 text-left">Stock</th>
 							<th class="px-4 py-2 text-left">Expiry</th>
 						</tr>
