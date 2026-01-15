@@ -41,6 +41,7 @@ class EmailService(
     private val httpClient: HttpClient,
     private val redisService: RedisService,
     private val apiKey: String,
+    private val appUrl: String,
     private val fromEmail: String = "noreply@medicate.app"
 ) {
     private val json = Json { ignoreUnknownKeys = true }
@@ -110,7 +111,7 @@ class EmailService(
      * Generate HTML content for password reset email
      */
     private fun generatePasswordResetEmailHtml(username: String, token: String): String {
-        val resetUrl = "https://medicate.app/reset-password?token=$token"
+        val resetUrl = "$appUrl/reset-password?token=$token"
         return """
             <!DOCTYPE html>
             <html>

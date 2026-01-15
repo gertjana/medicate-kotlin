@@ -9,6 +9,9 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger("ScheduleRoutes")
 
 /**
  * Helper function to extract username from request header
@@ -30,8 +33,10 @@ fun Route.scheduleRoutes(redisService: RedisService) {
 
         either {
             val schedules = redisService.getAllSchedules(username).bind()
+            logger.debug("Successfully retrieved ${schedules.size} schedules for user '$username'")
             call.respond(HttpStatusCode.OK, schedules)
         }.onLeft { error ->
+            logger.error("Failed to get all schedules for user '$username': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
@@ -50,8 +55,10 @@ fun Route.scheduleRoutes(redisService: RedisService) {
 
         either {
             val schedule = redisService.getSchedule(username, id).bind()
+            logger.debug("Successfully retrieved schedule '$id' for user '$username'")
             call.respond(HttpStatusCode.OK, schedule)
         }.onLeft { error ->
+            logger.error("Failed to get schedule '$id' for user '$username': ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -72,8 +79,10 @@ fun Route.scheduleRoutes(redisService: RedisService) {
 
         either {
             val created = redisService.createSchedule(username, request).bind()
+            logger.debug("Successfully created schedule '${created.id}' for medicine '${created.medicineId}' for user '$username'")
             call.respond(HttpStatusCode.Created, created)
         }.onLeft { error ->
+            logger.error("Failed to create schedule for user '$username': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
@@ -94,8 +103,10 @@ fun Route.scheduleRoutes(redisService: RedisService) {
 
         either {
             val updated = redisService.updateSchedule(username, id, schedule).bind()
+            logger.debug("Successfully updated schedule '$id' for user '$username'")
             call.respond(HttpStatusCode.OK, updated)
         }.onLeft { error ->
+            logger.error("Failed to update schedule '$id' for user '$username': ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -119,8 +130,10 @@ fun Route.scheduleRoutes(redisService: RedisService) {
 
         either {
             redisService.deleteSchedule(username, id).bind()
+            logger.debug("Successfully deleted schedule '$id' for user '$username'")
             call.respond(HttpStatusCode.NoContent)
         }.onLeft { error ->
+            logger.error("Failed to delete schedule '$id' for user '$username': ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))

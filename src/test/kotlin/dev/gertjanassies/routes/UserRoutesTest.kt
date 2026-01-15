@@ -247,4 +247,148 @@ class UserRoutesTest : FunSpec({
             }
         }
     }
+
+    context("PUT /user/password") {
+        test("should update password successfully") {
+            val username = "testuser"
+            val newPassword = "newpassword123"
+            val request = UserRequest(username, "", newPassword)
+
+            coEvery { mockRedisService.updatePassword(username, newPassword) } returns Unit.right()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ServerContentNegotiation) { json() }
+                routing { userRoutes(mockRedisService) }
+
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                val response = client.put("/user/password") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+
+                response.status shouldBe HttpStatusCode.OK
+                val body = response.body<Map<String, String>>()
+                body["message"] shouldBe "Password updated successfully"
+                coVerify { mockRedisService.updatePassword(username, newPassword) }
+            }
+        }
+
+        test("should return 400 when username is blank") {
+            val request = UserRequest("", "", "newpassword123")
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ServerContentNegotiation) { json() }
+                routing { userRoutes(mockRedisService) }
+
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                val response = client.put("/user/password") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+
+                response.status shouldBe HttpStatusCode.BadRequest
+                coVerify(exactly = 0) { mockRedisService.updatePassword(any(), any()) }
+            }
+        }
+
+        test("should return 400 when password is blank") {
+            val request = UserRequest("testuser", "", "")
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ServerContentNegotiation) { json() }
+                routing { userRoutes(mockRedisService) }
+
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                val response = client.put("/user/password") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+
+                response.status shouldBe HttpStatusCode.BadRequest
+                coVerify(exactly = 0) { mockRedisService.updatePassword(any(), any()) }
+            }
+        }
+
+        test("should return 400 when password is too short") {
+            val request = UserRequest("testuser", "", "short")
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ServerContentNegotiation) { json() }
+                routing { userRoutes(mockRedisService) }
+
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                val response = client.put("/user/password") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+
+                response.status shouldBe HttpStatusCode.BadRequest
+                coVerify(exactly = 0) { mockRedisService.updatePassword(any(), any()) }
+            }
+        }
+
+        test("should return 404 when user not found") {
+            val username = "nonexistent"
+            val newPassword = "newpassword123"
+            val request = UserRequest(username, "", newPassword)
+
+            coEvery { mockRedisService.updatePassword(username, newPassword) } returns
+                RedisError.NotFound("User not found").left()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ServerContentNegotiation) { json() }
+                routing { userRoutes(mockRedisService) }
+
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                val response = client.put("/user/password") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+
+                response.status shouldBe HttpStatusCode.NotFound
+                coVerify { mockRedisService.updatePassword(username, newPassword) }
+            }
+        }
+
+        test("should return 500 on update error") {
+            val username = "testuser"
+            val newPassword = "newpassword123"
+            val request = UserRequest(username, "", newPassword)
+
+            coEvery { mockRedisService.updatePassword(username, newPassword) } returns
+                RedisError.OperationError("Redis connection failed").left()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ServerContentNegotiation) { json() }
+                routing { userRoutes(mockRedisService) }
+
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                val response = client.put("/user/password") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+
+                response.status shouldBe HttpStatusCode.InternalServerError
+                coVerify { mockRedisService.updatePassword(username, newPassword) }
+            }
+        }
+    }
 })

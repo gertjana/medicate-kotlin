@@ -3,13 +3,18 @@ package dev.gertjanassies
 import dev.gertjanassies.model.serializer.LocalDateTimeSerializer
 import dev.gertjanassies.model.serializer.UUIDSerializer
 import dev.gertjanassies.routes.adherenceRoutes
+import dev.gertjanassies.routes.authRoutes
 import dev.gertjanassies.routes.dailyRoutes
 import dev.gertjanassies.routes.dosageHistoryRoutes
 import dev.gertjanassies.routes.healthRoutes
 import dev.gertjanassies.routes.medicineRoutes
 import dev.gertjanassies.routes.scheduleRoutes
 import dev.gertjanassies.routes.userRoutes
+import dev.gertjanassies.service.EmailService
 import dev.gertjanassies.service.RedisService
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -83,6 +88,20 @@ fun Application.module() {
         }
     )
 
+    // Initialize EmailService
+    val resendApiKey = environment.config.propertyOrNull("resend.apiKey")?.getString()
+        ?: System.getenv("RESEND_API_KEY") ?: ""
+    val appUrl = environment.config.propertyOrNull("app.url")?.getString()
+        ?: System.getenv("APP_URL") ?: "http://localhost:5173"
+
+    val httpClient = HttpClient(CIO) {
+        install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true })
+        }
+    }
+
+    val emailService = EmailService(httpClient, redisService, resendApiKey, appUrl)
+
     log.info("Configuring routing...")
     // Configure routing
     routing {
@@ -95,6 +114,7 @@ fun Application.module() {
             dosageHistoryRoutes(redisService)
             adherenceRoutes(redisService)
             userRoutes(redisService)
+            authRoutes(redisService, emailService)
         }
 
         // Serve static files if enabled

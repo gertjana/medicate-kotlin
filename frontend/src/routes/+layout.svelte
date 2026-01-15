@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { userStore } from '$lib/stores/user';
-	import { registerUser, loginUser } from '$lib/api';
+	import { registerUser, loginUser, requestPasswordReset } from '$lib/api';
 
 	// SvelteKit props - using const since they're not used internally
 	export const data = {};
@@ -28,6 +28,10 @@
 	let profileTop = 0;
 	let profileUseFixed = false;
 	let profileRight = 0;
+	let showForgotPassword = false;
+	let forgotPasswordUsername = '';
+	let forgotPasswordError = '';
+	let forgotPasswordSuccess = '';
 
 	$: profileInlineStyle = profileUseFixed
 		? `position:fixed; right:${profileRight}px; top:${profileTop}px; min-width:24rem; min-height:8rem; width:auto; max-width:calc(100vw - 2rem);`
@@ -92,6 +96,32 @@
 		password = '';
 		authError = '';
 		showAuthModal = true;
+	}
+
+	function openForgotPassword() {
+		showAuthModal = false;
+		showForgotPassword = true;
+		forgotPasswordUsername = '';
+		forgotPasswordError = '';
+		forgotPasswordSuccess = '';
+	}
+
+	async function handleForgotPassword() {
+		forgotPasswordError = '';
+		forgotPasswordSuccess = '';
+
+		if (!forgotPasswordUsername.trim()) {
+			forgotPasswordError = 'Username is required';
+			return;
+		}
+
+		try {
+			await requestPasswordReset(forgotPasswordUsername.trim());
+			forgotPasswordSuccess = 'Password reset email sent! Please check your inbox.';
+			forgotPasswordUsername = '';
+		} catch (e) {
+			forgotPasswordError = e instanceof Error ? e.message : 'Failed to send reset email';
+		}
 	}
 
 	function toggleProfile(event: MouseEvent) {
@@ -254,6 +284,15 @@
 						>
 							Don't have an account? Register
 						</button>
+						<div class="mt-2">
+							<button
+								type="button"
+								on:click={openForgotPassword}
+								class="text-[steelblue] hover:underline text-xs"
+							>
+								Forgot password?
+							</button>
+						</div>
 					{:else}
 						<button
 							type="button"
@@ -263,6 +302,48 @@
 							Already have an account? Login
 						</button>
 					{/if}
+				</div>
+			</form>
+		</div>
+	</div>
+{/if}
+
+<!-- Forgot Password Modal -->
+{#if showForgotPassword}
+	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+		<div class="bg-white border border-black p-6 max-w-md w-full rounded-tr-lg rounded-bl-lg">
+			<h3 class="text-xl font-bold mb-4">Reset Password</h3>
+			<form on:submit|preventDefault={handleForgotPassword}>
+				<div class="mb-4">
+					<label for="forgot-username" class="block mb-1 font-semibold">Username</label>
+					<input
+						id="forgot-username"
+						type="text"
+						bind:value={forgotPasswordUsername}
+						class="input w-full"
+						placeholder="Enter your username"
+						required
+						autofocus
+					/>
+					<p class="text-xs text-gray-600 mt-1">We'll send a password reset link to your email</p>
+				</div>
+				{#if forgotPasswordError}
+					<div class="mb-4 p-3 bg-red-50 border border-red-300 text-red-800 text-sm rounded">
+						{forgotPasswordError}
+					</div>
+				{/if}
+				{#if forgotPasswordSuccess}
+					<div class="mb-4 p-3 bg-green-50 border border-green-300 text-green-800 text-sm rounded">
+						{forgotPasswordSuccess}
+					</div>
+				{/if}
+				<div class="flex gap-2">
+					<button type="submit" class="btn btn-nav flex-1">
+						Send Reset Link
+					</button>
+					<button type="button" on:click={() => { showForgotPassword = false; showAuthModal = true; }} class="btn btn-nav flex-1">
+						Back to Login
+					</button>
 				</div>
 			</form>
 		</div>

@@ -11,7 +11,10 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.slf4j.LoggerFactory
 import java.util.*
+
+private val logger = LoggerFactory.getLogger("MedicineRoutes")
 
 /**
  * Helper function to extract username from request header
@@ -33,8 +36,10 @@ fun Route.medicineRoutes(redisService: RedisService) {
 
         either {
             val medicines = redisService.getAllMedicines(username).bind()
+            logger.debug("Successfully retrieved ${medicines.size} medicines for user '$username'")
             call.respond(HttpStatusCode.OK, medicines)
         }.onLeft { error ->
+            logger.error("Failed to get all medicines for user '$username': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
@@ -53,8 +58,10 @@ fun Route.medicineRoutes(redisService: RedisService) {
 
         either {
             val medicine = redisService.getMedicine(username, id).bind()
+            logger.debug("Successfully retrieved medicine '$id' (${medicine.name}) for user '$username'")
             call.respond(HttpStatusCode.OK, medicine)
         }.onLeft { error ->
+            logger.error("Failed to get medicine '$id' for user '$username': ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -75,8 +82,10 @@ fun Route.medicineRoutes(redisService: RedisService) {
 
         either {
             val created = redisService.createMedicine(username, request).bind()
+            logger.debug("Successfully created medicine '${created.name}' (${created.id}) for user '$username'")
             call.respond(HttpStatusCode.Created, created)
         }.onLeft { error ->
+            logger.error("Failed to create medicine for user '$username': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
@@ -97,8 +106,10 @@ fun Route.medicineRoutes(redisService: RedisService) {
 
         either {
             val updated = redisService.updateMedicine(username, id, medicine).bind()
+            logger.debug("Successfully updated medicine '$id' (${updated.name}) for user '$username'")
             call.respond(HttpStatusCode.OK, updated)
         }.onLeft { error ->
+            logger.error("Failed to update medicine '$id' for user '$username': ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -122,8 +133,10 @@ fun Route.medicineRoutes(redisService: RedisService) {
 
         either {
             redisService.deleteMedicine(username, id).bind()
+            logger.debug("Successfully deleted medicine '$id' for user '$username'")
             call.respond(HttpStatusCode.NoContent)
         }.onLeft { error ->
+            logger.error("Failed to delete medicine '$id' for user '$username': ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -144,8 +157,10 @@ fun Route.medicineRoutes(redisService: RedisService) {
 
         either {
             val dosageHistory = redisService.createDosageHistory(username, request.medicineId, request.amount, request.scheduledTime, request.datetime).bind()
+            logger.debug("Successfully recorded dose for medicine '${request.medicineId}' (amount: ${request.amount}) for user '$username'")
             call.respond(HttpStatusCode.Created, dosageHistory)
         }.onLeft { error ->
+            logger.error("Failed to record dose for medicine '${request.medicineId}' for user '$username': ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -166,8 +181,10 @@ fun Route.medicineRoutes(redisService: RedisService) {
 
         either {
             val updatedMedicine = redisService.addStock(username, request.medicineId, request.amount).bind()
+            logger.debug("Successfully added ${request.amount} stock to medicine '${request.medicineId}' for user '$username' (new stock: ${updatedMedicine.stock})")
             call.respond(HttpStatusCode.OK, updatedMedicine)
         }.onLeft { error ->
+            logger.error("Failed to add stock to medicine '${request.medicineId}' for user '$username': ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -185,8 +202,10 @@ fun Route.medicineRoutes(redisService: RedisService) {
 
         either {
             val expiringMedicines = redisService.medicineExpiry(username).bind()
+            logger.debug("Successfully retrieved ${expiringMedicines.size} medicine expiry records for user '$username'")
             call.respond(HttpStatusCode.OK, expiringMedicines)
         }.onLeft { error ->
+            logger.error("Failed to get medicine expiry for user '$username': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
