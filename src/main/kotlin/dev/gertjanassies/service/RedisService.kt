@@ -16,6 +16,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.Serializable
 import org.mindrot.jbcrypt.BCrypt
+import org.slf4j.LoggerFactory
 import java.util.*
 import java.security.SecureRandom
 import java.time.LocalDateTime
@@ -33,6 +34,7 @@ class RedisService private constructor(
 ) {
     private var client: RedisClient? = null
     private val json = Json { ignoreUnknownKeys = true }
+    private val logger = LoggerFactory.getLogger(RedisService::class.java)
 
     /**
      * Primary constructor for production use
@@ -967,9 +969,9 @@ class RedisService private constructor(
                     if (resetToken.token == token && resetToken.expiresAt.isAfter(LocalDateTime.now())) {
                         matchingKey = key
                     }
-                }.mapLeft { e ->
-                    // Log but continue - skip invalid entries
-                    RedisError.SerializationError("Failed to deserialize reset token: ${e.message}")
+                }.onLeft { e ->
+                    // Log deserialization errors for debugging
+                    logger.warn("Failed to deserialize reset token for key '$key': ${e.message}")
                 }
             }
         }
