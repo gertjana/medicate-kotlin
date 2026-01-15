@@ -7,7 +7,10 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.slf4j.LoggerFactory
 import java.util.*
+
+private val logger = LoggerFactory.getLogger("DosageHistoryRoutes")
 
 /**
  * Helper function to extract username from request header
@@ -29,8 +32,10 @@ fun Route.dosageHistoryRoutes(redisService: RedisService) {
 
         either {
             val histories = redisService.getAllDosageHistories(username).bind()
+            logger.debug("Successfully retrieved ${histories.size} dosage histories for user '$username'")
             call.respond(HttpStatusCode.OK, histories)
         }.onLeft { error ->
+            logger.error("Failed to get dosage histories for user '$username': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
@@ -56,8 +61,10 @@ fun Route.dosageHistoryRoutes(redisService: RedisService) {
 
         either {
             redisService.deleteDosageHistory(username, dosageHistoryId).bind()
+            logger.debug("Successfully deleted dosage history '$id' for user '$username'")
             call.respond(HttpStatusCode.NoContent)
         }.onLeft { error ->
+            logger.error("Failed to delete dosage history '$id' for user '$username': ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))

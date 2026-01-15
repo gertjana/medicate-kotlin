@@ -7,6 +7,9 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger("DailyRoutes")
 
 /**
  * Helper function to extract username from request header
@@ -28,8 +31,11 @@ fun Route.dailyRoutes(redisService: RedisService) {
 
         either {
             val dailySchedule = redisService.getDailySchedule(username).bind()
+
+            logger.debug("Successfully retrieved daily schedule for user '$username' with ${dailySchedule.schedule.size} time slots")
             call.respond(HttpStatusCode.OK, dailySchedule)
         }.onLeft { error ->
+            logger.error("Failed to get daily schedule for user '$username': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }

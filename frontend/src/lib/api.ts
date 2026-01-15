@@ -285,6 +285,44 @@ export async function loginUser(username: string, password: string): Promise<Use
 	return response.json();
 }
 
+export async function requestPasswordReset(username: string): Promise<{ message: string; emailId: string }> {
+	const response = await fetch(`${API_BASE}/auth/resetPassword`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ username })
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Failed to request password reset');
+	}
+	return response.json();
+}
+
+export async function verifyResetToken(token: string): Promise<{ username: string }> {
+	const response = await fetch(`${API_BASE}/auth/verifyResetToken`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ token })
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Invalid or expired token');
+	}
+	return response.json();
+}
+
+export async function updatePassword(username: string, newPassword: string): Promise<void> {
+	const response = await fetch(`${API_BASE}/user/password`, {
+		method: 'PUT',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ username, password: newPassword })
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Failed to update password');
+	}
+}
+
 export async function getMedicineExpiry(): Promise<MedicineExpiry[]> {
 	const response = await fetch(`${API_BASE}/medicineExpiry`, {
 		cache: 'no-store',

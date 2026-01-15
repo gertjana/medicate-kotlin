@@ -732,7 +732,31 @@ class RedisService private constructor(
     }
 
     /**
-     * Register a new user with password hashing
+     * Get a user by username
+     */
+    suspend fun getUser(username: String): Either<RedisError, User> {
+        val key = "$environment:user:$username"
+
+        return get(key).fold(
+            { error -> error.left() },
+            { jsonString ->
+                when (jsonString) {
+                    null -> RedisError.NotFound("User not found").left()
+                    else -> Either.catch {
+                        json.decodeFromString<User>(jsonString)
+                    }.mapLeft { e ->
+                        when (e) {
+                            is SerializationException -> RedisError.SerializationError("Failed to deserialize user: ${e.message}")
+                            else -> RedisError.OperationError("Failed to get user: ${e.message}")
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    /**
+     * Register a new user with username, email and password
      */
     suspend fun registerUser(username: String, email: String, password: String): Either<RedisError, User> {
         val key = "$environment:user:$username"
@@ -787,6 +811,35 @@ class RedisService private constructor(
                             is SerializationException -> RedisError.SerializationError("Failed to deserialize user: ${e.message}")
                             is IllegalArgumentException -> RedisError.OperationError("Invalid credentials")
                             else -> RedisError.OperationError("Failed to login: ${e.message}")
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    /**
+     * Update user password
+     */
+    suspend fun updatePassword(username: String, newPassword: String): Either<RedisError, Unit> {
+        val key = "$environment:user:$username"
+
+        return get(key).fold(
+            { error -> error.left() },
+            { jsonString ->
+                when (jsonString) {
+                    null -> RedisError.NotFound("User not found").left()
+                    else -> Either.catch {
+                        val user = json.decodeFromString<User>(jsonString)
+                        val newPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt())
+                        val updatedUser = user.copy(passwordHash = newPasswordHash)
+                        val updatedJsonString = json.encodeToString(updatedUser)
+                        connection?.async()?.set(key, updatedJsonString)?.await() ?: throw IllegalStateException("Not connected")
+                        Unit
+                    }.mapLeft { e ->
+                        when (e) {
+                            is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
+                            else -> RedisError.OperationError("Failed to update password: ${e.message}")
                         }
                     }
                 }
@@ -875,6 +928,67 @@ class RedisService private constructor(
                 }
             }
             .sortedBy { it.name }
+    }
+
+    /**
+     * Verify password reset token and return associated username
+     * Token is single-use and will be deleted after successful verification
+     */
+    suspend fun verifyPasswordResetToken(token: String): Either<RedisError, String> = either {
+        // Get all keys matching password_reset pattern
+        val pattern = "$environment:password_reset:*"
+        val keys = mutableListOf<String>()
+
+        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+        var scanCursor = Either.catch {
+            asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to scan for reset tokens: ${e.message}")
+        }.bind()
+
+        // Iterate through all cursor pages
+        while (true) {
+            keys.addAll(scanCursor.keys)
+            if (scanCursor.isFinished) break
+            scanCursor = Either.catch {
+                asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
+            }.mapLeft { e ->
+                RedisError.OperationError("Failed to scan for reset tokens: ${e.message}")
+            }.bind()
+        }
+
+        // Find the key that contains the matching token
+        var matchingKey: String? = null
+        for (key in keys) {
+            val value = get(key).bind()
+            if (value != null) {
+                Either.catch {
+                    val resetToken = json.decodeFromString<PasswordResetToken>(value)
+                    if (resetToken.token == token && resetToken.expiresAt.isAfter(LocalDateTime.now())) {
+                        matchingKey = key
+                    }
+                }.mapLeft { e ->
+                    // Log but continue - skip invalid entries
+                    RedisError.SerializationError("Failed to deserialize reset token: ${e.message}")
+                }
+            }
+        }
+
+        if (matchingKey == null) {
+            raise(RedisError.NotFound("Invalid or expired password reset token"))
+        }
+
+        // Extract username from key (format: {environment}:password_reset:{username})
+        val username = matchingKey!!.removePrefix("$environment:password_reset:")
+
+        // Delete the token after successful verification (one-time use)
+        Either.catch {
+            asyncCommands.del(matchingKey!!).await()
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to delete reset token: ${e.message}")
+        }.bind()
+
+        username
     }
 
     // end of RedisService class

@@ -7,6 +7,9 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger("AdherenceRoutes")
 
 /**
  * Helper function to extract username from request header
@@ -28,8 +31,10 @@ fun Route.adherenceRoutes(redisService: RedisService) {
 
         either {
             val weeklyAdherence = redisService.getWeeklyAdherence(username).bind()
+            logger.debug("Successfully retrieved weekly adherence for user '$username'")
             call.respond(HttpStatusCode.OK, weeklyAdherence)
         }.onLeft { error ->
+            logger.error("Failed to get weekly adherence for user '$username': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
@@ -65,8 +70,10 @@ fun Route.adherenceRoutes(redisService: RedisService) {
         }
         either {
             val lowStockMedicines = redisService.getLowStockMedicines(username, threshold).bind()
+            logger.debug("Successfully retrieved ${lowStockMedicines.size} low stock medicines for user '$username' (threshold: $threshold)")
             call.respond(HttpStatusCode.OK, lowStockMedicines)
         }.onLeft { error ->
+            logger.error("Failed to get low stock medicines for user '$username': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }

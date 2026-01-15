@@ -3,6 +3,6 @@ package dev.gertjanassies.model.request
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class PasswordResetRequest(
-    val username: String
+data class VerifyResetTokenRequest(
+    val token: String
 )

@@ -8,6 +8,9 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.slf4j.LoggerFactory
+
+private val logger = LoggerFactory.getLogger("UserRoutes")
 
 fun Route.userRoutes(redisService: RedisService) {
     route("/user") {
@@ -42,11 +45,13 @@ fun Route.userRoutes(redisService: RedisService) {
 
             val left = result.leftOrNull()
             if (left != null) {
+                logger.error("Failed to register user '${request.username}': ${left.message}")
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to left.message))
                 return@post
             }
 
             val user = result.getOrNull()!!
+            logger.debug("Successfully registered user '${request.username}' with email '${request.email}'")
             call.respond(HttpStatusCode.Created, user.toResponse())
         }
 
@@ -71,12 +76,55 @@ fun Route.userRoutes(redisService: RedisService) {
 
             val leftLogin = loginResult.leftOrNull()
             if (leftLogin != null) {
+                logger.error("Failed login attempt for user '${request.username}': ${leftLogin.message}")
                 call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid credentials"))
                 return@post
             }
 
             val user = loginResult.getOrNull()!!
+            logger.debug("Successfully logged in user '${request.username}'")
             call.respond(HttpStatusCode.OK, user.toResponse())
+        }
+
+        /**
+         * PUT /api/user/password
+         * Update user password
+         */
+        put("/password") {
+            val request = call.receive<UserRequest>()
+
+            if (request.username.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Username cannot be empty"))
+                return@put
+            }
+
+            if (request.password.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "New password cannot be empty"))
+                return@put
+            }
+
+            if (request.password.length < 6) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 6 characters"))
+                return@put
+            }
+
+            val result = redisService.updatePassword(request.username, request.password)
+
+            result.fold(
+                { error ->
+                    logger.error("Failed to update password for user '${request.username}': ${error.message}")
+                    when (error) {
+                        is dev.gertjanassies.service.RedisError.NotFound ->
+                            call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
+                        else ->
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    }
+                },
+                {
+                    logger.debug("Successfully updated password for user '${request.username}'")
+                    call.respond(HttpStatusCode.OK, mapOf("message" to "Password updated successfully"))
+                }
+            )
         }
     }
 }
