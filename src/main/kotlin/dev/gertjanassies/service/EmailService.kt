@@ -169,11 +169,7 @@ class EmailService(
         }
 
         // Generate secure token
-        val token = Either.catch {
-            generateToken()
-        }.mapLeft { e ->
-            EmailError.TokenGenerationFailed(e.message ?: "Unknown error")
-        }.bind()
+        val token = generateToken()
 
         // Set expiry to 1 hour from now
         val expiresAt = LocalDateTime.now().plusHours(1)
