@@ -974,16 +974,16 @@ class RedisService private constructor(
             }
         }
 
-        if (matchingKey == null) {
-            raise(RedisError.NotFound("Invalid or expired password reset token"))
-        }
+        val nonNullMatchingKey = matchingKey ?: raise(
+            RedisError.NotFound("Invalid or expired password reset token")
+        )
 
         // Extract username from key (format: {environment}:password_reset:{username})
-        val username = matchingKey!!.removePrefix("$environment:password_reset:")
+        val username = nonNullMatchingKey.removePrefix("$environment:password_reset:")
 
         // Delete the token after successful verification (one-time use)
         Either.catch {
-            asyncCommands.del(matchingKey!!).await()
+            asyncCommands.del(nonNullMatchingKey).await()
         }.mapLeft { e ->
             RedisError.OperationError("Failed to delete reset token: ${e.message}")
         }.bind()
