@@ -977,9 +977,26 @@ class RedisService private constructor(
         logger.debug("Found ${keys.size} matching keys: $keys")
 
         // Should find exactly one matching key (if token exists and hasn't expired via TTL)
-        val matchingKey = keys.firstOrNull() ?: raise(
-            RedisError.NotFound("Invalid or expired password reset token")
-        )
+        val matchingKey = when (keys.size) {
+            0 -> raise(
+                RedisError.NotFound("Invalid or expired password reset token")
+            )
+            1 -> keys[0]
+            else -> {
+                // Multiple matching keys indicate a potential attack or cleanup bug
+                logger.warn(
+                    "Multiple matching password reset keys found for token pattern {}: count={}, keys={}",
+                    pattern,
+                    keys.size,
+                    keys
+                )
+                raise(
+                    RedisError.OperationError(
+                        "Multiple password reset tokens found; possible attack or cleanup issue"
+                    )
+                )
+            }
+        }
 
         logger.debug("Using matching key: $matchingKey")
 
