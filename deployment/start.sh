@@ -2,7 +2,6 @@
 set -e
 
 echo "=== Starting Medicate Application ==="
-PORT=80
 
 # Start backend in background with logs to stdout
 echo "Starting backend (Ktor)..."
@@ -15,7 +14,7 @@ echo "Starting frontend (SvelteKit SSR)..."
 cd /app/frontend
 # Set NODE_ENV to production for better performance
 export NODE_ENV=production
-node build/index.js 2>&1 | sed 's/^/[FRONTEND] /' &
+PORT=3000 node build/index.js 2>&1 | sed 's/^/[FRONTEND] /' &
 FRONTEND_PID=$!
 echo "Frontend PID: $FRONTEND_PID"
 cd /
@@ -65,5 +64,5 @@ fi
 
 # Start nginx (foreground) with logs
 echo "=== Starting nginx ==="
-echo "Application is ready and serving on port $PORT"
+echo "Application is ready and serving on port 80"
 exec nginx -g 'daemon off;'
