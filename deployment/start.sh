@@ -3,6 +3,14 @@ set -e
 
 echo "=== Starting Medicate Application ==="
 
+# Use PORT environment variable from Render.com, default to 80 for local
+PORT=${PORT:-80}
+echo "Configuring nginx to listen on port: $PORT"
+
+# Generate nginx config with the correct port
+sed "s/listen 80;/listen $PORT;/" /etc/nginx/nginx.conf > /tmp/nginx.conf
+mv /tmp/nginx.conf /etc/nginx/nginx.conf
+
 # Start backend in background with logs to stdout
 echo "Starting backend (Ktor)..."
 java -jar /app/app.jar 2>&1 | sed 's/^/[BACKEND] /' &
@@ -11,7 +19,10 @@ echo "Backend PID: $BACKEND_PID"
 
 # Start SvelteKit SSR frontend in background with logs to stdout
 echo "Starting frontend (SvelteKit SSR)..."
-cd /app/frontend && node build/index.js 2>&1 | sed 's/^/[FRONTEND] /' &
+cd /app/frontend
+# Set NODE_ENV to production for better performance
+export NODE_ENV=production
+node build/index.js 2>&1 | sed 's/^/[FRONTEND] /' &
 FRONTEND_PID=$!
 echo "Frontend PID: $FRONTEND_PID"
 cd /
@@ -31,6 +42,8 @@ done
 
 if [ $SLEPT -ge $MAX_WAIT ]; then
   echo "⚠ Warning: Backend did not become ready within ${MAX_WAIT}s"
+  echo "Backend process status:"
+  ps aux | grep java || echo "Backend process not found"
 else
   echo "✓ Backend became ready after ${SLEPT}s"
 fi
@@ -49,15 +62,15 @@ done
 
 if [ $SLEPT -ge $MAX_WAIT ]; then
   echo "⚠ Warning: Frontend SSR did not become ready within ${MAX_WAIT}s"
+  echo "Frontend process status:"
+  ps aux | grep node || echo "Frontend process not found"
+  echo "Checking if port 3000 is in use:"
+  netstat -tuln | grep 3000 || echo "Port 3000 is not in use"
 else
   echo "✓ Frontend SSR became ready after ${SLEPT}s"
 fi
 
 # Start nginx (foreground) with logs
 echo "=== Starting nginx ==="
-echo "Application is ready and serving on port 10000"
+echo "Application is ready and serving on port $PORT"
 exec nginx -g 'daemon off;'
-
-# Wait for backend and frontend if nginx exits
-wait $BACKEND_PID
-wait $FRONTEND_PID
