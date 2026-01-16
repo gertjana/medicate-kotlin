@@ -953,7 +953,7 @@ class RedisService private constructor(
         // Scan for keys matching: password_reset:*:token
         // This will find the key password_reset:username:token
         val pattern = "$environment:password_reset:*:$token"
-        logger.debug("Verifying password reset token, searching for pattern: $pattern")
+        logger.debug("Verifying password reset token, scanning for password_reset keys")
         val keys = mutableListOf<String>()
 
         val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
