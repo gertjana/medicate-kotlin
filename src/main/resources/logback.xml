@@ -3,14 +3,18 @@
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
+        <!-- Ensure immediate flushing for Docker/cloud environments -->
+        <immediateFlush>true</immediateFlush>
     </appender>
 
-    <root level="DEBUG">
+    <!-- Default to INFO, but allow override via LOG_LEVEL env var (e.g., DEBUG, INFO, WARN, ERROR) -->
+    <root level="${LOG_LEVEL:-INFO}">
         <appender-ref ref="STDOUT"/>
     </root>
-can
+
     <logger name="io.ktor" level="INFO"/>
     <logger name="io.netty" level="INFO"/>
     <logger name="io.lettuce" level="INFO"/>
-    <logger name="dev.gertjanassies" level="DEBUG"/>
+    <!-- Allow dev.gertjanassies to use LOG_LEVEL env var, default to INFO -->
+    <logger name="dev.gertjanassies" level="${LOG_LEVEL:-INFO}"/>
 </configuration>
