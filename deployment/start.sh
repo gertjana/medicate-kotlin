@@ -55,7 +55,7 @@ fi
 
 # Start nginx (foreground) with logs
 echo "=== Starting nginx ==="
-echo "Application is ready and serving on port 80"
+echo "Application is ready and serving on port 10000"
 exec nginx -g 'daemon off;'
 
 # Wait for backend and frontend if nginx exits
