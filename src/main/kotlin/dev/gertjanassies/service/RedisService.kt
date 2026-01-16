@@ -998,7 +998,7 @@ class RedisService private constructor(
             }
         }
 
-        logger.debug("Using matching key: $matchingKey")
+        logger.debug("Using matching key")
 
         // Get the username from the value
         val username = get(matchingKey).bind() ?: raise(
