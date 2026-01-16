@@ -47,6 +47,11 @@ class RedisService private constructor(
     constructor(environment: String, connection: StatefulRedisConnection<String, String>) : this(null, null, environment, connection, false)
 
     /**
+     * Get the environment name (for key prefixing)
+     */
+    fun getEnvironment(): String = environment
+
+    /**
      * Connect to Redis using Either for error handling
      * If connection is already set (for testing), returns it
      */
@@ -78,6 +83,14 @@ class RedisService private constructor(
      */
     suspend fun set(key: String, value: String): Either<RedisError, String> = Either.catch {
         connection?.async()?.set(key, value)?.await() ?: throw IllegalStateException("Not connected")
+    }.mapLeft { RedisError.OperationError(it.message ?: "Unknown error") }
+
+    /**
+     * Set a value in Redis with TTL (Time To Live) in seconds
+     * The key will automatically be deleted after the specified time
+     */
+    suspend fun setex(key: String, ttlSeconds: Long, value: String): Either<RedisError, String> = Either.catch {
+        connection?.async()?.setex(key, ttlSeconds, value)?.await() ?: throw IllegalStateException("Not connected")
     }.mapLeft { RedisError.OperationError(it.message ?: "Unknown error") }
 
     /**
@@ -937,8 +950,10 @@ class RedisService private constructor(
      * Token is single-use and will be deleted after successful verification
      */
     suspend fun verifyPasswordResetToken(token: String): Either<RedisError, String> = either {
-        // Get all keys matching password_reset pattern
-        val pattern = "$environment:password_reset:*"
+        // Scan for keys matching: password_reset:*:token
+        // This will find the key password_reset:username:token
+        val pattern = "$environment:password_reset:*:$token"
+        logger.debug("Verifying password reset token, searching for pattern: $pattern")
         val keys = mutableListOf<String>()
 
         val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
@@ -959,36 +974,30 @@ class RedisService private constructor(
             }.bind()
         }
 
-        // Find the key that contains the matching token
-        var matchingKey: String? = null
-        for (key in keys) {
-            val value = get(key).bind()
-            if (value != null) {
-                Either.catch {
-                    val resetToken = json.decodeFromString<PasswordResetToken>(value)
-                    if (resetToken.token == token && resetToken.expiresAt.isAfter(LocalDateTime.now())) {
-                        matchingKey = key
-                    }
-                }.onLeft { e ->
-                    // Log deserialization errors for debugging
-                    logger.warn("Failed to deserialize reset token for key '$key': ${e.message}")
-                }
-            }
-        }
+        logger.debug("Found ${keys.size} matching keys: $keys")
 
-        val nonNullMatchingKey = matchingKey ?: raise(
+        // Should find exactly one matching key (if token exists and hasn't expired via TTL)
+        val matchingKey = keys.firstOrNull() ?: raise(
             RedisError.NotFound("Invalid or expired password reset token")
         )
 
-        // Extract username from key (format: {environment}:password_reset:{username})
-        val username = nonNullMatchingKey.removePrefix("$environment:password_reset:")
+        logger.debug("Using matching key: $matchingKey")
+
+        // Get the username from the value
+        val username = get(matchingKey).bind() ?: raise(
+            RedisError.NotFound("Invalid or expired password reset token")
+        )
+
+        logger.debug("Found username: $username for token")
 
         // Delete the token after successful verification (one-time use)
         Either.catch {
-            asyncCommands.del(nonNullMatchingKey).await()
+            asyncCommands.del(matchingKey).await()
         }.mapLeft { e ->
             RedisError.OperationError("Failed to delete reset token: ${e.message}")
         }.bind()
+
+        logger.debug("Successfully verified and deleted token for user: $username")
 
         username
     }

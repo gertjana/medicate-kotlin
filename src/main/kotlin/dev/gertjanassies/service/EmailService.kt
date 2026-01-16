@@ -2,7 +2,6 @@ package dev.gertjanassies.service
 
 import arrow.core.Either
 import arrow.core.raise.either
-import dev.gertjanassies.model.PasswordResetToken
 import dev.gertjanassies.model.User
 import io.ktor.client.*
 import io.ktor.client.request.*
@@ -11,8 +10,8 @@ import io.ktor.http.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
 import java.security.SecureRandom
-import java.time.LocalDateTime
 import java.util.*
 
 sealed class EmailError(val message: String) {
@@ -42,9 +41,10 @@ class EmailService(
     private val redisService: RedisService,
     private val apiKey: String,
     private val appUrl: String,
-    private val fromEmail: String = "noreply@medicate.app"
+    private val fromEmail: String = "no-reply@gertjanassies.dev"
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+    private val logger = LoggerFactory.getLogger(EmailService::class.java)
 
     /**
      * Generate a secure random token for password reset
@@ -57,15 +57,20 @@ class EmailService(
     }
 
     /**
-     * Store password reset token in Redis with expiry
+     * Store password reset token in Redis with TTL expiry
+     * Redis will automatically delete the key after the specified time
+     * Key format: {environment}:password_reset:{username}:{token}
      */
     private suspend fun storePasswordResetToken(
         username: String,
         token: String,
-        expiresAt: LocalDateTime
+        ttlSeconds: Long = 3600 // 1 hour default
     ): Either<RedisError, Unit> {
-        val resetToken = PasswordResetToken(token = token, expiresAt = expiresAt)
-        return redisService.set("password_reset:$username", json.encodeToString(resetToken))
+        // Get environment from RedisService to ensure consistency
+        val environment = redisService.getEnvironment()
+        val key = "$environment:password_reset:$username:$token"
+        logger.debug("Storing password reset token with key: $key, TTL: $ttlSeconds seconds")
+        return redisService.setex(key, ttlSeconds, username)
             .map { } // Convert Either<RedisError, String> to Either<RedisError, Unit>
     }
 
@@ -161,7 +166,7 @@ class EmailService(
     }
 
     /**
-     * Reset password - generate token, store it, and send email
+     * Reset password - generate token, store it with TTL, and send email
      */
     suspend fun resetPassword(user: User): Either<EmailError, String> = either {
         // Validate user has an email
@@ -172,11 +177,9 @@ class EmailService(
         // Generate secure token
         val token = generateToken()
 
-        // Set expiry to 1 hour from now
-        val expiresAt = LocalDateTime.now().plusHours(1)
-
-        // Store token in Redis
-        storePasswordResetToken(user.username, token, expiresAt).mapLeft { redisError ->
+        // Store token in Redis with 1 hour TTL (3600 seconds)
+        // Redis will automatically delete the key after 1 hour
+        storePasswordResetToken(user.username, token, ttlSeconds = 3600).mapLeft { redisError ->
             EmailError.SendFailed("Failed to store reset token: ${redisError.message}")
         }.bind()
 
