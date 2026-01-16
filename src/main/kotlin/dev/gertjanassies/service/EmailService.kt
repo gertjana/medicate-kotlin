@@ -69,7 +69,7 @@ class EmailService(
         // Get environment from RedisService to ensure consistency
         val environment = redisService.getEnvironment()
         val key = "$environment:password_reset:$username:$token"
-        logger.debug("Storing password reset token with key: $key, TTL: $ttlSeconds seconds")
+        logger.debug("Storing password reset token for user: $username in environment: $environment with TTL: $ttlSeconds seconds")
         return redisService.setex(key, ttlSeconds, username)
             .map { } // Convert Either<RedisError, String> to Either<RedisError, Unit>
     }
