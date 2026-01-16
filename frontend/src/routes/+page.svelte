@@ -95,6 +95,11 @@
 	}
 
 	async function loadMedicineExpiry() {
+		if (!browser) return;
+		if (!$userStore) {
+			expiryLoading = false;
+			return;
+		}
 		expiryLoading = true;
 		expiryError = '';
 		try {
