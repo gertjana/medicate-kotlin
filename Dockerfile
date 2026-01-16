@@ -43,6 +43,6 @@ COPY --from=backend-builder /app/build/libs/*.jar /app/app.jar
 COPY deployment/start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
 
-EXPOSE 10000
+EXPOSE 80
 
 CMD ["/usr/local/bin/start.sh"]

@@ -2,14 +2,7 @@
 set -e
 
 echo "=== Starting Medicate Application ==="
-
-# Use PORT environment variable from Render.com, default to 80 for local
-PORT=${PORT:-80}
-echo "Configuring nginx to listen on port: $PORT"
-
-# Generate nginx config with the correct port
-sed "s/listen 80;/listen $PORT;/" /etc/nginx/nginx.conf > /tmp/nginx.conf
-mv /tmp/nginx.conf /etc/nginx/nginx.conf
+PORT=80
 
 # Start backend in background with logs to stdout
 echo "Starting backend (Ktor)..."

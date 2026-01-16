@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-    - 8000:80      # Map local port 8000 to container port 80
+    - 80:80      # Map local port 8000 to container port 80
     environment:
     - REDIS_HOST=host.docker.internal
     - REDIS_PORT=6379
