@@ -14,7 +14,7 @@ echo "Starting frontend (SvelteKit SSR)..."
 cd /app/frontend
 # Set NODE_ENV to production for better performance
 export NODE_ENV=production
-stdbuf -oL -eL node build/index.js 2>&1 | stdbuf -oL -eL sed 's/^/[FRONTEND] /' &
+PORT=3000 stdbuf -oL -eL node build/index.js 2>&1 | stdbuf -oL -eL sed 's/^/[FRONTEND] /' &
 FRONTEND_PID=$!
 echo "Frontend PID: $FRONTEND_PID"
 cd /
