@@ -65,4 +65,14 @@ fi
 # Start nginx (foreground) with logs
 echo "=== Starting nginx ==="
 echo "Application is ready and serving on port 80"
-exec nginx -g 'daemon off;'
+
+# Start nginx in the background (not exec, so we can still see backend/frontend logs)
+nginx -g 'daemon off;' &
+NGINX_PID=$!
+echo "Nginx PID: $NGINX_PID"
+
+# Wait for any process to exit
+wait -n
+
+# If any process exits, exit with its status
+exit $?
