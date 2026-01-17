@@ -1,6 +1,6 @@
 # Medicate - Medicine Tracking Application
 
-A functional Kotlin REST API service built with Ktor framework, Arrow for functional programming, and Redis for backend storage. Features multi-user support with isolated data per user.
+A functional Kotlin REST API service built with Ktor framework, Arrow for functional programming, and Redis for backend storage. Features multi-user support with JWT authentication and complete data isolation per user.
 
 ## Features
 
@@ -8,8 +8,22 @@ A functional Kotlin REST API service built with Ktor framework, Arrow for functi
 - 📅 **Schedule Management** - Create schedules for taking medicines
 - 📊 **Dosage History** - Record and track medicine intake
 - 📈 **Adherence Tracking** - Monitor weekly adherence to schedules
-- 👥 **Multi-User Support** - Each user has isolated data
-- 🔐 **Simple Authentication** - Username-based login/register
+- 👥 **Multi-User Support** - Each user has completely isolated data
+- 🔐 **JWT Authentication** - Secure authentication with cryptographically signed tokens
+- 📧 **Password Reset** - Email-based password reset flow
+- ⏰ **Medicine Expiry Tracking** - Calculate when medicines will run out based on schedules
+
+## Security
+
+This application uses **JWT (JSON Web Token) authentication** for secure user authentication:
+
+- ✅ Cryptographically signed tokens (HMAC SHA-256)
+- ✅ 24-hour token expiration
+- ✅ Cannot be forged without secret key
+- ✅ All protected routes require valid JWT
+- ✅ Production-grade security
+
+See `FINAL_JWT_SUMMARY.md` for complete security details.
 
 ## Quick Start
 
@@ -23,29 +37,42 @@ A functional Kotlin REST API service built with Ktor framework, Arrow for functi
 redis-server
 ```
 
-### 2. Start Backend
+### 2. Set Environment Variables
+```bash
+# Required for production, optional for development
+export JWT_SECRET=$(openssl rand -base64 64)
+export RESEND_API_KEY=your-resend-api-key  # For password reset emails
+```
+
+### 3. Start Backend
 ```bash
 ./gradlew run
 ```
 
-### 3. Start Frontend (in new terminal)
+### 4. Start Frontend (in new terminal)
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-### 4. Access Application
+### 5. Access Application
 Open http://localhost:5173 in your browser
 
 ## Configuration
 
 The application can be configured via `src/main/resources/application.conf` or environment variables:
 
+### Required (Production)
+- `JWT_SECRET` - Secret key for signing JWT tokens (generate with `openssl rand -base64 64`)
+
+### Optional
 - `PORT` - Server port (default: 8080)
 - `REDIS_HOST` - Redis host (default: localhost)
 - `REDIS_PORT` - Redis port (default: 6379)
 - `APP_ENV` - Environment name for Redis keys (default: test)
+- `RESEND_API_KEY` - API key for Resend email service (for password reset)
+- `APP_URL` - Application URL for password reset emails (default: http://localhost:5173)
 
 ## API Endpoints
 
@@ -85,11 +112,81 @@ All endpoints require `X-Username` header (automatically sent by frontend when l
 - Arrow 1.2.1 (Functional Programming)
 - Lettuce 6.3.0 (Redis Client)
 - Kotest 5.8.0 (Testing)
+- JWT (JSON Web Tokens) for Authentication
 
 **Frontend:**
 - SvelteKit
 - TypeScript
 - TailwindCSS
+
+## Authentication
+
+This application uses **JWT (JSON Web Token)** authentication:
+
+1. **Register/Login** - User receives a JWT token
+2. **Token Storage** - Token stored in browser localStorage
+3. **API Requests** - Token sent in `Authorization: Bearer <token>` header
+4. **Token Validation** - Backend validates signature, expiration, and claims
+5. **Logout** - Token removed from localStorage
+
+**Token Details:**
+- Algorithm: HMAC SHA-256
+- Expiration: 24 hours
+- Claims: username, issuer, audience, expiration
+- Cannot be forged without `JWT_SECRET`
+
+See `FINAL_JWT_SUMMARY.md` for complete implementation details.
+
+## Testing
+
+### Backend Tests
+```bash
+./gradlew test
+
+# Result: 165/165 tests passing ✅
+```
+
+All protected routes are tested with JWT authentication using the `TestJwtConfig` helper.
+
+### Frontend Build
+```bash
+cd frontend && npm run build
+
+# Result: Build successful ✅
+```
+
+## Production Deployment
+
+See `PRODUCTION_DEPLOYMENT_CHECKLIST.md` for complete deployment guide.
+
+**Quick Deploy:**
+1. Generate JWT secret: `openssl rand -base64 64`
+2. Set environment variables in hosting platform
+3. Deploy: `git push origin main`
+
+**Required Environment Variables:**
+```bash
+JWT_SECRET=<strong-random-secret>
+REDIS_URL=<redis-connection-string>
+RESEND_API_KEY=<email-api-key>
+APP_URL=<your-app-url>
+```
+
+## Documentation
+
+- `FINAL_JWT_SUMMARY.md` - Complete JWT implementation overview
+- `JWT_IMPLEMENTATION.md` - Backend technical details
+- `FRONTEND_JWT_COMPLETE.md` - Frontend implementation
+- `PASSWORD_RESET_FIX.md` - Password reset flow
+- `PRODUCTION_DEPLOYMENT_CHECKLIST.md` - Deployment guide
+
+## License
+
+MIT
+
+## Author
+
+[Gert Jan Assies](https://gertjanassies.dev)
 
 **Database:**
 - Redis
