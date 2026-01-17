@@ -9,6 +9,8 @@ import dev.gertjanassies.model.request.DosageHistoryRequest
 import dev.gertjanassies.model.request.MedicineRequest
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.test.TestJwtConfig
+import dev.gertjanassies.test.TestJwtConfig.installTestJwtAuth
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.call.*
@@ -17,6 +19,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
@@ -28,6 +31,7 @@ import java.util.*
 class MedicineRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
+    val jwtToken = TestJwtConfig.generateToken(testUsername)
 
     beforeEach {
         mockRedisService = mockk()
@@ -49,11 +53,18 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.get("/medicine") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.OK
@@ -68,11 +79,21 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.get("/medicine") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
@@ -90,12 +111,22 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/medicine/$medicineId") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.OK
@@ -114,11 +145,21 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.get("/medicine/$medicineId") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.NotFound
@@ -136,12 +177,22 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/medicine") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -162,12 +213,22 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/medicine") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -187,12 +248,22 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.put("/medicine/$medicineId") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(medicine)
                 }
@@ -212,12 +283,22 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.put("/medicine/$medicineId") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(medicine)
                 }
@@ -236,11 +317,21 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.delete("/medicine/$medicineId") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.NoContent
@@ -257,11 +348,21 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.delete("/medicine/$medicineId") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.NotFound
@@ -285,12 +386,22 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/takedose") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -313,12 +424,22 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/takedose") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -337,12 +458,22 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/takedose") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -363,12 +494,22 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/addstock") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -390,12 +531,22 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/addstock") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -414,12 +565,22 @@ class MedicineRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+
+                    install(ContentNegotiation) { json() }
+
+                    installTestJwtAuth()
+
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/addstock") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }

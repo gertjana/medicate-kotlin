@@ -6,6 +6,8 @@ import dev.gertjanassies.model.request.ScheduleRequest
 import dev.gertjanassies.service.RedisService
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -14,10 +16,11 @@ import org.slf4j.LoggerFactory
 private val logger = LoggerFactory.getLogger("ScheduleRoutes")
 
 /**
- * Helper function to extract username from request header
+ * Helper function to extract username from JWT token
  */
-private suspend fun ApplicationCall.getUsername(): String? {
-    return request.header("X-Username")
+private fun ApplicationCall.getUsername(): String? {
+    val principal = principal<JWTPrincipal>()
+    return principal?.payload?.getClaim("username")?.asString()
 }
 
 /**

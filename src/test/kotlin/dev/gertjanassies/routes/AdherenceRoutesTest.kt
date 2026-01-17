@@ -8,14 +8,19 @@ import dev.gertjanassies.model.Medicine
 import dev.gertjanassies.model.WeeklyAdherence
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.test.TestJwtConfig
+import dev.gertjanassies.test.TestJwtConfig.installTestJwtAuth
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import io.mockk.*
 import java.util.*
@@ -23,6 +28,7 @@ import java.util.*
 class AdherenceRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
+    val jwtToken = TestJwtConfig.generateToken(testUsername)
 
     beforeEach {
         mockRedisService = mockk()
@@ -60,8 +66,11 @@ class AdherenceRoutesTest : FunSpec({
 
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { adherenceRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
 
                 val client = createClient {
                     install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
@@ -70,7 +79,7 @@ class AdherenceRoutesTest : FunSpec({
                 }
 
                 val response = client.get("/adherence") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.OK
@@ -85,8 +94,11 @@ class AdherenceRoutesTest : FunSpec({
         test("should return 401 if no username header") {
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { adherenceRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
 
                 val response = client.get("/adherence")
 
@@ -101,11 +113,14 @@ class AdherenceRoutesTest : FunSpec({
 
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { adherenceRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
 
                 val response = client.get("/adherence") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
@@ -124,8 +139,11 @@ class AdherenceRoutesTest : FunSpec({
 
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { adherenceRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
 
                 val client = createClient {
                     install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
@@ -134,7 +152,7 @@ class AdherenceRoutesTest : FunSpec({
                 }
 
                 val response = client.get("/lowstock") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.OK
@@ -154,8 +172,11 @@ class AdherenceRoutesTest : FunSpec({
 
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { adherenceRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
 
                 val client = createClient {
                     install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
@@ -164,7 +185,7 @@ class AdherenceRoutesTest : FunSpec({
                 }
 
                 val response = client.get("/lowstock?threshold=20.0") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.OK
@@ -178,11 +199,14 @@ class AdherenceRoutesTest : FunSpec({
         test("should return 400 for invalid threshold") {
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { adherenceRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
 
                 val response = client.get("/lowstock?threshold=invalid") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.BadRequest
@@ -193,11 +217,14 @@ class AdherenceRoutesTest : FunSpec({
         test("should return 400 for negative threshold") {
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { adherenceRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
 
                 val response = client.get("/lowstock?threshold=-5.0") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.BadRequest
@@ -208,11 +235,14 @@ class AdherenceRoutesTest : FunSpec({
         test("should return 400 for zero threshold") {
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { adherenceRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
 
                 val response = client.get("/lowstock?threshold=0") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.BadRequest
@@ -223,8 +253,11 @@ class AdherenceRoutesTest : FunSpec({
         test("should return 401 if no username header") {
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { adherenceRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
 
                 val response = client.get("/lowstock")
 
@@ -239,11 +272,14 @@ class AdherenceRoutesTest : FunSpec({
 
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { adherenceRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
 
                 val response = client.get("/lowstock") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.InternalServerError

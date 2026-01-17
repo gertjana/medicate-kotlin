@@ -4,6 +4,7 @@ import dev.gertjanassies.model.request.PasswordResetRequest
 import dev.gertjanassies.model.request.VerifyResetTokenRequest
 import dev.gertjanassies.service.EmailError
 import dev.gertjanassies.service.EmailService
+import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
 import io.ktor.http.*
@@ -15,7 +16,7 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("AuthRoutes")
 
-fun Route.authRoutes(redisService: RedisService, emailService: EmailService) {
+fun Route.authRoutes(redisService: RedisService, emailService: EmailService, jwtService: JwtService) {
     route("/auth") {
         /**
          * POST /api/auth/resetPassword

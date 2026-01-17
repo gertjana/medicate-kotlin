@@ -5,6 +5,8 @@ import arrow.core.right
 import dev.gertjanassies.model.DosageHistory
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.test.TestJwtConfig
+import dev.gertjanassies.test.TestJwtConfig.installTestJwtAuth
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.call.*
@@ -13,6 +15,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
@@ -24,6 +27,7 @@ import java.util.*
 class DosageHistoryRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
+    val jwtToken = TestJwtConfig.generateToken(testUsername)
 
     beforeEach {
         mockRedisService = mockk()
@@ -38,19 +42,22 @@ class DosageHistoryRoutesTest : FunSpec({
             coEvery { mockRedisService.getAllDosageHistories(testUsername) } returns emptyList<DosageHistory>().right()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
                 routing {
                     route("/api") {
-                        dosageHistoryRoutes(mockRedisService)
+                        authenticate("auth-jwt") {
+                            dosageHistoryRoutes(mockRedisService)
+                        }
                     }
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/api/history") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<List<DosageHistory>>()
@@ -88,19 +95,22 @@ class DosageHistoryRoutesTest : FunSpec({
             coEvery { mockRedisService.getAllDosageHistories(testUsername) } returns histories.right()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
                 routing {
                     route("/api") {
-                        dosageHistoryRoutes(mockRedisService)
+                        authenticate("auth-jwt") {
+                            dosageHistoryRoutes(mockRedisService)
+                        }
                     }
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/api/history") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<List<DosageHistory>>()
@@ -137,19 +147,22 @@ class DosageHistoryRoutesTest : FunSpec({
             coEvery { mockRedisService.getAllDosageHistories(testUsername) } returns histories.right()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
                 routing {
                     route("/api") {
-                        dosageHistoryRoutes(mockRedisService)
+                        authenticate("auth-jwt") {
+                            dosageHistoryRoutes(mockRedisService)
+                        }
                     }
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/api/history") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<List<DosageHistory>>()
@@ -166,18 +179,21 @@ class DosageHistoryRoutesTest : FunSpec({
             coEvery { mockRedisService.getAllDosageHistories(testUsername) } returns RedisError.OperationError("Database error").left()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
                 routing {
                     route("/api") {
-                        dosageHistoryRoutes(mockRedisService)
+                        authenticate("auth-jwt") {
+                            dosageHistoryRoutes(mockRedisService)
+                        }
                     }
                 }
 
                 val response = client.get("/api/history") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.InternalServerError
                 coVerify { mockRedisService.getAllDosageHistories(testUsername) }
@@ -191,18 +207,21 @@ class DosageHistoryRoutesTest : FunSpec({
             coEvery { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) } returns Unit.right()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
                 routing {
                     route("/api") {
-                        dosageHistoryRoutes(mockRedisService)
+                        authenticate("auth-jwt") {
+                            dosageHistoryRoutes(mockRedisService)
+                        }
                     }
                 }
 
                 val response = client.delete("/api/history/$dosageHistoryId") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.NoContent
                 coVerify { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) }
@@ -213,13 +232,16 @@ class DosageHistoryRoutesTest : FunSpec({
             val dosageHistoryId = UUID.randomUUID()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
                 routing {
                     route("/api") {
-                        dosageHistoryRoutes(mockRedisService)
+                        authenticate("auth-jwt") {
+                            dosageHistoryRoutes(mockRedisService)
+                        }
                     }
                 }
 
@@ -230,18 +252,21 @@ class DosageHistoryRoutesTest : FunSpec({
 
         test("should return 400 when id is invalid") {
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
                 routing {
                     route("/api") {
-                        dosageHistoryRoutes(mockRedisService)
+                        authenticate("auth-jwt") {
+                            dosageHistoryRoutes(mockRedisService)
+                        }
                     }
                 }
 
                 val response = client.delete("/api/history/invalid-uuid") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.BadRequest
             }
@@ -252,18 +277,21 @@ class DosageHistoryRoutesTest : FunSpec({
             coEvery { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) } returns RedisError.NotFound("Not found").left()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
                 routing {
                     route("/api") {
-                        dosageHistoryRoutes(mockRedisService)
+                        authenticate("auth-jwt") {
+                            dosageHistoryRoutes(mockRedisService)
+                        }
                     }
                 }
 
                 val response = client.delete("/api/history/$dosageHistoryId") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.NotFound
                 coVerify { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) }
@@ -275,18 +303,21 @@ class DosageHistoryRoutesTest : FunSpec({
             coEvery { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) } returns RedisError.OperationError("Database error").left()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
                 routing {
                     route("/api") {
-                        dosageHistoryRoutes(mockRedisService)
+                        authenticate("auth-jwt") {
+                            dosageHistoryRoutes(mockRedisService)
+                        }
                     }
                 }
 
                 val response = client.delete("/api/history/$dosageHistoryId") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.InternalServerError
                 coVerify { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) }

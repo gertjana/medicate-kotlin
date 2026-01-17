@@ -7,6 +7,7 @@ import dev.gertjanassies.model.request.PasswordResetRequest
 import dev.gertjanassies.model.request.VerifyResetTokenRequest
 import dev.gertjanassies.service.EmailError
 import dev.gertjanassies.service.EmailService
+import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
 import io.kotest.core.spec.style.FunSpec
@@ -26,10 +27,12 @@ import io.mockk.*
 class AuthRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     lateinit var mockEmailService: EmailService
+    lateinit var mockJwtService: JwtService
 
     beforeEach {
         mockRedisService = mockk()
         mockEmailService = mockk()
+        mockJwtService = mockk()
     }
 
     afterEach {
@@ -52,7 +55,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/resetPassword") {
@@ -80,7 +83,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/resetPassword") {
@@ -108,7 +111,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/resetPassword") {
@@ -136,7 +139,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/resetPassword") {
@@ -167,7 +170,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/resetPassword") {
@@ -198,7 +201,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/resetPassword") {
@@ -229,7 +232,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/resetPassword") {
@@ -260,7 +263,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/verifyResetToken") {
@@ -284,7 +287,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/verifyResetToken") {
@@ -311,7 +314,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/verifyResetToken") {
@@ -338,7 +341,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/verifyResetToken") {
@@ -366,7 +369,7 @@ class AuthRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService) }
+                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/verifyResetToken") {
