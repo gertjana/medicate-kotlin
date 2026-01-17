@@ -3,18 +3,18 @@ set -e
 
 echo "=== Starting Medicate Application ==="
 
-# Start backend in background with logs to stdout
+# Start backend in background with logs to stdout (unbuffered)
 echo "Starting backend (Ktor)..."
-java -jar /app/app.jar 2>&1 | sed 's/^/[BACKEND] /' &
+stdbuf -oL -eL java -jar /app/app.jar 2>&1 | stdbuf -oL -eL sed 's/^/[BACKEND] /' &
 BACKEND_PID=$!
 echo "Backend PID: $BACKEND_PID"
 
-# Start SvelteKit SSR frontend in background with logs to stdout
+# Start SvelteKit SSR frontend in background with logs to stdout (unbuffered)
 echo "Starting frontend (SvelteKit SSR)..."
 cd /app/frontend
 # Set NODE_ENV to production for better performance
 export NODE_ENV=production
-PORT=3000 node build/index.js 2>&1 | sed 's/^/[FRONTEND] /' &
+stdbuf -oL -eL node build/index.js 2>&1 | stdbuf -oL -eL sed 's/^/[FRONTEND] /' &
 FRONTEND_PID=$!
 echo "Frontend PID: $FRONTEND_PID"
 cd /

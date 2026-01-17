@@ -32,8 +32,8 @@ RUN ./gradlew assemble --no-daemon -x test
 # Stage 3: Final runtime image - JRE base, Node, and nginx
 FROM eclipse-temurin:21-jre-alpine
 
-# Install nginx, nodejs, curl, and net-tools (for netstat debugging)
-RUN apk add --no-cache nginx nodejs npm curl net-tools
+# Install nginx, nodejs, curl, net-tools (for netstat debugging), and coreutils (for stdbuf unbuffered logging)
+RUN apk add --no-cache nginx nodejs npm curl net-tools coreutils
 
 # Create directories
 RUN mkdir -p /usr/share/nginx/html /var/run/nginx /app /app/frontend
