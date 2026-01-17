@@ -62,32 +62,40 @@ export interface MedicineExpiry {
 	dose: number;
 	unit: string;
 	stock: number;
-	expiryDate: string;
+	description?: string;
 }
 
-// Update API_BASE to always use the SSR endpoint
-const API_BASE = '/api';
+// Determine API base URL based on environment
+// - Server-side (SSR): Use internal backend URL (http://127.0.0.1:8080/api)
+// - Client-side: Use relative URL (/api) which nginx proxies to backend
+import { browser } from '$app/environment';
+
+const API_BASE = browser
+	? '/api'  // Client-side: relative URL, proxied by nginx
+	: 'http://127.0.0.1:8080/api';  // Server-side: direct internal connection
 
 // Helper function to get headers with username
 function getHeaders(includeContentType: boolean = false): HeadersInit {
 	const headers: HeadersInit = {};
 
-	// Get username from localStorage
-	const userJson = localStorage.getItem('medicate_user');
-	if (userJson) {
-		try {
-			const user = JSON.parse(userJson);
-			if (user && typeof user.username === 'string' && user.username.trim().length > 0) {
-				headers['X-Username'] = user.username;
-			} else {
-				console.error('Invalid user data in localStorage for key "medicate_user"', user);
+	// Get username from localStorage (only available in browser)
+	if (browser) {
+		const userJson = localStorage.getItem('medicate_user');
+		if (userJson) {
+			try {
+				const user = JSON.parse(userJson);
+				if (user && typeof user.username === 'string' && user.username.trim().length > 0) {
+					headers['X-Username'] = user.username;
+				} else {
+					console.error('Invalid user data in localStorage for key "medicate_user"', user);
+					localStorage.removeItem('medicate_user');
+					throw new Error('Stored user session is corrupted. Please reload the page and sign in again.');
+				}
+			} catch (e) {
+				console.error('Failed to parse user from localStorage for key "medicate_user"', e);
 				localStorage.removeItem('medicate_user');
 				throw new Error('Stored user session is corrupted. Please reload the page and sign in again.');
 			}
-		} catch (e) {
-			console.error('Failed to parse user from localStorage for key "medicate_user"', e);
-			localStorage.removeItem('medicate_user');
-			throw new Error('Stored user session is corrupted. Please reload the page and sign in again.');
 		}
 	}
 
