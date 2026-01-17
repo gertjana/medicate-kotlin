@@ -3,9 +3,19 @@
 # Stage 1: Build frontend SSR (SvelteKit Node)
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
+
+# Copy package files and install dependencies
 COPY frontend/package*.json ./
 RUN npm ci
+
+# Copy all frontend source files (including updated api.ts)
 COPY frontend/ ./
+
+# Add build info for debugging
+ARG BUILD_TIME
+RUN echo "Frontend built at: ${BUILD_TIME:-unknown}" > build-info.txt
+
+# Build the frontend
 RUN npm run build
 
 # Stage 2: Build backend (assemble jar)

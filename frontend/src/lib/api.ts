@@ -74,6 +74,7 @@ const API_BASE = browser
 	? '/api'  // Client-side: relative URL, proxied by nginx
 	: 'http://127.0.0.1:8080/api';  // Server-side: direct internal connection
 
+
 // Helper function to get headers with username
 function getHeaders(includeContentType: boolean = false): HeadersInit {
 	const headers: HeadersInit = {};
@@ -273,13 +274,19 @@ export async function registerUser(username: string, password: string, email?: s
     const body: any = { username, password };
     if (email) body.email = email;
 
-    // Use the correct SSR endpoint for registration
-    const response = await fetch(`/api/user/register`, {
+    const url = `${API_BASE}/user/register`;
+
+    const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
     });
-    if (!response.ok) throw new Error('Failed to register user');
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to register user: ${response.status} ${response.statusText}`);
+    }
+
     return response.json();
 }
 
