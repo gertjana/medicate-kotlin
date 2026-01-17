@@ -1,5 +1,7 @@
 package dev.gertjanassies
 
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
 import dev.gertjanassies.model.serializer.LocalDateTimeSerializer
 import dev.gertjanassies.model.serializer.UUIDSerializer
 import dev.gertjanassies.routes.adherenceRoutes
@@ -11,6 +13,7 @@ import dev.gertjanassies.routes.medicineRoutes
 import dev.gertjanassies.routes.scheduleRoutes
 import dev.gertjanassies.routes.userRoutes
 import dev.gertjanassies.service.EmailService
+import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisService
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -18,6 +21,8 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
 import io.ktor.server.engine.*
 import io.ktor.server.http.content.staticFiles
 import io.ktor.server.netty.*
@@ -29,6 +34,7 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import java.io.File
+import java.util.*
 
 fun main() {
     embeddedServer(Netty, port = 8080, host = "127.0.0.1", module = Application::module)
@@ -38,6 +44,7 @@ fun main() {
 fun Application.module() {
     val serveStatic = environment.config.propertyOrNull("app.serveStatic")?.getString()?.toBoolean()
         ?: System.getenv("SERVE_STATIC")?.toBoolean() ?: false
+
 
     // Configure CORS - only needed in development when frontend is served separately
     if (!serveStatic) {
@@ -102,19 +109,58 @@ fun Application.module() {
 
     val emailService = EmailService(httpClient, redisService, resendApiKey, appUrl)
 
+    // Initialize JWT Service
+    val jwtSecret = environment.config.propertyOrNull("jwt.secret")?.getString()
+        ?: System.getenv("JWT_SECRET")
+        ?: "default-secret-change-in-production"
+
+    if (jwtSecret.startsWith("default-secret")) {
+        log.warn("⚠️  Using default JWT secret! Set JWT_SECRET environment variable in production!")
+    }
+
+    val jwtService = JwtService(jwtSecret)
+
+    // Install JWT Authentication
+    install(Authentication) {
+        jwt("auth-jwt") {
+            verifier(
+                JWT.require(Algorithm.HMAC256(jwtSecret))
+                    .withAudience("medicate-users")
+                    .withIssuer("medicate-app")
+                    .build()
+            )
+            validate { credential ->
+                val username = credential.payload.getClaim("username").asString()
+                if (username != null) {
+                    JWTPrincipal(credential.payload)
+                } else {
+                    null
+                }
+            }
+            challenge { _, _ ->
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid or expired token"))
+            }
+        }
+    }
+
     log.info("Configuring routing...")
     // Configure routing
     routing {
         // API routes under /api prefix
         route("/api") {
+            // Public routes (no authentication required)
             healthRoutes()
-            medicineRoutes(redisService)
-            scheduleRoutes(redisService)
-            dailyRoutes(redisService)
-            dosageHistoryRoutes(redisService)
-            adherenceRoutes(redisService)
-            userRoutes(redisService)
-            authRoutes(redisService, emailService)
+            authRoutes(redisService, emailService, jwtService)
+
+            // Protected routes (require JWT authentication)
+            authenticate("auth-jwt") {
+                userRoutes(redisService, jwtService)
+                medicineRoutes(redisService)
+                scheduleRoutes(redisService)
+                dailyRoutes(redisService)
+                dosageHistoryRoutes(redisService)
+                adherenceRoutes(redisService)
+            }
         }
 
         // Serve static files if enabled

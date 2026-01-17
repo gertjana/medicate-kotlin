@@ -4,7 +4,9 @@ import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.User
 import dev.gertjanassies.model.request.UserRequest
+import dev.gertjanassies.model.response.AuthResponse
 import dev.gertjanassies.model.response.UserResponse
+import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
 import io.kotest.core.spec.style.FunSpec
@@ -21,9 +23,14 @@ import io.mockk.*
 
 class UserRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
+    lateinit var mockJwtService: JwtService
 
     beforeEach {
         mockRedisService = mockk()
+        mockJwtService = mockk()
+
+        // Mock JWT token generation
+        every { mockJwtService.generateToken(any()) } returns "test-jwt-token-123"
     }
 
     afterEach {
@@ -31,7 +38,7 @@ class UserRoutesTest : FunSpec({
     }
 
     context("POST /user/register") {
-        test("should register a new user successfully") {
+        test("should register a new user successfully and return JWT token") {
             val username = "testuser"
             val email = "testuser@example.com"
             val password = "password123"
@@ -44,7 +51,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -53,10 +60,13 @@ class UserRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.Created
-                val body = response.body<UserResponse>()
-                body.username shouldBe username
-                body.email shouldBe email
+                val body = response.body<AuthResponse>()
+                body.user.username shouldBe username
+                body.user.email shouldBe email
+                body.token shouldBe "test-jwt-token-123"
+
                 coVerify { mockRedisService.registerUser(username, email, password) }
+                verify { mockJwtService.generateToken(username) }
             }
         }
 
@@ -68,7 +78,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -89,7 +99,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -110,7 +120,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -137,7 +147,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -152,7 +162,7 @@ class UserRoutesTest : FunSpec({
     }
 
     context("POST /user/login") {
-        test("should login user successfully") {
+        test("should login user successfully and return JWT token") {
             val username = "testuser"
             val password = "password123"
             val request = UserRequest(username, "", password)
@@ -164,7 +174,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -173,9 +183,12 @@ class UserRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.OK
-                val body = response.body<UserResponse>()
-                body.username shouldBe username
+                val body = response.body<AuthResponse>()
+                body.user.username shouldBe username
+                body.token shouldBe "test-jwt-token-123"
+
                 coVerify { mockRedisService.loginUser(username, password) }
+                verify { mockJwtService.generateToken(username) }
             }
         }
 
@@ -187,7 +200,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -208,7 +221,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -234,7 +247,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -261,7 +274,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {
@@ -284,7 +297,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {
@@ -305,7 +318,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {
@@ -326,7 +339,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {
@@ -352,7 +365,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {
@@ -378,7 +391,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ServerContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService) }
+                routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {

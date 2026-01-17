@@ -1,7 +1,9 @@
 package dev.gertjanassies.routes
 
 import dev.gertjanassies.model.request.UserRequest
+import dev.gertjanassies.model.response.AuthResponse
 import dev.gertjanassies.model.response.toResponse
+import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -12,7 +14,7 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("UserRoutes")
 
-fun Route.userRoutes(redisService: RedisService) {
+fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
     route("/user") {
         /**
          * POST /api/user/register
@@ -51,8 +53,15 @@ fun Route.userRoutes(redisService: RedisService) {
             }
 
             val user = result.getOrNull()!!
-            logger.debug("Successfully registered user '${request.username}' with email '${request.email}'")
-            call.respond(HttpStatusCode.Created, user.toResponse())
+
+            // Generate JWT token for the new user
+            val token = jwtService.generateToken(user.username)
+
+            logger.debug("Successfully registered user '${user.username}' with email '${request.email}' and generated JWT token")
+            call.respond(
+                HttpStatusCode.Created,
+                AuthResponse(user = user.toResponse(), token = token)
+            )
         }
 
         /**
@@ -82,8 +91,15 @@ fun Route.userRoutes(redisService: RedisService) {
             }
 
             val user = loginResult.getOrNull()!!
-            logger.debug("Successfully logged in user '${request.username}'")
-            call.respond(HttpStatusCode.OK, user.toResponse())
+
+            // Generate JWT token for logged in user
+            val token = jwtService.generateToken(user.username)
+
+            logger.debug("Successfully logged in user '${request.username}' and generated JWT token")
+            call.respond(
+                HttpStatusCode.OK,
+                AuthResponse(user = user.toResponse(), token = token)
+            )
         }
 
         /**

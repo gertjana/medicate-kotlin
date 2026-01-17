@@ -6,6 +6,8 @@ import dev.gertjanassies.model.Schedule
 import dev.gertjanassies.model.request.ScheduleRequest
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.test.TestJwtConfig
+import dev.gertjanassies.test.TestJwtConfig.installTestJwtAuth
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.call.*
@@ -14,6 +16,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
@@ -23,6 +26,8 @@ import java.util.*
 
 class ScheduleRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
+    val testUsername = "testuser"
+    val jwtToken = TestJwtConfig.generateToken(testUsername)
 
     beforeEach {
         mockRedisService = mockk()
@@ -42,14 +47,19 @@ class ScheduleRoutesTest : FunSpec({
             coEvery { mockRedisService.getAllSchedules(any()) } returns schedules.right()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
-                routing { scheduleRoutes(mockRedisService) }
+                routing {
+                    authenticate("auth-jwt") {
+                        scheduleRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.get("/schedule") {
-                    header("X-Username", "testuser")
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.OK
@@ -61,14 +71,19 @@ class ScheduleRoutesTest : FunSpec({
             coEvery { mockRedisService.getAllSchedules(any()) } returns RedisError.OperationError("Error").left()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
-                routing { scheduleRoutes(mockRedisService) }
+                routing {
+                    authenticate("auth-jwt") {
+                        scheduleRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.get("/schedule") {
-                    header("X-Username", "testuser")
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
@@ -84,15 +99,20 @@ class ScheduleRoutesTest : FunSpec({
             coEvery { mockRedisService.getSchedule(any(), scheduleId.toString()) } returns schedule.right()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
-                routing { scheduleRoutes(mockRedisService) }
+                routing {
+                    authenticate("auth-jwt") {
+                        scheduleRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/schedule/$scheduleId") {
-                    header("X-Username", "testuser")
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.OK
@@ -108,14 +128,19 @@ class ScheduleRoutesTest : FunSpec({
                 RedisError.NotFound("Schedule not found").left()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
-                routing { scheduleRoutes(mockRedisService) }
+                routing {
+                    authenticate("auth-jwt") {
+                        scheduleRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.get("/schedule/$scheduleId") {
-                    header("X-Username", "testuser")
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.NotFound
@@ -131,15 +156,20 @@ class ScheduleRoutesTest : FunSpec({
             coEvery { mockRedisService.createSchedule(any(), any<ScheduleRequest>()) } returns createdSchedule.right()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
-                routing { scheduleRoutes(mockRedisService) }
+                routing {
+                    authenticate("auth-jwt") {
+                        scheduleRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/schedule") {
-                    header("X-Username", "testuser")
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -157,15 +187,20 @@ class ScheduleRoutesTest : FunSpec({
                 RedisError.OperationError("Failed to create").left()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
-                routing { scheduleRoutes(mockRedisService) }
+                routing {
+                    authenticate("auth-jwt") {
+                        scheduleRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.post("/schedule") {
-                    header("X-Username", "testuser")
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(request)
                 }
@@ -182,15 +217,20 @@ class ScheduleRoutesTest : FunSpec({
             coEvery { mockRedisService.updateSchedule(any(), scheduleId.toString(), any<Schedule>()) } returns schedule.right()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
-                routing { scheduleRoutes(mockRedisService) }
+                routing {
+                    authenticate("auth-jwt") {
+                        scheduleRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.put("/schedule/$scheduleId") {
-                    header("X-Username", "testuser")
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(schedule)
                 }
@@ -207,15 +247,20 @@ class ScheduleRoutesTest : FunSpec({
                 RedisError.NotFound("Schedule not found").left()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
-                routing { scheduleRoutes(mockRedisService) }
+                routing {
+                    authenticate("auth-jwt") {
+                        scheduleRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.put("/schedule/$scheduleId") {
-                    header("X-Username", "testuser")
+                    header("Authorization", "Bearer $jwtToken")
                     contentType(ContentType.Application.Json)
                     setBody(schedule)
                 }
@@ -231,14 +276,19 @@ class ScheduleRoutesTest : FunSpec({
             coEvery { mockRedisService.deleteSchedule(any(), scheduleId.toString()) } returns Unit.right()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
-                routing { scheduleRoutes(mockRedisService) }
+                routing {
+                    authenticate("auth-jwt") {
+                        scheduleRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.delete("/schedule/$scheduleId") {
-                    header("X-Username", "testuser")
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.NoContent
@@ -252,14 +302,19 @@ class ScheduleRoutesTest : FunSpec({
                 RedisError.NotFound("Schedule not found").left()
 
             testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
                 }
-                install(ContentNegotiation) { json() }
-                routing { scheduleRoutes(mockRedisService) }
+                routing {
+                    authenticate("auth-jwt") {
+                        scheduleRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.delete("/schedule/$scheduleId") {
-                    header("X-Username", "testuser")
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.NotFound

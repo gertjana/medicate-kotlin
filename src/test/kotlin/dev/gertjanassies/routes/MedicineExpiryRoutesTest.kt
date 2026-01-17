@@ -6,12 +6,16 @@ import dev.gertjanassies.model.MedicineWithExpiry
 import dev.gertjanassies.model.serializer.LocalDateTimeSerializer
 import dev.gertjanassies.model.serializer.UUIDSerializer
 import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.test.TestJwtConfig
+import dev.gertjanassies.test.TestJwtConfig.installTestJwtAuth
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.config.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
@@ -26,6 +30,7 @@ import kotlinx.serialization.modules.contextual
 class MedicineExpiryRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
+    val jwtToken = TestJwtConfig.generateToken(testUsername)
 
     beforeEach { mockRedisService = mockk(relaxed = true) }
     afterEach { clearAllMocks() }
@@ -65,8 +70,15 @@ class MedicineExpiryRoutesTest : FunSpec({
 
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json(customJson) }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json(customJson) }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val client = createClient {
                     install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
@@ -75,7 +87,7 @@ class MedicineExpiryRoutesTest : FunSpec({
                 }
 
                 val response = client.get("/medicineExpiry") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.OK
@@ -92,11 +104,18 @@ class MedicineExpiryRoutesTest : FunSpec({
 
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.get("/medicineExpiry") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.OK
@@ -107,8 +126,15 @@ class MedicineExpiryRoutesTest : FunSpec({
         test("should return 401 if no username header") {
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.get("/medicineExpiry")
 
@@ -123,11 +149,18 @@ class MedicineExpiryRoutesTest : FunSpec({
 
             testApplication {
                 environment { config = MapApplicationConfig() }
-                install(ContentNegotiation) { json() }
-                routing { medicineRoutes(mockRedisService) }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
 
                 val response = client.get("/medicineExpiry") {
-                    header("X-Username", testUsername)
+                    header("Authorization", "Bearer $jwtToken")
                 }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
