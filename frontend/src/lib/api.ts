@@ -12,6 +12,11 @@ export interface User {
 	email?: string;
 }
 
+export interface AuthResponse {
+	user: User;
+	token: string;
+}
+
 export interface Schedule {
 	id: string;
 	medicineId: string;
@@ -75,28 +80,18 @@ const API_BASE = browser
 	: 'http://127.0.0.1:8080/api';  // Server-side: direct internal connection
 
 
-// Helper function to get headers with username
+// Helper function to get headers with JWT token
 function getHeaders(includeContentType: boolean = false): HeadersInit {
 	const headers: HeadersInit = {};
 
-	// Get username from localStorage (only available in browser)
+	// Get JWT token from localStorage (only available in browser)
 	if (browser) {
-		const userJson = localStorage.getItem('medicate_user');
-		if (userJson) {
-			try {
-				const user = JSON.parse(userJson);
-				if (user && typeof user.username === 'string' && user.username.trim().length > 0) {
-					headers['X-Username'] = user.username;
-				} else {
-					console.error('Invalid user data in localStorage for key "medicate_user"', user);
-					localStorage.removeItem('medicate_user');
-					throw new Error('Stored user session is corrupted. Please reload the page and sign in again.');
-				}
-			} catch (e) {
-				console.error('Failed to parse user from localStorage for key "medicate_user"', e);
-				localStorage.removeItem('medicate_user');
-				throw new Error('Stored user session is corrupted. Please reload the page and sign in again.');
-			}
+		const token = localStorage.getItem('medicate_token');
+		if (token) {
+			headers['Authorization'] = `Bearer ${token}`;
+		} else {
+			// No token found - user needs to login
+			throw new Error('No authentication token found. Please login again.');
 		}
 	}
 
@@ -287,7 +282,15 @@ export async function registerUser(username: string, password: string, email?: s
         throw new Error(`Failed to register user: ${response.status} ${response.statusText}`);
     }
 
-    return response.json();
+    const authResponse: AuthResponse = await response.json();
+
+    // Store both user and JWT token in localStorage
+    if (browser) {
+        localStorage.setItem('medicate_user', JSON.stringify(authResponse.user));
+        localStorage.setItem('medicate_token', authResponse.token);
+    }
+
+    return authResponse.user;
 }
 
 export async function loginUser(username: string, password: string): Promise<User> {
@@ -297,7 +300,16 @@ export async function loginUser(username: string, password: string): Promise<Use
 		body: JSON.stringify({ username, password })
 	});
 	if (!response.ok) throw new Error('Failed to login');
-	return response.json();
+
+	const authResponse: AuthResponse = await response.json();
+
+	// Store both user and JWT token in localStorage
+	if (browser) {
+		localStorage.setItem('medicate_user', JSON.stringify(authResponse.user));
+		localStorage.setItem('medicate_token', authResponse.token);
+	}
+
+	return authResponse.user;
 }
 
 export async function requestPasswordReset(username: string): Promise<{ message: string; emailId: string }> {
@@ -345,4 +357,31 @@ export async function getMedicineExpiry(): Promise<MedicineExpiry[]> {
 	});
 	if (!response.ok) throw new Error('Failed to fetch medicine expiry');
 	return response.json();
+}
+
+// Logout function to clear authentication
+export function logout(): void {
+	if (browser) {
+		localStorage.removeItem('medicate_user');
+		localStorage.removeItem('medicate_token');
+	}
+}
+
+// Helper to check if user is logged in
+export function isLoggedIn(): boolean {
+	if (!browser) return false;
+	return localStorage.getItem('medicate_token') !== null;
+}
+
+// Helper to get current user
+export function getCurrentUser(): User | null {
+	if (!browser) return null;
+	const userJson = localStorage.getItem('medicate_user');
+	if (!userJson) return null;
+	try {
+		return JSON.parse(userJson);
+	} catch (e) {
+		console.error('Failed to parse user from localStorage', e);
+		return null;
+	}
 }

@@ -19,6 +19,7 @@ function createUserStore() {
 		logout: () => {
 			if (browser) {
 				localStorage.removeItem(STORAGE_KEY);
+				localStorage.removeItem('medicate_token'); // Also remove JWT token
 			}
 			set(null);
 		},
