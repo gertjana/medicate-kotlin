@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 
-const BACKEND = 'http://localhost:8080/api/takedose';
+const BACKEND = 'http://127.0.0.1:8080/api/takedose';
 
 export const POST: RequestHandler = async ({ request, fetch }) => {
   const body = await request.text();

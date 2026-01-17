@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 
-const BACKEND = 'http://localhost:8080/api/history';
+const BACKEND = 'http://127.0.0.1:8080/api/history';
 
 export const GET: RequestHandler = async ({ fetch }) => {
   const res = await fetch(BACKEND);

@@ -2,7 +2,7 @@ import type { RequestHandler } from '@sveltejs/kit';
 
 export const POST: RequestHandler = async ({ request, fetch }) => {
   const body = await request.text();
-  const res = await fetch('http://localhost:8080/api/user/login', {
+  const res = await fetch('http://127.0.0.1:8080/api/user/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body
