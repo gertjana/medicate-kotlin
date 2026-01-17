@@ -1,6 +1,7 @@
 package dev.gertjanassies.routes
 
 import dev.gertjanassies.model.request.PasswordResetRequest
+import dev.gertjanassies.model.request.UserRequest
 import dev.gertjanassies.model.request.VerifyResetTokenRequest
 import dev.gertjanassies.service.EmailError
 import dev.gertjanassies.service.EmailService
@@ -102,6 +103,47 @@ fun Route.authRoutes(redisService: RedisService, emailService: EmailService, jwt
             val username = result.getOrNull()!!
             logger.debug("Successfully verified password reset token for user '$username'")
             call.respond(HttpStatusCode.OK, mapOf("username" to username))
+        }
+
+        /**
+         * PUT /api/auth/updatePassword
+         * Update user password (public endpoint for password reset flow)
+         */
+        put("/updatePassword") {
+            val request = call.receive<UserRequest>()
+
+            if (request.username.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Username cannot be empty"))
+                return@put
+            }
+
+            if (request.password.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "New password cannot be empty"))
+                return@put
+            }
+
+            if (request.password.length < 6) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 6 characters"))
+                return@put
+            }
+
+            val result = redisService.updatePassword(request.username, request.password)
+
+            result.fold(
+                { error ->
+                    logger.error("Failed to update password for user '${request.username}': ${error.message}")
+                    when (error) {
+                        is RedisError.NotFound ->
+                            call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
+                        else ->
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    }
+                },
+                {
+                    logger.debug("Successfully updated password for user '${request.username}'")
+                    call.respond(HttpStatusCode.OK, mapOf("message" to "Password updated successfully"))
+                }
+            )
         }
     }
 }

@@ -336,7 +336,7 @@ export async function verifyResetToken(token: string): Promise<{ username: strin
 }
 
 export async function updatePassword(username: string, newPassword: string): Promise<void> {
-	const response = await fetch(`${API_BASE}/user/password`, {
+	const response = await fetch(`${API_BASE}/auth/updatePassword`, {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ username, password: newPassword })
