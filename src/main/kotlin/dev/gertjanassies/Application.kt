@@ -20,13 +20,15 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.server.http.content.*
-import io.ktor.server.request.*
-import java.io.File
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
+import org.slf4j.event.Level
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
@@ -52,6 +54,7 @@ fun Application.module() {
             // Allow requests from localhost:5173 for local development
             allowHost("localhost:5173", schemes = listOf("http", "https"))
             allowHost("127.0.0.1:5173", schemes = listOf("http", "https"))
+            allowHost("medicate-kotlin.onrender.com", schemes = listOf("https"))
         }
     }
 
