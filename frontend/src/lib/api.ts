@@ -89,9 +89,6 @@ function getHeaders(includeContentType: boolean = false): HeadersInit {
 		const token = localStorage.getItem('medicate_token');
 		if (token) {
 			headers['Authorization'] = `Bearer ${token}`;
-		} else {
-			// No token found - user needs to login
-			throw new Error('No authentication token found. Please login again.');
 		}
 	}
 
