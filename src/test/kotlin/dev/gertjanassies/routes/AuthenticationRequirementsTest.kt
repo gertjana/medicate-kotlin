@@ -17,7 +17,6 @@ import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import io.mockk.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
-import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 
 /**
  * Tests to verify that routes are properly protected (or public) based on authentication requirements
@@ -38,7 +37,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                     this@application.installTestJwtAuth()
                 }
                 routing {
@@ -59,7 +58,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                     this@application.installTestJwtAuth()
                 }
                 routing {
@@ -80,7 +79,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                     this@application.installTestJwtAuth()
                 }
                 routing {
@@ -101,7 +100,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                     this@application.installTestJwtAuth()
                 }
                 routing {
@@ -122,7 +121,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                     this@application.installTestJwtAuth()
                 }
                 routing {
@@ -143,7 +142,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                     this@application.installTestJwtAuth()
                 }
                 routing {
@@ -164,7 +163,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                     this@application.installTestJwtAuth()
                 }
                 routing {
@@ -185,7 +184,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                     this@application.installTestJwtAuth()
                 }
                 routing {
@@ -214,7 +213,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                 }
                 routing { healthRoutes() }
 
@@ -230,7 +229,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                 }
                 routing {
                     // Note: We're just testing the route is public, not the full functionality
@@ -260,7 +259,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                 }
                 routing {
                     route("/auth") {
@@ -289,7 +288,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                 }
                 routing {
                     route("/user") {
@@ -318,7 +317,7 @@ class AuthenticationRequirementsTest : FunSpec({
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
-                    install(ServerContentNegotiation) { json() }
+                    install(ContentNegotiation) { json() }
                 }
                 routing {
                     route("/user") {
