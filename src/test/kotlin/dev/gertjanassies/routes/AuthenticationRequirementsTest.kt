@@ -159,6 +159,54 @@ class AuthenticationRequirementsTest : FunSpec({
                 response.status shouldBe HttpStatusCode.Unauthorized
             }
         }
+
+        test("GET /user/profile should return 401 without authentication") {
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ServerContentNegotiation) { json() }
+                    this@application.installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        protectedUserRoutes(mockRedisService)
+                    }
+                }
+
+                val response = client.get("/user/profile") {
+                    // No Authorization header
+                }
+
+                response.status shouldBe HttpStatusCode.Unauthorized
+            }
+        }
+
+        test("PUT /user/profile should return 401 without authentication") {
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ServerContentNegotiation) { json() }
+                    this@application.installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        protectedUserRoutes(mockRedisService)
+                    }
+                }
+
+                val client = createClient {
+                    install(ClientContentNegotiation) { json() }
+                }
+
+                val response = client.put("/user/profile") {
+                    contentType(ContentType.Application.Json)
+                    setBody(mapOf("email" to "test@example.com", "firstName" to "Test", "lastName" to "User"))
+                    // No Authorization header
+                }
+
+                response.status shouldBe HttpStatusCode.Unauthorized
+            }
+        }
     }
 
     context("Public Routes - Should NOT require authentication") {
