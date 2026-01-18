@@ -100,6 +100,37 @@ See `REFRESH_TOKEN_IMPLEMENTATION.md` for full implementation details.
 - [x] Tested email sending in production with real Resend API key
 - [x] Tested full password reset flow end-to-end
 
+---
+
+## User Profile Feature ✅ (Completed)
+
+### Backend ✅
+- [x] Add firstName and lastName fields to User model
+- [x] Update UserResponse to include firstName and lastName
+- [x] Create UpdateProfileRequest model
+- [x] Add RedisService.updateProfile() function
+- [x] Add GET /api/user/profile endpoint (protected)
+- [x] Add PUT /api/user/profile endpoint (protected)
+- [x] Update email service to use firstName/lastName in greetings
+- [x] Validation: email, firstName, lastName all required
+
+### Frontend ✅
+- [x] Update User interface with firstName and lastName
+- [x] Add getProfile() and updateProfile() API functions
+- [x] Create /profile page with edit form
+- [x] Add profile link to user dropdown menu
+- [x] Form validation (all fields required, email format)
+- [x] Success/error messaging
+- [x] Update localStorage on profile change
+
+### Features ✅
+- [x] View profile (username, email, firstName, lastName)
+- [x] Edit email, firstName, lastName (username read-only)
+- [x] Personalized password reset emails using name
+- [x] All tests passing (178/178)
+
+---
+
 ## Notes
 
 - ✅ **JWT Authentication**: Fully implemented with refresh tokens (secure!)

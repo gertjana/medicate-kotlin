@@ -10,6 +10,8 @@ export interface Medicine {
 export interface User {
 	username: string;
 	email?: string;
+	firstName?: string;
+	lastName?: string;
 }
 
 export interface AuthResponse {
@@ -415,6 +417,28 @@ export function logout(): void {
 		localStorage.removeItem('medicate_token');
 		localStorage.removeItem('medicate_refresh_token');
 	}
+}
+
+// Get user profile
+export async function getProfile(): Promise<User> {
+	return authenticatedFetch(`${API_BASE}/user/profile`, {
+		method: 'GET'
+	});
+}
+
+// Update user profile
+export async function updateProfile(email: string, firstName: string, lastName: string): Promise<User> {
+	const user = await authenticatedFetch(`${API_BASE}/user/profile`, {
+		method: 'PUT',
+		body: JSON.stringify({ email, firstName, lastName })
+	});
+
+	// Update stored user in localStorage
+	if (browser) {
+		localStorage.setItem('medicate_user', JSON.stringify(user));
+	}
+
+	return user;
 }
 
 // Helper to check if user is logged in

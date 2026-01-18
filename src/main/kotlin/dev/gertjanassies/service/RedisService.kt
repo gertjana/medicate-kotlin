@@ -862,6 +862,34 @@ class RedisService private constructor(
         )
     }
 
+    /**
+     * Update user profile (email, firstName, lastName)
+     */
+    suspend fun updateProfile(username: String, email: String, firstName: String, lastName: String): Either<RedisError, User> {
+        val key = "$environment:user:$username"
+
+        return get(key).fold(
+            { error -> error.left() },
+            { jsonString ->
+                when (jsonString) {
+                    null -> RedisError.NotFound("User not found").left()
+                    else -> Either.catch {
+                        val user = json.decodeFromString<User>(jsonString)
+                        val updatedUser = user.copy(email = email, firstName = firstName, lastName = lastName)
+                        val updatedJsonString = json.encodeToString(updatedUser)
+                        connection?.async()?.set(key, updatedJsonString)?.await() ?: throw IllegalStateException("Not connected")
+                        updatedUser
+                    }.mapLeft { e ->
+                        when (e) {
+                            is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
+                            else -> RedisError.OperationError("Failed to update profile: ${e.message}")
+                        }
+                    }
+                }
+            }
+        )
+    }
+
     suspend fun validateToken(username: String, token: String): Either<RedisError, Boolean> {
         val key = "$environment:user:$username:token:$token"
 

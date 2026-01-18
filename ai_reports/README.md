@@ -22,9 +22,10 @@
 
 ### Features
 10. **[EMAIL_SERVICE_IMPLEMENTATION.md](EMAIL_SERVICE_IMPLEMENTATION.md)** - Email service integration
+11. **[USER_PROFILE_FEATURE.md](USER_PROFILE_FEATURE.md)** - User profile with firstName, lastName, and email editing
 
 ### Troubleshooting
-11. **[CONTENT_TYPE_FIX.md](CONTENT_TYPE_FIX.md)** - Fixed 415 error on POST/PUT requests
+12. **[CONTENT_TYPE_FIX.md](CONTENT_TYPE_FIX.md)** - Fixed 415 error on POST/PUT requests
 
 ---
 

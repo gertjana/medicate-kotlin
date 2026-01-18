@@ -30,7 +30,6 @@ class UserRoutesTest : FunSpec({
         mockJwtService = mockk()
 
         // Mock JWT token generation
-        every { mockJwtService.generateToken(any()) } returns "test-jwt-token-123"
         every { mockJwtService.generateAccessToken(any()) } returns "test-access-token-123"
         every { mockJwtService.generateRefreshToken(any()) } returns "test-refresh-token-456"
     }
