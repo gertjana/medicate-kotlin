@@ -14,7 +14,8 @@ export interface User {
 
 export interface AuthResponse {
 	user: User;
-	token: string;
+	token: string;  // Access token (short-lived, 1 hour)
+	refreshToken: string;  // Refresh token (long-lived, 30 days)
 }
 
 export interface Schedule {
@@ -97,6 +98,98 @@ function getHeaders(includeContentType: boolean = false): HeadersInit {
 	}
 
 	return headers;
+}
+
+// Helper function to refresh the access token using refresh token
+async function refreshAccessToken(): Promise<boolean> {
+	if (!browser) return false;
+
+	const refreshToken = localStorage.getItem('medicate_refresh_token');
+	if (!refreshToken) {
+		return false;
+	}
+
+	try {
+		const response = await fetch(`${API_BASE}/auth/refresh`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ refreshToken })
+		});
+
+		if (!response.ok) {
+			// Refresh token is also invalid - need to login again
+			return false;
+		}
+
+		const data = await response.json();
+		// Store new access token
+		localStorage.setItem('medicate_token', data.token);
+		return true;
+	} catch (e) {
+		console.error('Failed to refresh token:', e);
+		return false;
+	}
+}
+
+// Helper function to handle API responses and auto-refresh/logout on 401
+async function handleApiResponse(response: Response, retryFn?: () => Promise<Response>): Promise<any> {
+	if (response.status === 401) {
+		// Try to refresh the token
+		const refreshed = await refreshAccessToken();
+
+		if (refreshed && retryFn) {
+			// Retry the original request with new token
+			const retryResponse = await retryFn();
+			if (retryResponse.ok || retryResponse.status !== 401) {
+				// Retry succeeded or failed for different reason
+				return handleApiResponse(retryResponse); // Recursive call without retry to avoid infinite loop
+			}
+		}
+
+		// Token refresh failed or retry failed - logout user
+		if (browser) {
+			localStorage.removeItem('medicate_token');
+			localStorage.removeItem('medicate_refresh_token');
+			localStorage.removeItem('medicate_user');
+			// Reload to show login page
+			window.location.reload();
+		}
+		throw new Error('Session expired. Please login again.');
+	}
+
+	if (!response.ok) {
+		// Try to get error message from response
+		try {
+			const errorData = await response.json();
+			throw new Error(errorData.error || `Request failed with status ${response.status}`);
+		} catch (e) {
+			if (e instanceof Error && e.message.startsWith('Session expired')) {
+				throw e; // Re-throw session expired error
+			}
+			throw new Error(`Request failed with status ${response.status}`);
+		}
+	}
+
+	// Return empty object for 204 No Content responses
+	if (response.status === 204) {
+		return {};
+	}
+
+	return response.json();
+}
+
+// Helper to make authenticated fetch requests with automatic retry on token refresh
+async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<any> {
+	const makeRequest = () => fetch(url, {
+		...options,
+		headers: {
+			...options.headers,
+			...getHeaders(options.headers && 'Content-Type' in options.headers)
+		}
+	});
+
+	const response = await makeRequest();
+	return handleApiResponse(response, makeRequest);
 }
 
 // Medicine API
@@ -209,8 +302,7 @@ export async function getDailySchedule(): Promise<DailySchedule> {
 		cache: 'no-store',
 		headers: getHeaders()
 	});
-	if (!response.ok) throw new Error('Failed to fetch daily schedule');
-	return response.json();
+	return handleApiResponse(response);
 }
 
 // Dosage history
@@ -229,8 +321,7 @@ export async function getDosageHistories(): Promise<DosageHistory[]> {
 		cache: 'no-store',
 		headers: getHeaders()
 	});
-	if (!response.ok) throw new Error('Failed to fetch dosage history');
-	return response.json();
+	return handleApiResponse(response);
 }
 
 export async function deleteDosageHistory(id: string): Promise<void> {
@@ -248,8 +339,7 @@ export async function getWeeklyAdherence(): Promise<WeeklyAdherence> {
 		cache: 'no-store',
 		headers: getHeaders()
 	});
-	if (!response.ok) throw new Error('Failed to fetch weekly adherence');
-	return response.json();
+	return handleApiResponse(response);
 }
 
 export async function getLowStockMedicines(threshold: number = 10): Promise<Medicine[]> {
@@ -257,8 +347,7 @@ export async function getLowStockMedicines(threshold: number = 10): Promise<Medi
 		cache: 'no-store',
 		headers: getHeaders()
 	});
-	if (!response.ok) throw new Error('Failed to fetch low stock medicines');
-	return response.json();
+	return handleApiResponse(response);
 }
 
 // User authentication API
@@ -281,10 +370,11 @@ export async function registerUser(username: string, password: string, email?: s
 
     const authResponse: AuthResponse = await response.json();
 
-    // Store both user and JWT token in localStorage
+    // Store user, access token, and refresh token in localStorage
     if (browser) {
         localStorage.setItem('medicate_user', JSON.stringify(authResponse.user));
         localStorage.setItem('medicate_token', authResponse.token);
+        localStorage.setItem('medicate_refresh_token', authResponse.refreshToken);
     }
 
     return authResponse.user;
@@ -300,10 +390,11 @@ export async function loginUser(username: string, password: string): Promise<Use
 
 	const authResponse: AuthResponse = await response.json();
 
-	// Store both user and JWT token in localStorage
+	// Store user, access token, and refresh token in localStorage
 	if (browser) {
 		localStorage.setItem('medicate_user', JSON.stringify(authResponse.user));
 		localStorage.setItem('medicate_token', authResponse.token);
+		localStorage.setItem('medicate_refresh_token', authResponse.refreshToken);
 	}
 
 	return authResponse.user;
@@ -352,8 +443,7 @@ export async function getMedicineExpiry(): Promise<MedicineExpiry[]> {
 		cache: 'no-store',
 		headers: getHeaders()
 	});
-	if (!response.ok) throw new Error('Failed to fetch medicine expiry');
-	return response.json();
+	return handleApiResponse(response);
 }
 
 // Logout function to clear authentication
@@ -361,6 +451,7 @@ export function logout(): void {
 	if (browser) {
 		localStorage.removeItem('medicate_user');
 		localStorage.removeItem('medicate_token');
+		localStorage.removeItem('medicate_refresh_token');
 	}
 }
 
