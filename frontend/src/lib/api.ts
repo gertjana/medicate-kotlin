@@ -176,14 +176,21 @@ async function handleApiResponse(response: Response, retryFn?: () => Promise<Res
 
 // Helper to make authenticated fetch requests with automatic retry on token refresh
 async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<any> {
-	const makeRequest = () => fetch(url, {
-		...options,
-		headers: {
-			...options.headers,
-			...getHeaders()
-		}
-	});
-
+	const makeRequest = () => {
+		// Merge headers: spread user headers first, then add auth headers (without Content-Type if already provided)
+		const headers = { ...options.headers };
+		const hasContentType = 'Content-Type' in headers;
+		
+		// Add Authorization header (and Content-Type if not already present and body exists)
+		const authHeaders = getHeaders(!hasContentType && options.body != null);
+		Object.assign(headers, authHeaders);
+		
+		return fetch(url, {
+			...options,
+			headers
+		});
+	};
+  
 	const response = await makeRequest();
 	return handleApiResponse(response, makeRequest);
 }
@@ -204,7 +211,6 @@ export async function getMedicine(id: string): Promise<Medicine> {
 export async function createMedicine(medicine: Omit<Medicine, 'id'>): Promise<Medicine> {
 	return authenticatedFetch(`${API_BASE}/medicine`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(medicine)
 	});
 }
@@ -212,7 +218,6 @@ export async function createMedicine(medicine: Omit<Medicine, 'id'>): Promise<Me
 export async function updateMedicine(id: string, medicine: Medicine): Promise<Medicine> {
 	return authenticatedFetch(`${API_BASE}/medicine/${id}`, {
 		method: 'PUT',
-		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(medicine)
 	});
 }
@@ -226,7 +231,6 @@ export async function deleteMedicine(id: string): Promise<void> {
 export async function addStock(medicineId: string, amount: number): Promise<Medicine> {
 	return authenticatedFetch(`${API_BASE}/addstock`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ medicineId, amount })
 	});
 }
@@ -247,7 +251,6 @@ export async function getSchedule(id: string): Promise<Schedule> {
 export async function createSchedule(schedule: Omit<Schedule, 'id'>): Promise<Schedule> {
 	return authenticatedFetch(`${API_BASE}/schedule`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(schedule)
 	});
 }
@@ -255,7 +258,6 @@ export async function createSchedule(schedule: Omit<Schedule, 'id'>): Promise<Sc
 export async function updateSchedule(id: string, schedule: Schedule): Promise<Schedule> {
 	return authenticatedFetch(`${API_BASE}/schedule/${id}`, {
 		method: 'PUT',
-		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify(schedule)
 	});
 }
@@ -277,7 +279,6 @@ export async function getDailySchedule(): Promise<DailySchedule> {
 export async function takeDose(medicineId: string, amount: number, scheduledTime?: string, datetime?: string): Promise<DosageHistory> {
 	return authenticatedFetch(`${API_BASE}/takedose`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({ medicineId, amount, scheduledTime, datetime })
 	});
 }
