@@ -50,7 +50,9 @@
 			return;
 		}
 
-		if (!email.includes('@')) {
+		// Robust email validation regex
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		if (!emailRegex.test(email)) {
 			error = 'Please enter a valid email address';
 			return;
 		}
