@@ -221,4 +221,162 @@ class UserServiceTest : FunSpec({
             verify(exactly = 1) { mockAsyncCommands.get(userKey) }
         }
     }
+
+    context("updateProfile") {
+        test("should successfully update profile when email is not in use by another user") {
+            val username = "testuser"
+            val email = "newemail@example.com"
+            val firstName = "John"
+            val lastName = "Doe"
+            val userKey = "$environment:user:$username"
+            val user = User(username = username, email = "old@example.com", firstName = "OldFirst", lastName = "OldLast", passwordHash = "hashedpassword")
+            val userJson = json.encodeToString(user)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            // Mock scan to return only the current user
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns listOf(userKey)
+            every { mockScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor)
+            // Mock get for email check
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+            // Mock set for update
+            every { mockAsyncCommands.set(userKey, any()) } returns createRedisFutureMock("OK")
+
+            val result = redisService.updateProfile(username, email, firstName, lastName)
+
+            result.isRight() shouldBe true
+            val updatedUser = result.getOrNull()!!
+            updatedUser.username shouldBe username
+            updatedUser.email shouldBe email
+            updatedUser.firstName shouldBe firstName
+            updatedUser.lastName shouldBe lastName
+
+            verify(atLeast = 1) { mockAsyncCommands.get(userKey) }
+            verify(exactly = 1) { mockAsyncCommands.set(userKey, any()) }
+        }
+
+        test("should return error when email is already in use by another user") {
+            val username = "testuser"
+            val email = "existing@example.com"
+            val firstName = "John"
+            val lastName = "Doe"
+            val userKey = "$environment:user:$username"
+            val otherUserKey = "$environment:user:otheruser"
+            val user = User(username = username, email = "old@example.com", passwordHash = "hashedpassword")
+            val otherUser = User(username = "otheruser", email = email, passwordHash = "hashedpassword")
+            val userJson = json.encodeToString(user)
+            val otherUserJson = json.encodeToString(otherUser)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            // Mock scan to return both users
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns listOf(userKey, otherUserKey)
+            every { mockScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor)
+            // Mock get for email check
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+            every { mockAsyncCommands.get(otherUserKey) } returns createRedisFutureMock(otherUserJson)
+
+            val result = redisService.updateProfile(username, email, firstName, lastName)
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
+            result.leftOrNull()?.message shouldBe "Email is already in use by another user"
+
+            verify(atLeast = 1) { mockAsyncCommands.get(any()) }
+            verify(exactly = 0) { mockAsyncCommands.set(any(), any()) }
+        }
+
+        test("should allow updating profile with same email (no change)") {
+            val username = "testuser"
+            val email = "same@example.com"
+            val firstName = "John"
+            val lastName = "Doe"
+            val userKey = "$environment:user:$username"
+            val user = User(username = username, email = email, firstName = "OldFirst", lastName = "OldLast", passwordHash = "hashedpassword")
+            val userJson = json.encodeToString(user)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            // Mock scan to return only the current user
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns listOf(userKey)
+            every { mockScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor)
+            // Mock get for email check and user retrieval
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+            // Mock set for update
+            every { mockAsyncCommands.set(userKey, any()) } returns createRedisFutureMock("OK")
+
+            val result = redisService.updateProfile(username, email, firstName, lastName)
+
+            result.isRight() shouldBe true
+            val updatedUser = result.getOrNull()!!
+            updatedUser.username shouldBe username
+            updatedUser.email shouldBe email
+            updatedUser.firstName shouldBe firstName
+            updatedUser.lastName shouldBe lastName
+
+            verify(atLeast = 1) { mockAsyncCommands.get(userKey) }
+            verify(exactly = 1) { mockAsyncCommands.set(userKey, any()) }
+        }
+
+        test("should return NotFound when user does not exist") {
+            val username = "nonexistent"
+            val email = "new@example.com"
+            val firstName = "John"
+            val lastName = "Doe"
+            val userKey = "$environment:user:$username"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            // Mock scan to return empty
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns emptyList()
+            every { mockScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor)
+            // Mock get to return null (user not found)
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(null as String?)
+
+            val result = redisService.updateProfile(username, email, firstName, lastName)
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
+            result.leftOrNull()?.message shouldBe "User not found"
+
+            verify(exactly = 1) { mockAsyncCommands.get(userKey) }
+            verify(exactly = 0) { mockAsyncCommands.set(any(), any()) }
+        }
+
+        test("should be case-insensitive when checking email uniqueness") {
+            val username = "testuser"
+            val email = "EXISTING@EXAMPLE.COM"  // uppercase
+            val firstName = "John"
+            val lastName = "Doe"
+            val userKey = "$environment:user:$username"
+            val otherUserKey = "$environment:user:otheruser"
+            val user = User(username = username, email = "old@example.com", passwordHash = "hashedpassword")
+            val otherUser = User(username = "otheruser", email = "existing@example.com", passwordHash = "hashedpassword")  // lowercase
+            val userJson = json.encodeToString(user)
+            val otherUserJson = json.encodeToString(otherUser)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            // Mock scan to return both users
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns listOf(userKey, otherUserKey)
+            every { mockScanCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor)
+            // Mock get for email check
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+            every { mockAsyncCommands.get(otherUserKey) } returns createRedisFutureMock(otherUserJson)
+
+            val result = redisService.updateProfile(username, email, firstName, lastName)
+
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
+            result.leftOrNull()?.message shouldBe "Email is already in use by another user"
+
+            verify(atLeast = 1) { mockAsyncCommands.get(any()) }
+            verify(exactly = 0) { mockAsyncCommands.set(any(), any()) }
+        }
+    }
 })

@@ -863,28 +863,79 @@ class RedisService private constructor(
     }
 
     /**
+     * Check if an email is already in use by a different user
+     */
+    private suspend fun isEmailInUseByOtherUser(email: String, currentUsername: String): Either<RedisError, Boolean> {
+        return Either.catch {
+            val pattern = "$environment:user:*"
+            val keys = mutableListOf<String>()
+
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
+
+            // Iterate through all cursor pages
+            while (true) {
+                keys.addAll(scanCursor.keys)
+                if (scanCursor.isFinished) break
+                scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
+            }
+
+            // Check if any user (other than current user) has this email
+            keys.any { key ->
+                // Skip the current user's key
+                if (key == "$environment:user:$currentUsername") {
+                    false
+                } else {
+                    asyncCommands.get(key).await()?.let { jsonString ->
+                        try {
+                            val user = json.decodeFromString<User>(jsonString)
+                            user.email.equals(email, ignoreCase = true)
+                        } catch (e: SerializationException) {
+                            // Log and skip malformed user data
+                            logger.warn("Failed to deserialize user from key $key: ${e.message}")
+                            false
+                        }
+                    } ?: false
+                }
+            }
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to check email uniqueness: ${e.message}")
+        }
+    }
+
+    /**
      * Update user profile (email, firstName, lastName)
      */
     suspend fun updateProfile(username: String, email: String, firstName: String, lastName: String): Either<RedisError, User> {
         val key = "$environment:user:$username"
 
-        return get(key).fold(
+        // Check if email is already in use by another user
+        return isEmailInUseByOtherUser(email, username).fold(
             { error -> error.left() },
-            { jsonString ->
-                when (jsonString) {
-                    null -> RedisError.NotFound("User not found").left()
-                    else -> Either.catch {
-                        val user = json.decodeFromString<User>(jsonString)
-                        val updatedUser = user.copy(email = email, firstName = firstName, lastName = lastName)
-                        val updatedJsonString = json.encodeToString(updatedUser)
-                        connection?.async()?.set(key, updatedJsonString)?.await() ?: throw IllegalStateException("Not connected")
-                        updatedUser
-                    }.mapLeft { e ->
-                        when (e) {
-                            is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
-                            else -> RedisError.OperationError("Failed to update profile: ${e.message}")
+            { emailInUse ->
+                if (emailInUse) {
+                    RedisError.OperationError("Email is already in use by another user").left()
+                } else {
+                    get(key).fold(
+                        { error -> error.left() },
+                        { jsonString ->
+                            when (jsonString) {
+                                null -> RedisError.NotFound("User not found").left()
+                                else -> Either.catch {
+                                    val user = json.decodeFromString<User>(jsonString)
+                                    val updatedUser = user.copy(email = email, firstName = firstName, lastName = lastName)
+                                    val updatedJsonString = json.encodeToString(updatedUser)
+                                    connection?.async()?.set(key, updatedJsonString)?.await() ?: throw IllegalStateException("Not connected")
+                                    updatedUser
+                                }.mapLeft { e ->
+                                    when (e) {
+                                        is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
+                                        else -> RedisError.OperationError("Failed to update profile: ${e.message}")
+                                    }
+                                }
+                            }
                         }
-                    }
+                    )
                 }
             }
         )
