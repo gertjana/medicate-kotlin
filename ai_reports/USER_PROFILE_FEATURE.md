@@ -63,6 +63,11 @@ suspend fun updateProfile(
 
 #### 5. **UserRoutes - New Endpoints**
 
+**Split into Public and Protected Routes:**
+- Created `protectedUserRoutes()` function for profile endpoints
+- Called from `authenticate("auth-jwt")` block in Application.kt
+- Ensures profile endpoints require valid JWT token
+
 **GET /api/user/profile**
 - Protected route (requires JWT authentication)
 - Returns current user's profile information
@@ -73,6 +78,8 @@ suspend fun updateProfile(
 - Updates email, firstName, lastName
 - Validation: All fields required and non-empty
 - Response: Updated `UserResponse`
+
+**Note:** Initially, profile endpoints were in the public `userRoutes()` function, causing logout issues. Fixed by creating separate `protectedUserRoutes()` function. See `PROFILE_AUTH_FIX.md` for details.
 
 #### 6. **Email Service Enhancement**
 Updated password reset emails to use personalized names:

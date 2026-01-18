@@ -146,7 +146,14 @@ fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
                 }
             )
         }
+    }
+}
 
+/**
+ * Protected user routes (require JWT authentication)
+ */
+fun Route.protectedUserRoutes(redisService: RedisService) {
+    route("/user") {
         /**
          * GET /api/user/profile
          * Get current user's profile

@@ -26,6 +26,7 @@
 
 ### Troubleshooting
 12. **[CONTENT_TYPE_FIX.md](CONTENT_TYPE_FIX.md)** - Fixed 415 error on POST/PUT requests
+13. **[PROFILE_AUTH_FIX.md](PROFILE_AUTH_FIX.md)** - Fixed profile page logout issue
 
 ---
 
