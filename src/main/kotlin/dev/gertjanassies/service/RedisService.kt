@@ -890,7 +890,9 @@ class RedisService private constructor(
                         try {
                             val user = json.decodeFromString<User>(jsonString)
                             user.email.equals(email, ignoreCase = true)
-                        } catch (e: Exception) {
+                        } catch (e: SerializationException) {
+                            // Log and skip malformed user data
+                            logger.warn("Failed to deserialize user from key $key: ${e.message}")
                             false
                         }
                     } ?: false
