@@ -54,13 +54,14 @@ fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
 
             val user = result.getOrNull()!!
 
-            // Generate JWT token for the new user
-            val token = jwtService.generateToken(user.username)
+            // Generate JWT tokens for newly registered user
+            val accessToken = jwtService.generateAccessToken(user.username)
+            val refreshToken = jwtService.generateRefreshToken(user.username)
 
-            logger.debug("Successfully registered user '${user.username}' with email '${request.email}' and generated JWT token")
+            logger.debug("Successfully registered user '${request.username}' and generated JWT tokens")
             call.respond(
                 HttpStatusCode.Created,
-                AuthResponse(user = user.toResponse(), token = token)
+                AuthResponse(user = user.toResponse(), token = accessToken, refreshToken = refreshToken)
             )
         }
 
@@ -92,13 +93,14 @@ fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
 
             val user = loginResult.getOrNull()!!
 
-            // Generate JWT token for logged in user
-            val token = jwtService.generateToken(user.username)
+            // Generate JWT tokens for logged in user
+            val accessToken = jwtService.generateAccessToken(user.username)
+            val refreshToken = jwtService.generateRefreshToken(user.username)
 
-            logger.debug("Successfully logged in user '${request.username}' and generated JWT token")
+            logger.debug("Successfully logged in user '${request.username}' and generated JWT tokens")
             call.respond(
                 HttpStatusCode.OK,
-                AuthResponse(user = user.toResponse(), token = token)
+                AuthResponse(user = user.toResponse(), token = accessToken, refreshToken = refreshToken)
             )
         }
 

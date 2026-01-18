@@ -20,6 +20,40 @@ private val logger = LoggerFactory.getLogger("AuthRoutes")
 fun Route.authRoutes(redisService: RedisService, emailService: EmailService, jwtService: JwtService) {
     route("/auth") {
         /**
+         * POST /api/auth/refresh
+         * Refresh access token using a valid refresh token
+         */
+        post("/refresh") {
+            val request = call.receive<Map<String, String>>()
+            val refreshToken = request["refreshToken"]
+
+            if (refreshToken.isNullOrBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Refresh token is required"))
+                return@post
+            }
+
+            // Validate refresh token and extract username
+            val username = jwtService.validateRefreshToken(refreshToken)
+            if (username == null) {
+                logger.debug("Invalid or expired refresh token")
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid or expired refresh token"))
+                return@post
+            }
+
+            // Generate new access token
+            val newAccessToken = jwtService.generateAccessToken(username)
+
+            logger.debug("Successfully refreshed access token for user '$username'")
+            call.respond(
+                HttpStatusCode.OK,
+                mapOf(
+                    "token" to newAccessToken,
+                    "refreshToken" to refreshToken  // Return same refresh token
+                )
+            )
+        }
+
+        /**
          * POST /api/auth/resetPassword
          * Request a password reset for a user by username
          */

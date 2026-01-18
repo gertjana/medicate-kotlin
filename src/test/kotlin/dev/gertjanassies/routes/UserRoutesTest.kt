@@ -31,6 +31,8 @@ class UserRoutesTest : FunSpec({
 
         // Mock JWT token generation
         every { mockJwtService.generateToken(any()) } returns "test-jwt-token-123"
+        every { mockJwtService.generateAccessToken(any()) } returns "test-access-token-123"
+        every { mockJwtService.generateRefreshToken(any()) } returns "test-refresh-token-456"
     }
 
     afterEach {
@@ -63,10 +65,12 @@ class UserRoutesTest : FunSpec({
                 val body = response.body<AuthResponse>()
                 body.user.username shouldBe username
                 body.user.email shouldBe email
-                body.token shouldBe "test-jwt-token-123"
+                body.token shouldBe "test-access-token-123"
+                body.refreshToken shouldBe "test-refresh-token-456"
 
                 coVerify { mockRedisService.registerUser(username, email, password) }
-                verify { mockJwtService.generateToken(username) }
+                verify { mockJwtService.generateAccessToken(username) }
+                verify { mockJwtService.generateRefreshToken(username) }
             }
         }
 
@@ -185,10 +189,12 @@ class UserRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<AuthResponse>()
                 body.user.username shouldBe username
-                body.token shouldBe "test-jwt-token-123"
+                body.token shouldBe "test-access-token-123"
+                body.refreshToken shouldBe "test-refresh-token-456"
 
                 coVerify { mockRedisService.loginUser(username, password) }
-                verify { mockJwtService.generateToken(username) }
+                verify { mockJwtService.generateAccessToken(username) }
+                verify { mockJwtService.generateRefreshToken(username) }
             }
         }
 

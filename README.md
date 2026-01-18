@@ -15,15 +15,19 @@ A functional Kotlin REST API service built with Ktor framework, Arrow for functi
 
 ## Security
 
-This application uses **JWT (JSON Web Token) authentication** for secure user authentication:
+This application uses **JWT (JSON Web Token) authentication** with **refresh tokens** for secure user authentication:
 
 - ✅ Cryptographically signed tokens (HMAC SHA-256)
-- ✅ 24-hour token expiration
+- ✅ Short-lived access tokens (1 hour)
+- ✅ Long-lived refresh tokens (30 days)
+- ✅ Automatic token refresh (seamless UX)
 - ✅ Cannot be forged without secret key
 - ✅ All protected routes require valid JWT
 - ✅ Production-grade security
 
-See `FINAL_JWT_SUMMARY.md` for complete security details.
+**User Experience:** Users stay logged in for 30 days with automatic token refresh in the background.
+
+See `REFRESH_TOKEN_IMPLEMENTATION.md` for complete details.
 
 ## Quick Start
 
@@ -121,21 +125,34 @@ All endpoints require `X-Username` header (automatically sent by frontend when l
 
 ## Authentication
 
-This application uses **JWT (JSON Web Token)** authentication:
+This application uses **JWT (JSON Web Token)** authentication with **refresh tokens**:
 
-1. **Register/Login** - User receives a JWT token
-2. **Token Storage** - Token stored in browser localStorage
-3. **API Requests** - Token sent in `Authorization: Bearer <token>` header
+1. **Register/Login** - User receives an access token + refresh token
+2. **Token Storage** - Both tokens stored in browser localStorage
+3. **API Requests** - Access token sent in `Authorization: Bearer <token>` header
 4. **Token Validation** - Backend validates signature, expiration, and claims
-5. **Logout** - Token removed from localStorage
+5. **Auto-Refresh** - When access token expires, frontend automatically uses refresh token to get new access token
+6. **Logout** - Both tokens removed from localStorage
 
-**Token Details:**
+**Token Lifespans:**
+- **Access Token:** 1 hour (for security - short-lived)
+- **Refresh Token:** 30 days (for UX - stay logged in longer)
+
+**How It Works:**
+- Access tokens are used for every API request
+- When access token expires (after 1 hour), frontend automatically:
+  - Uses refresh token to get new access token
+  - Retries the original request
+  - User doesn't notice anything!
+- When refresh token expires (after 30 days), user must login again
+
+**Security:**
 - Algorithm: HMAC SHA-256
-- Expiration: 24 hours
-- Claims: username, issuer, audience, expiration
+- Access tokens expire quickly (limits damage if stolen)
+- Refresh tokens only used during refresh (not on every request)
 - Cannot be forged without `JWT_SECRET`
 
-See `FINAL_JWT_SUMMARY.md` for complete implementation details.
+See `REFRESH_TOKEN_IMPLEMENTATION.md` for complete implementation details.
 
 ## Testing
 
