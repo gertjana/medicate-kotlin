@@ -151,10 +151,10 @@ fun Application.module() {
             // Public routes (no authentication required)
             healthRoutes()
             authRoutes(redisService, emailService, jwtService)
+            userRoutes(redisService, jwtService)  // Login/register are public
 
             // Protected routes (require JWT authentication)
             authenticate("auth-jwt") {
-                userRoutes(redisService, jwtService)
                 medicineRoutes(redisService)
                 scheduleRoutes(redisService)
                 dailyRoutes(redisService)

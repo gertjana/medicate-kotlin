@@ -18,3 +18,4 @@ This is a Kotlin project using Ktor framework with Arrow for functional programm
 ## Agent guidelines
 - re-use existing terminal instead of opening new ones
 - Don't suggest terminal commands, instead show me the code changes directly
+- store any documentation in .md files in the ai_reports/ folder

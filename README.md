@@ -191,11 +191,13 @@ APP_URL=<your-app-url>
 
 ## Documentation
 
-- `FINAL_JWT_SUMMARY.md` - Complete JWT implementation overview
-- `JWT_IMPLEMENTATION.md` - Backend technical details
-- `FRONTEND_JWT_COMPLETE.md` - Frontend implementation
-- `PASSWORD_RESET_FIX.md` - Password reset flow
-- `PRODUCTION_DEPLOYMENT_CHECKLIST.md` - Deployment guide
+### Quick Start
+- See this README for basic setup and usage
+- Check `todo.md` for project status and completed features
+
+### Detailed Documentation
+
+All technical documentation is stored in the `ai_reports/` folder.
 
 ## License
 
@@ -203,7 +205,7 @@ MIT
 
 ## Author
 
-[Gert Jan Assies](https://gertjanassies.dev)
+[Gertjan Assies](https://gertjanassies.dev)
 
 **Database:**
 - Redis

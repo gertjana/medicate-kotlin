@@ -410,4 +410,80 @@ class UserRoutesTest : FunSpec({
             }
         }
     }
+
+    context("Authentication Requirements") {
+        test("POST /user/register should NOT require authentication (public endpoint)") {
+            val request = UserRequest("testuser", "test@example.com", "password123")
+            val user = dev.gertjanassies.model.User("testuser", email = "test@example.com", passwordHash = "hashedpassword")
+            coEvery { mockRedisService.registerUser(any(), any(), any()) } returns user.right()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ServerContentNegotiation) { json() }
+                routing { userRoutes(mockRedisService, mockJwtService) }
+
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                // Should succeed WITHOUT authentication header
+                val response = client.post("/user/register") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                    // No Authorization header!
+                }
+
+                // Should succeed (201 Created) without authentication
+                response.status shouldBe HttpStatusCode.Created
+            }
+        }
+
+        test("POST /user/login should NOT require authentication (public endpoint)") {
+            val request = UserRequest("testuser", "", "password123")
+            val user = dev.gertjanassies.model.User("testuser", email = "", passwordHash = "hashedpassword")
+            coEvery { mockRedisService.loginUser(any(), any()) } returns user.right()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ServerContentNegotiation) { json() }
+                routing { userRoutes(mockRedisService, mockJwtService) }
+
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                // Should succeed WITHOUT authentication header
+                val response = client.post("/user/login") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                    // No Authorization header!
+                }
+
+                // Should succeed (200 OK) without authentication
+                response.status shouldBe HttpStatusCode.OK
+            }
+        }
+
+        test("PUT /user/password should work without authentication (currently public for password reset flow)") {
+            val request = UserRequest("testuser", "", "newpassword123")
+            coEvery { mockRedisService.updatePassword(any(), any()) } returns Unit.right()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                install(ServerContentNegotiation) { json() }
+                routing { userRoutes(mockRedisService, mockJwtService) }
+
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                // Can work without authentication (for password reset)
+                val response = client.put("/user/password") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                    // No Authorization header
+                }
+
+                // Should succeed without authentication (currently public)
+                response.status shouldBe HttpStatusCode.OK
+            }
+        }
+    }
 })
