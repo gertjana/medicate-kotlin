@@ -7,6 +7,8 @@ import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisService
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.principal
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -141,6 +143,88 @@ fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
                 {
                     logger.debug("Successfully updated password for user '${request.username}'")
                     call.respond(HttpStatusCode.OK, mapOf("message" to "Password updated successfully"))
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Protected user routes (require JWT authentication)
+ */
+fun Route.protectedUserRoutes(redisService: RedisService) {
+    route("/user") {
+        /**
+         * GET /api/user/profile
+         * Get current user's profile
+         */
+        get("/profile") {
+            val username = call.principal<JWTPrincipal>()?.payload?.getClaim("username")?.asString() ?: run {
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Not authenticated"))
+                return@get
+            }
+
+            val result = redisService.getUser(username)
+
+            result.fold(
+                { error ->
+                    logger.error("Failed to get profile for user '$username': ${error.message}")
+                    when (error) {
+                        is dev.gertjanassies.service.RedisError.NotFound ->
+                            call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
+                        else ->
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    }
+                },
+                { user ->
+                    logger.debug("Successfully retrieved profile for user '$username'")
+                    call.respond(HttpStatusCode.OK, user.toResponse())
+                }
+            )
+        }
+
+        /**
+         * PUT /api/user/profile
+         * Update current user's profile (email, firstName, lastName)
+         */
+        put("/profile") {
+            val username = call.principal<JWTPrincipal>()?.payload?.getClaim("username")?.asString() ?: run {
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Not authenticated"))
+                return@put
+            }
+
+            val request = call.receive<dev.gertjanassies.model.request.UpdateProfileRequest>()
+
+            if (request.email.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Email cannot be empty"))
+                return@put
+            }
+
+            if (request.firstName.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "First name cannot be empty"))
+                return@put
+            }
+
+            if (request.lastName.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Last name cannot be empty"))
+                return@put
+            }
+
+            val result = redisService.updateProfile(username, request.email, request.firstName, request.lastName)
+
+            result.fold(
+                { error ->
+                    logger.error("Failed to update profile for user '$username': ${error.message}")
+                    when (error) {
+                        is dev.gertjanassies.service.RedisError.NotFound ->
+                            call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
+                        else ->
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    }
+                },
+                { user ->
+                    logger.debug("Successfully updated profile for user '$username'")
+                    call.respond(HttpStatusCode.OK, user.toResponse())
                 }
             )
         }

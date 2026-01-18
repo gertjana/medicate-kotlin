@@ -115,7 +115,15 @@ class EmailService(
     /**
      * Generate HTML content for password reset email
      */
-    private fun generatePasswordResetEmailHtml(username: String, token: String): String {
+    private fun generatePasswordResetEmailHtml(user: User, token: String): String {
+        val displayName = if (user.firstName.isNotBlank() && user.lastName.isNotBlank()) {
+            "${user.firstName} ${user.lastName}"
+        } else if (user.firstName.isNotBlank()) {
+            user.firstName
+        } else {
+            user.username
+        }
+
         val resetUrl = "$appUrl/reset-password?token=$token"
         return """
             <!DOCTYPE html>
@@ -145,7 +153,7 @@ class EmailService(
                         <h1>Medicate - Password Reset</h1>
                     </div>
                     <div class="content">
-                        <h2>Hello $username,</h2>
+                        <h2>Hello $displayName,</h2>
                         <p>We received a request to reset your password. Click the button below to create a new password:</p>
                         <p style="text-align: center;">
                             <a href="$resetUrl" class="button">Reset Password</a>
@@ -184,7 +192,7 @@ class EmailService(
         }.bind()
 
         // Generate email HTML
-        val emailHtml = generatePasswordResetEmailHtml(user.username, token)
+        val emailHtml = generatePasswordResetEmailHtml(user, token)
 
         // Send email
         val emailId = sendEmail(
