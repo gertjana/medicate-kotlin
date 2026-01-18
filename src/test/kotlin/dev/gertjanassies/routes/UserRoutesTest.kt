@@ -3,12 +3,15 @@ package dev.gertjanassies.routes
 import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.User
+import dev.gertjanassies.model.request.UpdateProfileRequest
 import dev.gertjanassies.model.request.UserRequest
 import dev.gertjanassies.model.response.AuthResponse
 import dev.gertjanassies.model.response.UserResponse
 import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.test.TestJwtConfig
+import dev.gertjanassies.test.TestJwtConfig.installTestJwtAuth
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.call.*
@@ -16,8 +19,11 @@ import io.ktor.client.request.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.config.*
-import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import io.mockk.*
 
@@ -51,7 +57,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -80,7 +86,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -101,7 +107,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -122,7 +128,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -149,7 +155,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -176,7 +182,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -204,7 +210,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -225,7 +231,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -251,7 +257,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -278,7 +284,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -301,7 +307,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -322,7 +328,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -343,7 +349,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -369,7 +375,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -395,7 +401,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -420,7 +426,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -445,7 +451,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -469,7 +475,7 @@ class UserRoutesTest : FunSpec({
                 environment {
                     config = MapApplicationConfig()
                 }
-                install(ServerContentNegotiation) { json() }
+                install(ContentNegotiation) { json() }
                 routing { userRoutes(mockRedisService, mockJwtService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
@@ -482,6 +488,341 @@ class UserRoutesTest : FunSpec({
 
                 // Should succeed without authentication (currently public)
                 response.status shouldBe HttpStatusCode.OK
+            }
+        }
+    }
+
+    context("GET /user/profile") {
+        test("should retrieve user profile successfully with valid JWT") {
+            val username = "testuser"
+            val user = User(
+                username = username,
+                email = "test@example.com",
+                firstName = "Test",
+                lastName = "User",
+                passwordHash = "hashedpassword"
+            )
+            
+            coEvery { mockRedisService.getUser(username) } returns user.right()
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        protectedUserRoutes(mockRedisService)
+                    }
+                }
+
+                val token = TestJwtConfig.generateToken(username)
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                
+                val response = client.get("/user/profile") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                }
+
+                response.status shouldBe HttpStatusCode.OK
+                val body = response.body<UserResponse>()
+                body.username shouldBe username
+                body.email shouldBe "test@example.com"
+                body.firstName shouldBe "Test"
+                body.lastName shouldBe "User"
+
+                coVerify { mockRedisService.getUser(username) }
+            }
+        }
+
+        test("should return 404 when user not found") {
+            val username = "nonexistent"
+            
+            coEvery { mockRedisService.getUser(username) } returns 
+                RedisError.NotFound("User not found").left()
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        protectedUserRoutes(mockRedisService)
+                    }
+                }
+
+                val token = TestJwtConfig.generateToken(username)
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                
+                val response = client.get("/user/profile") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                }
+
+                response.status shouldBe HttpStatusCode.NotFound
+                coVerify { mockRedisService.getUser(username) }
+            }
+        }
+
+        test("should return 500 on Redis error") {
+            val username = "testuser"
+            
+            coEvery { mockRedisService.getUser(username) } returns 
+                RedisError.OperationError("Redis connection failed").left()
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        protectedUserRoutes(mockRedisService)
+                    }
+                }
+
+                val token = TestJwtConfig.generateToken(username)
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                
+                val response = client.get("/user/profile") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                }
+
+                response.status shouldBe HttpStatusCode.InternalServerError
+                coVerify { mockRedisService.getUser(username) }
+            }
+        }
+    }
+
+    context("PUT /user/profile") {
+        test("should update user profile successfully with valid JWT") {
+            val username = "testuser"
+            val updateRequest = UpdateProfileRequest(
+                email = "updated@example.com",
+                firstName = "Updated",
+                lastName = "Name"
+            )
+            val updatedUser = User(
+                username = username,
+                email = updateRequest.email,
+                firstName = updateRequest.firstName,
+                lastName = updateRequest.lastName,
+                passwordHash = "hashedpassword"
+            )
+            
+            coEvery { 
+                mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) 
+            } returns updatedUser.right()
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        protectedUserRoutes(mockRedisService)
+                    }
+                }
+
+                val token = TestJwtConfig.generateToken(username)
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                
+                val response = client.put("/user/profile") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(updateRequest)
+                }
+
+                response.status shouldBe HttpStatusCode.OK
+                val body = response.body<UserResponse>()
+                body.username shouldBe username
+                body.email shouldBe updateRequest.email
+                body.firstName shouldBe updateRequest.firstName
+                body.lastName shouldBe updateRequest.lastName
+
+                coVerify { mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) }
+            }
+        }
+
+        test("should return 400 when email is blank") {
+            val username = "testuser"
+            val updateRequest = UpdateProfileRequest(
+                email = "",
+                firstName = "Test",
+                lastName = "User"
+            )
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        protectedUserRoutes(mockRedisService)
+                    }
+                }
+
+                val token = TestJwtConfig.generateToken(username)
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                
+                val response = client.put("/user/profile") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(updateRequest)
+                }
+
+                response.status shouldBe HttpStatusCode.BadRequest
+                coVerify(exactly = 0) { mockRedisService.updateProfile(any(), any(), any(), any()) }
+            }
+        }
+
+        test("should return 400 when firstName is blank") {
+            val username = "testuser"
+            val updateRequest = UpdateProfileRequest(
+                email = "test@example.com",
+                firstName = "",
+                lastName = "User"
+            )
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        protectedUserRoutes(mockRedisService)
+                    }
+                }
+
+                val token = TestJwtConfig.generateToken(username)
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                
+                val response = client.put("/user/profile") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(updateRequest)
+                }
+
+                response.status shouldBe HttpStatusCode.BadRequest
+                coVerify(exactly = 0) { mockRedisService.updateProfile(any(), any(), any(), any()) }
+            }
+        }
+
+        test("should return 400 when lastName is blank") {
+            val username = "testuser"
+            val updateRequest = UpdateProfileRequest(
+                email = "test@example.com",
+                firstName = "Test",
+                lastName = ""
+            )
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        protectedUserRoutes(mockRedisService)
+                    }
+                }
+
+                val token = TestJwtConfig.generateToken(username)
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                
+                val response = client.put("/user/profile") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(updateRequest)
+                }
+
+                response.status shouldBe HttpStatusCode.BadRequest
+                coVerify(exactly = 0) { mockRedisService.updateProfile(any(), any(), any(), any()) }
+            }
+        }
+
+        test("should return 404 when user not found") {
+            val username = "nonexistent"
+            val updateRequest = UpdateProfileRequest(
+                email = "test@example.com",
+                firstName = "Test",
+                lastName = "User"
+            )
+            
+            coEvery { 
+                mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) 
+            } returns RedisError.NotFound("User not found").left()
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        protectedUserRoutes(mockRedisService)
+                    }
+                }
+
+                val token = TestJwtConfig.generateToken(username)
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                
+                val response = client.put("/user/profile") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(updateRequest)
+                }
+
+                response.status shouldBe HttpStatusCode.NotFound
+                coVerify { mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) }
+            }
+        }
+
+        test("should return 500 on Redis error") {
+            val username = "testuser"
+            val updateRequest = UpdateProfileRequest(
+                email = "test@example.com",
+                firstName = "Test",
+                lastName = "User"
+            )
+            
+            coEvery { 
+                mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) 
+            } returns RedisError.OperationError("Redis connection failed").left()
+
+            testApplication {
+                environment { config = MapApplicationConfig() }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        protectedUserRoutes(mockRedisService)
+                    }
+                }
+
+                val token = TestJwtConfig.generateToken(username)
+                val client = createClient { install(ClientContentNegotiation) { json() } }
+                
+                val response = client.put("/user/profile") {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(updateRequest)
+                }
+
+                response.status shouldBe HttpStatusCode.InternalServerError
+                coVerify { mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) }
             }
         }
     }
