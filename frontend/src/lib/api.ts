@@ -183,10 +183,10 @@ async function authenticatedFetch(url: string, options: RequestInit = {}): Promi
 	const makeRequest = () => {
 		// Merge headers: spread user headers first, then add auth headers (without Content-Type if already provided)
 		const headers = { ...options.headers };
-		const hasContentType = headers && 'Content-Type' in headers;
+		const hasContentType = 'Content-Type' in headers;
 		
-		// Add Authorization header (and Content-Type if not already present)
-		const authHeaders = getHeaders(!hasContentType && options.body !== undefined);
+		// Add Authorization header (and Content-Type if not already present and body exists)
+		const authHeaders = getHeaders(!hasContentType && options.body != null);
 		Object.assign(headers, authHeaders);
 		
 		return fetch(url, {
