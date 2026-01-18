@@ -82,7 +82,7 @@ const API_BASE = browser
 
 
 // Helper function to get headers with JWT token
-function getHeaders(includeContentType: boolean = false): HeadersInit {
+function getHeaders(): HeadersInit {
 	const headers: HeadersInit = {};
 
 	// Get JWT token from localStorage (only available in browser)
@@ -91,10 +91,6 @@ function getHeaders(includeContentType: boolean = false): HeadersInit {
 		if (token) {
 			headers['Authorization'] = `Bearer ${token}`;
 		}
-	}
-
-	if (includeContentType) {
-		headers['Content-Type'] = 'application/json';
 	}
 
 	return headers;
@@ -184,7 +180,7 @@ async function authenticatedFetch(url: string, options: RequestInit = {}): Promi
 		...options,
 		headers: {
 			...options.headers,
-			...getHeaders(options.headers && 'Content-Type' in options.headers)
+			...getHeaders()
 		}
 	});
 
