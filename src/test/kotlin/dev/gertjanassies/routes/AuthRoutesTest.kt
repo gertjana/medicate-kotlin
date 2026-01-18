@@ -285,8 +285,10 @@ class AuthRoutesTest : FunSpec({
             }
         }
 
-        test("should return 401 when refresh token is invalid") {
-            val invalidToken = "invalid-refresh-token"
+        test("should return 401 when refresh token is invalid, expired, or wrong type") {
+            // Test various scenarios where validateRefreshToken returns null
+            // (invalid token, expired token, or access token with wrong type claim)
+            val invalidToken = "invalid-or-expired-or-access-token"
             val request = mapOf("refreshToken" to invalidToken)
 
             every { mockJwtService.validateRefreshToken(invalidToken) } returns null
@@ -309,63 +311,6 @@ class AuthRoutesTest : FunSpec({
                 body["error"] shouldContain "Invalid or expired refresh token"
 
                 verify { mockJwtService.validateRefreshToken(invalidToken) }
-                verify(exactly = 0) { mockJwtService.generateAccessToken(any()) }
-            }
-        }
-
-        test("should return 401 when refresh token is expired") {
-            val expiredToken = "expired-refresh-token"
-            val request = mapOf("refreshToken" to expiredToken)
-
-            every { mockJwtService.validateRefreshToken(expiredToken) } returns null
-
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
-                }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/refresh") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.Unauthorized
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Invalid or expired refresh token"
-
-                verify { mockJwtService.validateRefreshToken(expiredToken) }
-                verify(exactly = 0) { mockJwtService.generateAccessToken(any()) }
-            }
-        }
-
-        test("should return 401 when access token is provided instead of refresh token") {
-            val accessToken = "access-token-not-refresh"
-            val request = mapOf("refreshToken" to accessToken)
-
-            // validateRefreshToken will return null for access tokens (wrong type claim)
-            every { mockJwtService.validateRefreshToken(accessToken) } returns null
-
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
-                }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(mockRedisService, mockEmailService, mockJwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/refresh") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.Unauthorized
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Invalid or expired refresh token"
-
-                verify { mockJwtService.validateRefreshToken(accessToken) }
                 verify(exactly = 0) { mockJwtService.generateAccessToken(any()) }
             }
         }
