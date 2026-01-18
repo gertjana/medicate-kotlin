@@ -155,15 +155,16 @@ async function handleApiResponse(response: Response, retryFn?: () => Promise<Res
 
 	if (!response.ok) {
 		// Try to get error message from response
+		let errorData;
 		try {
-			const errorData = await response.json();
-			throw new Error(errorData.error || `Request failed with status ${response.status}`);
-		} catch (e) {
-			if (e instanceof Error && e.message.startsWith('Session expired')) {
-				throw e; // Re-throw session expired error
-			}
+			errorData = await response.json();
+		} catch (jsonError) {
+			// JSON parsing failed (empty or malformed response)
+			// Fall back to status-based error message
 			throw new Error(`Request failed with status ${response.status}`);
 		}
+		// Successfully parsed error response
+		throw new Error(errorData.error || `Request failed with status ${response.status}`);
 	}
 
 	// Return empty object for 204 No Content responses
