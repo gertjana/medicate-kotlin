@@ -3,12 +3,15 @@ package dev.gertjanassies.routes
 import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.User
+import dev.gertjanassies.model.request.UpdateProfileRequest
 import dev.gertjanassies.model.request.UserRequest
 import dev.gertjanassies.model.response.AuthResponse
 import dev.gertjanassies.model.response.UserResponse
 import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.test.TestJwtConfig
+import dev.gertjanassies.test.TestJwtConfig.installTestJwtAuth
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.call.*
@@ -506,7 +509,7 @@ class UserRoutesTest : FunSpec({
                 environment { config = MapApplicationConfig() }
                 application {
                     install(ContentNegotiation) { json() }
-                    dev.gertjanassies.test.TestJwtConfig.run { installTestJwtAuth() }
+                    installTestJwtAuth()
                 }
                 routing {
                     authenticate("auth-jwt") {
@@ -514,7 +517,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = dev.gertjanassies.test.TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 
                 val response = client.get("/user/profile") {
@@ -542,7 +545,7 @@ class UserRoutesTest : FunSpec({
                 environment { config = MapApplicationConfig() }
                 application {
                     install(ContentNegotiation) { json() }
-                    dev.gertjanassies.test.TestJwtConfig.run { installTestJwtAuth() }
+                    installTestJwtAuth()
                 }
                 routing {
                     authenticate("auth-jwt") {
@@ -550,7 +553,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = dev.gertjanassies.test.TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 
                 val response = client.get("/user/profile") {
@@ -572,7 +575,7 @@ class UserRoutesTest : FunSpec({
                 environment { config = MapApplicationConfig() }
                 application {
                     install(ContentNegotiation) { json() }
-                    dev.gertjanassies.test.TestJwtConfig.run { installTestJwtAuth() }
+                    installTestJwtAuth()
                 }
                 routing {
                     authenticate("auth-jwt") {
@@ -580,7 +583,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = dev.gertjanassies.test.TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 
                 val response = client.get("/user/profile") {
@@ -596,7 +599,7 @@ class UserRoutesTest : FunSpec({
     context("PUT /user/profile") {
         test("should update user profile successfully with valid JWT") {
             val username = "testuser"
-            val updateRequest = dev.gertjanassies.model.request.UpdateProfileRequest(
+            val updateRequest = UpdateProfileRequest(
                 email = "updated@example.com",
                 firstName = "Updated",
                 lastName = "Name"
@@ -617,7 +620,7 @@ class UserRoutesTest : FunSpec({
                 environment { config = MapApplicationConfig() }
                 application {
                     install(ContentNegotiation) { json() }
-                    dev.gertjanassies.test.TestJwtConfig.run { installTestJwtAuth() }
+                    installTestJwtAuth()
                 }
                 routing {
                     authenticate("auth-jwt") {
@@ -625,7 +628,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = dev.gertjanassies.test.TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 
                 val response = client.put("/user/profile") {
@@ -647,7 +650,7 @@ class UserRoutesTest : FunSpec({
 
         test("should return 400 when email is blank") {
             val username = "testuser"
-            val updateRequest = dev.gertjanassies.model.request.UpdateProfileRequest(
+            val updateRequest = UpdateProfileRequest(
                 email = "",
                 firstName = "Test",
                 lastName = "User"
@@ -657,7 +660,7 @@ class UserRoutesTest : FunSpec({
                 environment { config = MapApplicationConfig() }
                 application {
                     install(ContentNegotiation) { json() }
-                    dev.gertjanassies.test.TestJwtConfig.run { installTestJwtAuth() }
+                    installTestJwtAuth()
                 }
                 routing {
                     authenticate("auth-jwt") {
@@ -665,7 +668,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = dev.gertjanassies.test.TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 
                 val response = client.put("/user/profile") {
@@ -681,7 +684,7 @@ class UserRoutesTest : FunSpec({
 
         test("should return 400 when firstName is blank") {
             val username = "testuser"
-            val updateRequest = dev.gertjanassies.model.request.UpdateProfileRequest(
+            val updateRequest = UpdateProfileRequest(
                 email = "test@example.com",
                 firstName = "",
                 lastName = "User"
@@ -691,7 +694,7 @@ class UserRoutesTest : FunSpec({
                 environment { config = MapApplicationConfig() }
                 application {
                     install(ContentNegotiation) { json() }
-                    dev.gertjanassies.test.TestJwtConfig.run { installTestJwtAuth() }
+                    installTestJwtAuth()
                 }
                 routing {
                     authenticate("auth-jwt") {
@@ -699,7 +702,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = dev.gertjanassies.test.TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 
                 val response = client.put("/user/profile") {
@@ -715,7 +718,7 @@ class UserRoutesTest : FunSpec({
 
         test("should return 400 when lastName is blank") {
             val username = "testuser"
-            val updateRequest = dev.gertjanassies.model.request.UpdateProfileRequest(
+            val updateRequest = UpdateProfileRequest(
                 email = "test@example.com",
                 firstName = "Test",
                 lastName = ""
@@ -725,7 +728,7 @@ class UserRoutesTest : FunSpec({
                 environment { config = MapApplicationConfig() }
                 application {
                     install(ContentNegotiation) { json() }
-                    dev.gertjanassies.test.TestJwtConfig.run { installTestJwtAuth() }
+                    installTestJwtAuth()
                 }
                 routing {
                     authenticate("auth-jwt") {
@@ -733,7 +736,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = dev.gertjanassies.test.TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 
                 val response = client.put("/user/profile") {
@@ -749,7 +752,7 @@ class UserRoutesTest : FunSpec({
 
         test("should return 404 when user not found") {
             val username = "nonexistent"
-            val updateRequest = dev.gertjanassies.model.request.UpdateProfileRequest(
+            val updateRequest = UpdateProfileRequest(
                 email = "test@example.com",
                 firstName = "Test",
                 lastName = "User"
@@ -763,7 +766,7 @@ class UserRoutesTest : FunSpec({
                 environment { config = MapApplicationConfig() }
                 application {
                     install(ContentNegotiation) { json() }
-                    dev.gertjanassies.test.TestJwtConfig.run { installTestJwtAuth() }
+                    installTestJwtAuth()
                 }
                 routing {
                     authenticate("auth-jwt") {
@@ -771,7 +774,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = dev.gertjanassies.test.TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 
                 val response = client.put("/user/profile") {
@@ -787,7 +790,7 @@ class UserRoutesTest : FunSpec({
 
         test("should return 500 on Redis error") {
             val username = "testuser"
-            val updateRequest = dev.gertjanassies.model.request.UpdateProfileRequest(
+            val updateRequest = UpdateProfileRequest(
                 email = "test@example.com",
                 firstName = "Test",
                 lastName = "User"
@@ -801,7 +804,7 @@ class UserRoutesTest : FunSpec({
                 environment { config = MapApplicationConfig() }
                 application {
                     install(ContentNegotiation) { json() }
-                    dev.gertjanassies.test.TestJwtConfig.run { installTestJwtAuth() }
+                    installTestJwtAuth()
                 }
                 routing {
                     authenticate("auth-jwt") {
@@ -809,7 +812,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = dev.gertjanassies.test.TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 
                 val response = client.put("/user/profile") {
