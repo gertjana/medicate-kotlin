@@ -82,7 +82,7 @@ const API_BASE = browser
 
 
 // Helper function to get headers with JWT token
-function getHeaders(): HeadersInit {
+function getHeaders(includeContentType: boolean = false): HeadersInit {
 	const headers: HeadersInit = {};
 
 	// Get JWT token from localStorage (only available in browser)
@@ -91,6 +91,10 @@ function getHeaders(): HeadersInit {
 		if (token) {
 			headers['Authorization'] = `Bearer ${token}`;
 		}
+	}
+
+	if (includeContentType) {
+		headers['Content-Type'] = 'application/json';
 	}
 
 	return headers;

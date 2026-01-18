@@ -102,10 +102,11 @@ See `REFRESH_TOKEN_IMPLEMENTATION.md` for full implementation details.
 
 ## Notes
 
-- [x] **JWT Authentication**: Fully implemented with refresh tokens (secure!)
-- [x] Email tokens expire after 1 hour (managed by Redis TTL)
-- [x] Password reset tokens are single-use (deleted after verification)
-- [x] Generic error messages prevent information leakage
-- [x] All 178 tests passing (100% success rate)
-- [x] Production ready - awaiting deployment
+- ✅ **JWT Authentication**: Fully implemented with refresh tokens (secure!)
+- ✅ **Content-Type Fix**: Fixed 415 error on POST/PUT requests after JWT refactoring
+- ✅ Email tokens expire after 1 hour (managed by Redis TTL)
+- ✅ Password reset tokens are single-use (deleted after verification)
+- ✅ Generic error messages prevent information leakage
+- ✅ All 178 tests passing (100% success rate)
+- ✅ Production ready - awaiting deployment
 - [ ] Deploy to production and test end-to-end
