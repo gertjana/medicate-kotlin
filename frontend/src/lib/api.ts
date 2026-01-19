@@ -82,17 +82,26 @@ const API_BASE = browser
 	? '/api'  // Client-side: relative URL, proxied by nginx
 	: 'http://127.0.0.1:8080/api';  // Server-side: direct internal connection
 
+// Store access token in memory (not localStorage for security)
+let accessToken: string | null = null;
+
+// Helper function to get the current access token
+export function getAccessToken(): string | null {
+	return accessToken;
+}
+
+// Helper function to set the access token
+export function setAccessToken(token: string | null): void {
+	accessToken = token;
+}
 
 // Helper function to get headers with JWT token
 function getHeaders(includeContentType: boolean = false): HeadersInit {
 	const headers: HeadersInit = {};
 
-	// Get JWT token from localStorage (only available in browser)
-	if (browser) {
-		const token = localStorage.getItem('medicate_token');
-		if (token) {
-			headers['Authorization'] = `Bearer ${token}`;
-		}
+	// Get JWT token from memory (not localStorage)
+	if (browser && accessToken) {
+		headers['Authorization'] = `Bearer ${accessToken}`;
 	}
 
 	if (includeContentType) {
@@ -102,20 +111,14 @@ function getHeaders(includeContentType: boolean = false): HeadersInit {
 	return headers;
 }
 
-// Helper function to refresh the access token using refresh token
+// Helper function to refresh the access token using refresh token from cookie
 async function refreshAccessToken(): Promise<boolean> {
 	if (!browser) return false;
-
-	const refreshToken = localStorage.getItem('medicate_refresh_token');
-	if (!refreshToken) {
-		return false;
-	}
 
 	try {
 		const response = await fetch(`${API_BASE}/auth/refresh`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ refreshToken })
+			credentials: 'include' // Include cookies
 		});
 
 		if (!response.ok) {
@@ -124,8 +127,8 @@ async function refreshAccessToken(): Promise<boolean> {
 		}
 
 		const data = await response.json();
-		// Store new access token
-		localStorage.setItem('medicate_token', data.token);
+		// Store new access token in memory
+		setAccessToken(data.token);
 		return true;
 	} catch (e) {
 		console.error('Failed to refresh token:', e);
@@ -150,8 +153,7 @@ async function handleApiResponse(response: Response, retryFn?: () => Promise<Res
 
 		// Token refresh failed or retry failed - logout user
 		if (browser) {
-			localStorage.removeItem('medicate_token');
-			localStorage.removeItem('medicate_refresh_token');
+			setAccessToken(null);
 			localStorage.removeItem('medicate_user');
 			// Reload to show login page
 			window.location.reload();
@@ -194,7 +196,8 @@ async function authenticatedFetch(url: string, options: RequestInit = {}): Promi
 
 		return fetch(url, {
 			...options,
-			headers
+			headers,
+			credentials: 'include' // Include cookies for refresh token
 		});
 	};
 
@@ -336,11 +339,11 @@ export async function registerUser(username: string, password: string, email?: s
 
     const authResponse: AuthResponse = await response.json();
 
-    // Store user, access token, and refresh token in localStorage
+    // Store user in localStorage and access token in memory
+    // Refresh token is in HttpOnly cookie (set by server)
     if (browser) {
         localStorage.setItem('medicate_user', JSON.stringify(authResponse.user));
-        localStorage.setItem('medicate_token', authResponse.token);
-        localStorage.setItem('medicate_refresh_token', authResponse.refreshToken);
+        setAccessToken(authResponse.token);
     }
 
     return authResponse.user;
@@ -350,17 +353,18 @@ export async function loginUser(username: string, password: string): Promise<Use
 	const response = await fetch(`${API_BASE}/user/login`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ username, password })
+		body: JSON.stringify({ username, password }),
+		credentials: 'include' // Include cookies
 	});
 	if (!response.ok) throw new Error('Failed to login');
 
 	const authResponse: AuthResponse = await response.json();
 
-	// Store user, access token, and refresh token in localStorage
+	// Store user in localStorage and access token in memory
+	// Refresh token is in HttpOnly cookie (set by server)
 	if (browser) {
 		localStorage.setItem('medicate_user', JSON.stringify(authResponse.user));
-		localStorage.setItem('medicate_token', authResponse.token);
-		localStorage.setItem('medicate_refresh_token', authResponse.refreshToken);
+		setAccessToken(authResponse.token);
 	}
 
 	return authResponse.user;
@@ -411,11 +415,21 @@ export async function getMedicineExpiry(): Promise<MedicineExpiry[]> {
 }
 
 // Logout function to clear authentication
-export function logout(): void {
+export async function logout(): Promise<void> {
 	if (browser) {
+		// Call backend to clear HttpOnly cookie
+		try {
+			await fetch(`${API_BASE}/auth/logout`, {
+				method: 'POST',
+				credentials: 'include'
+			});
+		} catch (e) {
+			console.error('Failed to logout on server:', e);
+		}
+
+		// Clear user from localStorage and access token from memory
 		localStorage.removeItem('medicate_user');
-		localStorage.removeItem('medicate_token');
-		localStorage.removeItem('medicate_refresh_token');
+		setAccessToken(null);
 	}
 }
 

@@ -60,10 +60,23 @@ fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
             val accessToken = jwtService.generateAccessToken(user.username)
             val refreshToken = jwtService.generateRefreshToken(user.username)
 
+            // Set refresh token as HttpOnly cookie
+            call.response.cookies.append(
+                io.ktor.http.Cookie(
+                    name = "refresh_token",
+                    value = refreshToken,
+                    maxAge = 30 * 24 * 60 * 60, // 30 days in seconds
+                    httpOnly = true,
+                    secure = false, // Set to true in production with HTTPS
+                    path = "/",
+                    extensions = mapOf("SameSite" to "Strict")
+                )
+            )
+
             logger.debug("Successfully registered user '${request.username}' and generated JWT tokens")
             call.respond(
                 HttpStatusCode.Created,
-                AuthResponse(user = user.toResponse(), token = accessToken, refreshToken = refreshToken)
+                AuthResponse(user = user.toResponse(), token = accessToken, refreshToken = "") // Don't send refresh token in response
             )
         }
 
@@ -99,10 +112,23 @@ fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
             val accessToken = jwtService.generateAccessToken(user.username)
             val refreshToken = jwtService.generateRefreshToken(user.username)
 
+            // Set refresh token as HttpOnly cookie
+            call.response.cookies.append(
+                io.ktor.http.Cookie(
+                    name = "refresh_token",
+                    value = refreshToken,
+                    maxAge = 30 * 24 * 60 * 60, // 30 days in seconds
+                    httpOnly = true,
+                    secure = false, // Set to true in production with HTTPS
+                    path = "/",
+                    extensions = mapOf("SameSite" to "Strict")
+                )
+            )
+
             logger.debug("Successfully logged in user '${request.username}' and generated JWT tokens")
             call.respond(
                 HttpStatusCode.OK,
-                AuthResponse(user = user.toResponse(), token = accessToken, refreshToken = refreshToken)
+                AuthResponse(user = user.toResponse(), token = accessToken, refreshToken = "") // Don't send refresh token in response
             )
         }
 

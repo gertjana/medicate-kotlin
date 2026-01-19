@@ -255,7 +255,6 @@ class AuthRoutesTest : FunSpec({
             val refreshToken = "valid-refresh-token"
             val username = "testuser"
             val newAccessToken = "new-access-token"
-            val request = mapOf("refreshToken" to refreshToken)
 
             every { mockJwtService.validateRefreshToken(refreshToken) } returns username
             every { mockJwtService.generateAccessToken(username) } returns newAccessToken
@@ -269,16 +268,15 @@ class AuthRoutesTest : FunSpec({
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/refresh") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
+                    cookie("refresh_token", refreshToken)
                 }
 
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Map<String, String>>()
                 body shouldContainKey "token"
-                body shouldContainKey "refreshToken"
                 body["token"] shouldBe newAccessToken
-                body["refreshToken"] shouldBe refreshToken
+                // Refresh token should not be in response (it's in HttpOnly cookie)
+                (body.containsKey("refreshToken")) shouldBe false
 
                 verify { mockJwtService.validateRefreshToken(refreshToken) }
                 verify { mockJwtService.generateAccessToken(username) }
@@ -289,7 +287,6 @@ class AuthRoutesTest : FunSpec({
             // Test various scenarios where validateRefreshToken returns null
             // (invalid token, expired token, or access token with wrong type claim)
             val invalidToken = "invalid-or-expired-or-access-token"
-            val request = mapOf("refreshToken" to invalidToken)
 
             every { mockJwtService.validateRefreshToken(invalidToken) } returns null
 
@@ -302,8 +299,7 @@ class AuthRoutesTest : FunSpec({
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/refresh") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
+                    cookie("refresh_token", invalidToken)
                 }
 
                 response.status shouldBe HttpStatusCode.Unauthorized
@@ -316,7 +312,6 @@ class AuthRoutesTest : FunSpec({
         }
 
         test("should return 400 when refresh token is missing") {
-            val request = mapOf<String, String>()
 
             testApplication {
                 environment {
@@ -327,8 +322,7 @@ class AuthRoutesTest : FunSpec({
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/refresh") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
+                    // No cookie sent
                 }
 
                 response.status shouldBe HttpStatusCode.BadRequest
@@ -341,7 +335,6 @@ class AuthRoutesTest : FunSpec({
         }
 
         test("should return 400 when refresh token is blank") {
-            val request = mapOf("refreshToken" to "")
 
             testApplication {
                 environment {
@@ -352,8 +345,7 @@ class AuthRoutesTest : FunSpec({
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/auth/refresh") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
+                    cookie("refresh_token", "")
                 }
 
                 response.status shouldBe HttpStatusCode.BadRequest

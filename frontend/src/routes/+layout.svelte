@@ -85,7 +85,7 @@
 		// Close profile popup to avoid flicker
 		showProfile = false;
 		// Perform logout then redirect to dashboard to avoid "Authentication required" pages
-		userStore.logout();
+		await userStore.logout();
 		// Navigate to dashboard (root) and replace history so back doesn't return to protected page
 		goto('/', { replaceState: true });
 	}

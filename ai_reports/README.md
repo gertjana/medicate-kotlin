@@ -12,9 +12,10 @@
 2. **[JWT_IMPLEMENTATION.md](JWT_IMPLEMENTATION.md)** - Backend JWT implementation details
 3. **[FRONTEND_JWT_COMPLETE.md](FRONTEND_JWT_COMPLETE.md)** - Frontend JWT integration
 4. **[REFRESH_TOKEN_IMPLEMENTATION.md](REFRESH_TOKEN_IMPLEMENTATION.md)** - Refresh token system (30-day sessions)
-5. **[AUTHENTICATION_REQUIREMENTS_TESTS.md](AUTHENTICATION_REQUIREMENTS_TESTS.md)** - Security testing documentation
-6. **[SECURITY.md](SECURITY.md)** - Security overview
-7. **[PASSWORD_RESET_FIX.md](PASSWORD_RESET_FIX.md)** - Password reset flow
+5. **[JWT_HTTPONLY_SECURITY.md](JWT_HTTPONLY_SECURITY.md)** - Secure token storage with HttpOnly cookies
+6. **[AUTHENTICATION_REQUIREMENTS_TESTS.md](AUTHENTICATION_REQUIREMENTS_TESTS.md)** - Security testing documentation
+7. **[SECURITY.md](SECURITY.md)** - Security overview
+8. **[PASSWORD_RESET_FIX.md](PASSWORD_RESET_FIX.md)** - Password reset flow
 
 ### Deployment
 8. **[PRODUCTION_DEPLOYMENT_CHECKLIST.md](PRODUCTION_DEPLOYMENT_CHECKLIST.md)** - Complete deployment guide

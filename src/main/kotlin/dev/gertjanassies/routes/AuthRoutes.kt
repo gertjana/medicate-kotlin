@@ -21,11 +21,11 @@ fun Route.authRoutes(redisService: RedisService, emailService: EmailService, jwt
     route("/auth") {
         /**
          * POST /api/auth/refresh
-         * Refresh access token using a valid refresh token
+         * Refresh access token using refresh token from HttpOnly cookie
          */
         post("/refresh") {
-            val request = call.receive<Map<String, String>>()
-            val refreshToken = request["refreshToken"]
+            // Get refresh token from HttpOnly cookie
+            val refreshToken = call.request.cookies["refresh_token"]
 
             if (refreshToken.isNullOrBlank()) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Refresh token is required"))
@@ -46,11 +46,29 @@ fun Route.authRoutes(redisService: RedisService, emailService: EmailService, jwt
             logger.debug("Successfully refreshed access token for user '$username'")
             call.respond(
                 HttpStatusCode.OK,
-                mapOf(
-                    "token" to newAccessToken,
-                    "refreshToken" to refreshToken  // Return same refresh token
+                mapOf("token" to newAccessToken)
+            )
+        }
+
+        /**
+         * POST /api/auth/logout
+         * Logout user by clearing the refresh token cookie
+         */
+        post("/logout") {
+            // Clear the refresh token cookie
+            call.response.cookies.append(
+                io.ktor.http.Cookie(
+                    name = "refresh_token",
+                    value = "",
+                    maxAge = 0, // Expire immediately
+                    httpOnly = true,
+                    secure = false,
+                    path = "/"
                 )
             )
+
+            logger.debug("User logged out, refresh token cookie cleared")
+            call.respond(HttpStatusCode.OK, mapOf("message" to "Logged out successfully"))
         }
 
         /**

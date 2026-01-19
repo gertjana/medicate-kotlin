@@ -14,6 +14,7 @@ import dev.gertjanassies.test.TestJwtConfig
 import dev.gertjanassies.test.TestJwtConfig.installTestJwtAuth
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
@@ -71,7 +72,15 @@ class UserRoutesTest : FunSpec({
                 body.user.username shouldBe username
                 body.user.email shouldBe email
                 body.token shouldBe "test-access-token-123"
-                body.refreshToken shouldBe "test-refresh-token-456"
+                // Refresh token should not be in response body (empty string)
+                body.refreshToken shouldBe ""
+
+                // Verify refresh token cookie was set
+                val cookies = response.setCookie()
+                val refreshCookie = cookies.find { it.name == "refresh_token" }
+                refreshCookie shouldNotBe null
+                refreshCookie?.value shouldBe "test-refresh-token-456"
+                refreshCookie?.httpOnly shouldBe true
 
                 coVerify { mockRedisService.registerUser(username, email, password) }
                 verify { mockJwtService.generateAccessToken(username) }
@@ -195,7 +204,15 @@ class UserRoutesTest : FunSpec({
                 val body = response.body<AuthResponse>()
                 body.user.username shouldBe username
                 body.token shouldBe "test-access-token-123"
-                body.refreshToken shouldBe "test-refresh-token-456"
+                // Refresh token should not be in response body (empty string)
+                body.refreshToken shouldBe ""
+
+                // Verify refresh token cookie was set
+                val cookies = response.setCookie()
+                val refreshCookie = cookies.find { it.name == "refresh_token" }
+                refreshCookie shouldNotBe null
+                refreshCookie?.value shouldBe "test-refresh-token-456"
+                refreshCookie?.httpOnly shouldBe true
 
                 coVerify { mockRedisService.loginUser(username, password) }
                 verify { mockJwtService.generateAccessToken(username) }
