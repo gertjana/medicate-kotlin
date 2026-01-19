@@ -22,7 +22,7 @@ Moved the password update endpoint from protected UserRoutes to public AuthRoute
        authRoutes(redisService, emailService, jwtService)
        // - POST /auth/resetPassword
        // - POST /auth/verifyResetToken
-       // - PUT /auth/updatePassword ✅ NEW
+       // - PUT /auth/updatePassword  NEW
 
        // Protected routes (JWT required)
        authenticate("auth-jwt") {
@@ -58,16 +58,16 @@ Moved the password update endpoint from protected UserRoutes to public AuthRoute
 
 ## Testing
 
-✅ All backend tests passing (165/165)
-✅ Frontend builds successfully
-✅ Password reset flow tested and working
+ All backend tests passing (165/165)
+ Frontend builds successfully
+ Password reset flow tested and working
 
 ## Security Notes
 
-- ✅ Token validation still secure (cryptographically signed reset tokens)
-- ✅ Reset tokens expire (24 hour TTL in Redis)
-- ✅ Only password update is public, all other user operations require JWT
-- ✅ Two separate endpoints:
+-  Token validation still secure (cryptographically signed reset tokens)
+-  Reset tokens expire (24 hour TTL in Redis)
+-  Only password update is public, all other user operations require JWT
+-  Two separate endpoints:
   - `/auth/updatePassword` - Public (for password reset)
   - `/user/password` - Protected (for authenticated password changes)
 
@@ -78,5 +78,5 @@ Moved the password update endpoint from protected UserRoutes to public AuthRoute
 
 ---
 
-**Status:** ✅ FIXED and TESTED
+**Status:**  FIXED and TESTED
 **Date:** January 17, 2026

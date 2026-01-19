@@ -3,7 +3,7 @@
 ## Dashboard UX Improvements
 
  - [x] **With no medicines in the database, Have an "add Medicine" button on the main screen instead
-       of the "Add Schedule", if there are medicines but no schedules, show "Add Schedule" button.** ✅
+       of the "Add Schedule", if there are medicines but no schedules, show "Add Schedule" button.**
        - Implemented smart empty states on dashboard
        - Shows "Add Medicine" button when no medicines exist
        - Shows "Add Schedule" button when medicines exist but no schedules
@@ -12,22 +12,26 @@
 
 ## Profile & User Management
 
- - [x] **Clean up Profile popup** ✅
+ - [x] **Clean up Profile popup**
        - Added "Edit Profile" link to dropdown
        - Shows user info in cleaner format
 
- - [x] **Add First Name and Last Name fields to Profile** ✅
+ - [x] **Add First Name and Last Name fields to Profile**
        - Implemented full profile feature with firstName and lastName
        - Created /profile page for editing
        - Personalized password reset emails
        - See: `ai_reports/USER_PROFILE_FEATURE.md`
 
- - [x] **Validate email format in edit Profile** ✅
+ - [x] **Validate email format in edit Profile**
        - Client-side validation (requires @ symbol)
        - Backend validation (non-empty, format check)
        - Clear error messages
 
- - [ ] Change password via email link, same as reset password flow
+ - [x] **Change password via email link, same as reset password flow**
+       - Added "Change Password" link to profile popup
+       - Uses existing password reset flow (sends email with reset link)
+       - Integrated with profile dropdown menu
+       - One-click experience for logged-in users
 
 ## Production Rollout
 

@@ -25,11 +25,11 @@ Modified the `updateProfile` function to:
 
 ### 3. Comprehensive Test Coverage
 Added tests in `UserServiceTest.kt` covering:
-- ✅ Successfully updating profile when email is not in use
-- ✅ Returning error when email is already in use by another user
-- ✅ Allowing users to keep their current email
-- ✅ Handling non-existent users
-- ✅ Case-insensitive email checking
+-  Successfully updating profile when email is not in use
+-  Returning error when email is already in use by another user
+-  Allowing users to keep their current email
+-  Handling non-existent users
+-  Case-insensitive email checking
 
 ## Code Changes
 
@@ -58,9 +58,9 @@ suspend fun updateProfile(...): Either<RedisError, User> {
 ```
 
 ## Testing Results
-✅ All 5 new tests pass
-✅ All existing tests continue to pass
-✅ No regressions introduced
+ All 5 new tests pass
+ All existing tests continue to pass
+ No regressions introduced
 
 ## Performance Considerations
 
@@ -78,9 +78,9 @@ If the user base grows significantly, consider:
 The current implementation prioritizes correctness and simplicity over performance optimization, which is appropriate for the initial implementation.
 
 ## Security Considerations
-✅ No security vulnerabilities introduced
-✅ Proper error handling with specific exception types
-✅ Case-insensitive email comparison prevents bypassing via different casing
+ No security vulnerabilities introduced
+ Proper error handling with specific exception types
+ Case-insensitive email comparison prevents bypassing via different casing
 
 ## Commits
 - `cf6b69b` - Add email uniqueness validation to updateProfile

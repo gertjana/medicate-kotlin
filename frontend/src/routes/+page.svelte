@@ -242,12 +242,6 @@
 			<p class="text-gray-700 mb-8">
 				Please <strong>login</strong> or <strong>register</strong> to start tracking your medicines, schedules, and adherence.
 			</p>
-			<div class="text-sm text-gray-500">
-				<p class="mb-2">✓ Track your medicines and dosages</p>
-				<p class="mb-2">✓ Create medication schedules</p>
-				<p class="mb-2">✓ Monitor adherence and history</p>
-				<p>✓ Get low stock alerts</p>
-			</div>
 		</div>
 	</div>
 {:else}

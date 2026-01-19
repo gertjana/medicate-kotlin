@@ -14,7 +14,7 @@ This is a Kotlin project using Ktor framework with Arrow for functional programm
 - Use Arrow's IO for side effects
 - Follow immutable data patterns
 - Use Mocks for testing services
-- Never user emojis in code, commit messages or documentation
+- **NEVER use emojis in code, commit messages, or documentation - use plain text only**
 
 ## Agent guidelines
 - re-use existing terminal instead of opening new ones

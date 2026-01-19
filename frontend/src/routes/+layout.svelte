@@ -90,6 +90,22 @@
 		goto('/', { replaceState: true });
 	}
 
+	async function handleChangePassword() {
+		// Close profile popup
+		showProfile = false;
+
+		if (!$userStore?.username) {
+			return;
+		}
+
+		try {
+			await requestPasswordReset($userStore.username);
+			alert('Password reset email sent! Check your inbox for instructions.');
+		} catch (e) {
+			alert(e instanceof Error ? e.message : 'Failed to send password reset email');
+		}
+	}
+
 	function openAuthModal(mode: 'login' | 'register') {
 		authMode = mode;
 		username = '';
@@ -189,20 +205,24 @@
 									{#if $userStore}
 										<div class="relative flex items-center gap-2 overflow-visible">
 											<button on:click={toggleProfile} class="text-sm font-semibold flex items-center gap-2" aria-expanded={showProfile} aria-haspopup="true">
-												<span>👤 {$userStore.username}</span>
+												<span>{$userStore.username}</span>
 											</button>
 											{#if showProfile}
 												<div on:click|stopPropagation class="absolute bg-white border border-gray-200 shadow-lg rounded p-3 z-50 flex flex-col gap-2" style={profileInlineStyle}>
-													<div class="border-b border-gray-200 pb-2 mb-2">
-														<p class="text-sm font-semibold">Logged in as</p>
-														<p class="text-sm text-gray-700">{$userStore.username}</p>
-														{#if $userStore.email}
-															<p class="text-xs text-gray-500 mt-1" style="max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{$userStore.email}</p>
-														{/if}
-													</div>
+													{#if $userStore.firstName || $userStore.lastName}
+														<p class="text-sm text-gray-700 font-semibold border-b border-gray-200 pb-2 mb-1">
+															{$userStore.firstName || ''} {$userStore.lastName || ''}
+														</p>
+													{/if}
+													{#if $userStore.email}
+														<p class="text-xs text-gray-500 mb-2" style="max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{$userStore.email}</p>
+													{/if}
 													<a href="/profile" on:click={() => showProfile = false} class="text-sm text-blue-600 hover:text-blue-800 hover:underline">
-														⚙️ Edit Profile
+														Edit Profile
 													</a>
+													<button on:click={handleChangePassword} class="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left">
+														Change Password
+													</button>
 												</div>
 											{/if}
 											<button on:click={handleLogout} class="btn btn-nav text-xs">Logout</button>

@@ -36,13 +36,13 @@ suspend fun resetPassword(user: User): Either<EmailError, String>
 Location: `src/test/kotlin/dev/gertjanassies/service/EmailServiceTest.kt`
 
 Comprehensive test suite covering:
-- ✅ Successful password reset flow
-- ✅ User with no email error handling
-- ✅ Redis storage failure handling
-- ✅ Resend API error handling
-- ✅ Invalid email format validation
-- ✅ Unique token generation
-- ✅ Email content verification
+-  Successful password reset flow
+-  User with no email error handling
+-  Redis storage failure handling
+-  Resend API error handling
+-  Invalid email format validation
+-  Unique token generation
+-  Email content verification
 
 All tests mock the Resend service using Ktor's MockEngine.
 

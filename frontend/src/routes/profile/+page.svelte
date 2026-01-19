@@ -165,33 +165,23 @@
 				{/if}
 
 				<!-- Submit Button -->
-				<div class="flex gap-4">
+				<div class="flex gap-2">
 					<button
 						type="submit"
 						disabled={saving}
-						class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+						class="btn btn-primary"
 					>
 						{saving ? 'Saving...' : 'Save Changes'}
 					</button>
 					<button
 						type="button"
 						on:click={() => goto('/')}
-						class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+						class="btn"
 					>
 						Cancel
 					</button>
 				</div>
 			</form>
-		</div>
-
-		<!-- Additional Info -->
-		<div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-			<h3 class="font-semibold text-blue-900 mb-2">💡 Profile Information</h3>
-			<ul class="text-sm text-blue-800 space-y-1">
-				<li>• Your first and last name will be used in password reset emails</li>
-				<li>• Email address is required for password reset functionality</li>
-				<li>• Username is permanent and cannot be changed</li>
-			</ul>
 		</div>
 	{/if}
 </div>

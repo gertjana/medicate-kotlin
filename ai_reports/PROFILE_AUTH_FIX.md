@@ -2,11 +2,11 @@
 
 **Date:** January 18, 2026
 **Issue:** Clicking "Edit Profile" was logging users out
-**Status:** ✅ FIXED
+**Status:**  FIXED
 
 ---
 
-## 🐛 Problem
+##  Problem
 
 When users clicked "Edit Profile" in the dropdown menu, they were immediately logged out instead of being taken to the profile page.
 
@@ -19,7 +19,7 @@ When the frontend received the 401 response, the `handleApiResponse()` function 
 
 ---
 
-## 🔧 Solution
+##  Solution
 
 **Created a separate function for protected user routes:**
 
@@ -89,38 +89,38 @@ route("/api") {
 
 ---
 
-## ✅ What Was Fixed
+##  What Was Fixed
 
-- ✅ `GET /api/user/profile` now properly protected with JWT
-- ✅ `PUT /api/user/profile` now properly protected with JWT
-- ✅ Clicking "Edit Profile" navigates to profile page (no logout)
-- ✅ Profile page loads successfully
-- ✅ Users can view and edit their profile
-- ✅ All tests still passing (178/178)
+-  `GET /api/user/profile` now properly protected with JWT
+-  `PUT /api/user/profile` now properly protected with JWT
+-  Clicking "Edit Profile" navigates to profile page (no logout)
+-  Profile page loads successfully
+-  Users can view and edit their profile
+-  All tests still passing (178/178)
 
 ---
 
-## 🧪 Testing
+##  Testing
 
 **Backend:**
-- ✅ Code compiles successfully
-- ✅ All 178 tests passing
-- ✅ No new errors or warnings
+-  Code compiles successfully
+-  All 178 tests passing
+-  No new errors or warnings
 
 **Frontend:**
-- ✅ Builds successfully
-- ✅ Profile link works correctly
-- ✅ No logout on navigation
+-  Builds successfully
+-  Profile link works correctly
+-  No logout on navigation
 
 **Manual Testing:**
-- ✅ Click "Edit Profile" → Navigates to /profile
-- ✅ Profile page loads with user data
-- ✅ Can update profile successfully
-- ✅ No unexpected logouts
+-  Click "Edit Profile" → Navigates to /profile
+-  Profile page loads with user data
+-  Can update profile successfully
+-  No unexpected logouts
 
 ---
 
-## 📝 Key Learning
+##  Key Learning
 
 **Route Protection in Ktor:**
 - Routes are only protected if they're inside an `authenticate()` block
@@ -130,16 +130,16 @@ route("/api") {
 
 ---
 
-## 📁 Files Modified
+##  Files Modified
 
-1. ✅ `src/main/kotlin/dev/gertjanassies/routes/UserRoutes.kt` - Added `protectedUserRoutes()`
-2. ✅ `src/main/kotlin/dev/gertjanassies/Application.kt` - Added `protectedUserRoutes()` to auth block
+1.  `src/main/kotlin/dev/gertjanassies/routes/UserRoutes.kt` - Added `protectedUserRoutes()`
+2.  `src/main/kotlin/dev/gertjanassies/Application.kt` - Added `protectedUserRoutes()` to auth block
 
 **Total: 2 files modified**
 
 ---
 
-**Status:** ✅ RESOLVED
-**Build:** ✅ Successful
-**Tests:** ✅ All passing (178/178)
-**Production Ready:** ✅ YES
+**Status:**  RESOLVED
+**Build:**  Successful
+**Tests:**  All passing (178/178)
+**Production Ready:**  YES
