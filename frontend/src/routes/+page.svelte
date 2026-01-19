@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { userStore } from '$lib/stores/user';
-	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, getLowStockMedicines, takeDose, deleteDosageHistory, getMedicineExpiry, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine, type MedicineExpiry } from '$lib/api';
+	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, getLowStockMedicines, takeDose, deleteDosageHistory, getMedicineExpiry, getMedicines, getSchedules, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine, type MedicineExpiry, type Schedule } from '$lib/api';
 
 	// SvelteKit props - using const since they're not used internally
 	export const data = {};
@@ -13,6 +13,8 @@
 	let weeklyAdherence: WeeklyAdherence | null = null;
 	let lowStockMedicines: Medicine[] = [];
 	let medicineExpiry: MedicineExpiry[] = [];
+	let medicines: Medicine[] = [];
+	let schedules: Schedule[] = [];
 	let suppressedLowStockIds: Set<string> = new Set();
 	let loading = true;
 	let expiryLoading = false;
@@ -81,11 +83,13 @@
 		loading = true;
 		error = '';
 		try {
-			[dailySchedule, dosageHistories, weeklyAdherence, lowStockMedicines] = await Promise.all([
+			[dailySchedule, dosageHistories, weeklyAdherence, lowStockMedicines, medicines, schedules] = await Promise.all([
 				getDailySchedule(),
 				getDosageHistories(),
 				getWeeklyAdherence(),
-				getLowStockMedicines(10)
+				getLowStockMedicines(10),
+				getMedicines(),
+				getSchedules()
 			]);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load schedule';
@@ -406,8 +410,25 @@
 		</div>
 	{:else}
 		<div class="card text-center py-12">
-			<p class="text-gray-600 mb-4">No scheduled medicines for today</p>
-			<a href="/schedules" class="btn btn-primary">Add Schedule</a>
+			{#if medicines.length === 0}
+				<!-- No medicines at all -->
+				<p class="text-gray-600 mb-2 text-lg font-semibold">Welcome to Medicate!</p>
+				<p class="text-gray-500 mb-4">Get started by adding your first medicine</p>
+				<a href="/medicines?add=true" class="btn btn-primary">
+					Add Medicine
+				</a>
+			{:else if schedules.length === 0}
+				<!-- Has medicines but no schedules -->
+				<p class="text-gray-600 mb-2 text-lg font-semibold">You have {medicines.length} medicine{medicines.length !== 1 ? 's' : ''}</p>
+				<p class="text-gray-500 mb-4">Create a schedule to get started with reminders</p>
+				<a href="/schedules?add=true" class="btn btn-primary">
+					Add Schedule
+				</a>
+			{:else}
+				<!-- Has both medicines and schedules, but no schedule for today -->
+				<p class="text-gray-600 mb-4">No scheduled medicines for today</p>
+				<a href="/schedules?add=true" class="btn btn-primary">Add Schedule</a>
+			{/if}
 		</div>
 	{/if}
 

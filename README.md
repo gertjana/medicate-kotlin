@@ -68,4 +68,3 @@ The application can be configured via `src/main/resources/application.conf` or e
 ## License
 
 MIT
-

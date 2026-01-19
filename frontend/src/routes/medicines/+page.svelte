@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/user';
 	import {
 		getMedicines,
@@ -65,6 +66,15 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	// Check for 'add' query parameter and auto-open form
+	$: if (browser && $page.url.searchParams.get('add') === 'true' && !loading) {
+		startCreate();
+		// Clean up URL without reloading page
+		const url = new URL(window.location.href);
+		url.searchParams.delete('add');
+		window.history.replaceState({}, '', url);
 	}
 
 	function startCreate() {

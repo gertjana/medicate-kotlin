@@ -23,10 +23,11 @@
 ### Features
 10. **[EMAIL_SERVICE_IMPLEMENTATION.md](EMAIL_SERVICE_IMPLEMENTATION.md)** - Email service integration
 11. **[USER_PROFILE_FEATURE.md](USER_PROFILE_FEATURE.md)** - User profile with firstName, lastName, and email editing
+12. **[SMART_DASHBOARD_EMPTY_STATES.md](SMART_DASHBOARD_EMPTY_STATES.md)** - Intelligent empty states on dashboard
 
 ### Troubleshooting
-12. **[CONTENT_TYPE_FIX.md](CONTENT_TYPE_FIX.md)** - Fixed 415 error on POST/PUT requests
-13. **[PROFILE_AUTH_FIX.md](PROFILE_AUTH_FIX.md)** - Fixed profile page logout issue
+13. **[CONTENT_TYPE_FIX.md](CONTENT_TYPE_FIX.md)** - Fixed 415 error on POST/PUT requests
+14. **[PROFILE_AUTH_FIX.md](PROFILE_AUTH_FIX.md)** - Fixed profile page logout issue
 
 ---
 

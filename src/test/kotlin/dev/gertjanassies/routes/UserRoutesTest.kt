@@ -502,7 +502,7 @@ class UserRoutesTest : FunSpec({
                 lastName = "User",
                 passwordHash = "hashedpassword"
             )
-            
+
             coEvery { mockRedisService.getUser(username) } returns user.right()
 
             testApplication {
@@ -519,7 +519,7 @@ class UserRoutesTest : FunSpec({
 
                 val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
-                
+
                 val response = client.get("/user/profile") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                 }
@@ -537,8 +537,8 @@ class UserRoutesTest : FunSpec({
 
         test("should return 404 when user not found") {
             val username = "nonexistent"
-            
-            coEvery { mockRedisService.getUser(username) } returns 
+
+            coEvery { mockRedisService.getUser(username) } returns
                 RedisError.NotFound("User not found").left()
 
             testApplication {
@@ -555,7 +555,7 @@ class UserRoutesTest : FunSpec({
 
                 val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
-                
+
                 val response = client.get("/user/profile") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                 }
@@ -567,8 +567,8 @@ class UserRoutesTest : FunSpec({
 
         test("should return 500 on Redis error") {
             val username = "testuser"
-            
-            coEvery { mockRedisService.getUser(username) } returns 
+
+            coEvery { mockRedisService.getUser(username) } returns
                 RedisError.OperationError("Redis connection failed").left()
 
             testApplication {
@@ -585,7 +585,7 @@ class UserRoutesTest : FunSpec({
 
                 val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
-                
+
                 val response = client.get("/user/profile") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                 }
@@ -611,9 +611,9 @@ class UserRoutesTest : FunSpec({
                 lastName = updateRequest.lastName,
                 passwordHash = "hashedpassword"
             )
-            
-            coEvery { 
-                mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) 
+
+            coEvery {
+                mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName)
             } returns updatedUser.right()
 
             testApplication {
@@ -630,7 +630,7 @@ class UserRoutesTest : FunSpec({
 
                 val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
-                
+
                 val response = client.put("/user/profile") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                     contentType(ContentType.Application.Json)
@@ -670,7 +670,7 @@ class UserRoutesTest : FunSpec({
 
                 val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
-                
+
                 val response = client.put("/user/profile") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                     contentType(ContentType.Application.Json)
@@ -704,7 +704,7 @@ class UserRoutesTest : FunSpec({
 
                 val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
-                
+
                 val response = client.put("/user/profile") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                     contentType(ContentType.Application.Json)
@@ -738,7 +738,7 @@ class UserRoutesTest : FunSpec({
 
                 val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
-                
+
                 val response = client.put("/user/profile") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                     contentType(ContentType.Application.Json)
@@ -757,9 +757,9 @@ class UserRoutesTest : FunSpec({
                 firstName = "Test",
                 lastName = "User"
             )
-            
-            coEvery { 
-                mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) 
+
+            coEvery {
+                mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName)
             } returns RedisError.NotFound("User not found").left()
 
             testApplication {
@@ -776,7 +776,7 @@ class UserRoutesTest : FunSpec({
 
                 val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
-                
+
                 val response = client.put("/user/profile") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                     contentType(ContentType.Application.Json)
@@ -795,9 +795,9 @@ class UserRoutesTest : FunSpec({
                 firstName = "Test",
                 lastName = "User"
             )
-            
-            coEvery { 
-                mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) 
+
+            coEvery {
+                mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName)
             } returns RedisError.OperationError("Redis connection failed").left()
 
             testApplication {
@@ -814,7 +814,7 @@ class UserRoutesTest : FunSpec({
 
                 val token = TestJwtConfig.generateToken(username)
                 val client = createClient { install(ClientContentNegotiation) { json() } }
-                
+
                 val response = client.put("/user/profile") {
                     header(HttpHeaders.Authorization, "Bearer $token")
                     contentType(ContentType.Application.Json)
