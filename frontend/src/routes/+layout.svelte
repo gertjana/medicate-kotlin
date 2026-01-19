@@ -208,7 +208,14 @@
 												<span>{$userStore.username}</span>
 											</button>
 											{#if showProfile}
-												<div on:click|stopPropagation class="absolute bg-white border border-gray-200 shadow-lg rounded p-3 z-50 flex flex-col gap-2" style={profileInlineStyle}>
+												<div
+													on:click|stopPropagation
+													on:keydown={(e) => e.key === 'Escape' && (showProfile = false)}
+													role="menu"
+													tabindex="-1"
+													class="absolute bg-white border border-gray-200 shadow-lg rounded p-3 z-50 flex flex-col gap-2"
+													style={profileInlineStyle}
+												>
 													{#if $userStore.firstName || $userStore.lastName}
 														<p class="text-sm text-gray-700 font-semibold border-b border-gray-200 pb-2 mb-1">
 															{$userStore.firstName || ''} {$userStore.lastName || ''}
@@ -266,7 +273,6 @@
 						class="input w-full"
 						placeholder="Enter your username"
 						required
-						autofocus
 					/>
 				</div>
 				<div class="mb-4">
@@ -351,7 +357,6 @@
 						class="input w-full"
 						placeholder="Enter your username"
 						required
-						autofocus
 					/>
 					<p class="text-xs text-gray-600 mt-1">We'll send a password reset link to your email</p>
 				</div>

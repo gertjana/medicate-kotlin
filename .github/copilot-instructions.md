@@ -15,6 +15,7 @@ This is a Kotlin project using Ktor framework with Arrow for functional programm
 - Follow immutable data patterns
 - Use Mocks for testing services
 - **NEVER use emojis in code, commit messages, or documentation - use plain text only**
+- When creating files, always end with a newline
 
 ## Agent guidelines
 - re-use existing terminal instead of opening new ones

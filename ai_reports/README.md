@@ -1,7 +1,7 @@
 # AI Reports - Documentation Index
 
 **Project:** Medicate - Medicine Tracking Application
-**Last Updated:** January 18, 2026
+**Last Updated:** January 19, 2026
 
 ---
 
@@ -30,6 +30,8 @@
 ### Troubleshooting
 14. **[CONTENT_TYPE_FIX.md](CONTENT_TYPE_FIX.md)** - Fixed 415 error on POST/PUT requests
 15. **[PROFILE_AUTH_FIX.md](PROFILE_AUTH_FIX.md)** - Fixed profile page logout issue
+16. **[A11Y_FIXES.md](A11Y_FIXES.md)** - Accessibility fixes for WCAG compliance
+17. **[EMOJI_REMOVAL.md](EMOJI_REMOVAL.md)** - Removed emojis per project guidelines
 
 ---
 
