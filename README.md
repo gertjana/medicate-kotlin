@@ -34,6 +34,7 @@ npm install
 npm run dev
 ```
 
+
 ### 5. Access Application
 Open http://localhost:5173 in your browser
 
@@ -41,11 +42,8 @@ Open http://localhost:5173 in your browser
 
 The application can be configured via `src/main/resources/application.conf` or environment variables:
 
-### Required (Production)
+### Environment variables
 - `JWT_SECRET` - Secret key for signing JWT tokens (generate with `openssl rand -base64 64`)
-
-### Optional
-- `PORT` - Server port (default: 8080)
 - `REDIS_HOST` - Redis host (default: localhost)
 - `REDIS_PORT` - Redis port (default: 6379)
 - `APP_ENV` - Environment name for Redis keys (default: test)
