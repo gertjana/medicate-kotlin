@@ -67,15 +67,19 @@ class EmailServiceTest : FunSpec({
                 )
             }
 
-            val httpClient = HttpClient(mockEngine) {
-                install(ContentNegotiation) {
-                    json(json)
-                }
-            }
-
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            emailService = EmailService(
+                HttpClient(mockEngine) {
+                    install(ContentNegotiation) {
+                        json(json)
+                    }
+                },
+                redisService,
+                testApiKey,
+                testAppUrl
+            )
 
             val user = User(
+                id = java.util.UUID.randomUUID(),
                 username = "testuser",
                 email = "test@example.com",
                 passwordHash = "hash123"
@@ -112,6 +116,7 @@ class EmailServiceTest : FunSpec({
             emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
             val user = User(
+                id = java.util.UUID.randomUUID(),
                 username = "testuser",
                 email = "",
                 passwordHash = "hash123"
@@ -145,6 +150,7 @@ class EmailServiceTest : FunSpec({
             emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
             val user = User(
+                id = java.util.UUID.randomUUID(),
                 username = "testuser",
                 email = "test@example.com",
                 passwordHash = "hash123"
@@ -178,6 +184,7 @@ class EmailServiceTest : FunSpec({
             emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
             val user = User(
+                id = java.util.UUID.randomUUID(),
                 username = "testuser",
                 email = "test@example.com",
                 passwordHash = "hash123"
@@ -209,6 +216,7 @@ class EmailServiceTest : FunSpec({
             emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
             val user = User(
+                id = java.util.UUID.randomUUID(),
                 username = "testuser",
                 email = "invalid-email",
                 passwordHash = "hash123"
@@ -242,6 +250,7 @@ class EmailServiceTest : FunSpec({
             emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
             val user = User(
+                id = java.util.UUID.randomUUID(),
                 username = "testuser",
                 email = "test@example.com",
                 passwordHash = "hash123"
@@ -282,6 +291,7 @@ class EmailServiceTest : FunSpec({
             emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
             val user = User(
+                id = java.util.UUID.randomUUID(),
                 username = "johndoe",
                 email = "john@example.com",
                 passwordHash = "hash123"

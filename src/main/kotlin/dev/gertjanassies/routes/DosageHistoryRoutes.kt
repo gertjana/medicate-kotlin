@@ -1,7 +1,7 @@
 package dev.gertjanassies.routes
 
 import arrow.core.raise.either
-import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.service.StorageService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -25,7 +25,7 @@ private fun ApplicationCall.getUsername(): String? {
 /**
  * Dosage history routes
  */
-fun Route.dosageHistoryRoutes(redisService: RedisService) {
+fun Route.dosageHistoryRoutes(storageService: StorageService) {
     // Get all dosage histories
     get("/history") {
         val username = call.getUsername() ?: run {
@@ -34,7 +34,7 @@ fun Route.dosageHistoryRoutes(redisService: RedisService) {
         }
 
         either {
-            val histories = redisService.getAllDosageHistories(username).bind()
+            val histories = storageService.getAllDosageHistories(username).bind()
             logger.debug("Successfully retrieved ${histories.size} dosage histories for user '$username'")
             call.respond(HttpStatusCode.OK, histories)
         }.onLeft { error ->
@@ -63,7 +63,7 @@ fun Route.dosageHistoryRoutes(redisService: RedisService) {
         }
 
         either {
-            redisService.deleteDosageHistory(username, dosageHistoryId).bind()
+            storageService.deleteDosageHistory(username, dosageHistoryId).bind()
             logger.debug("Successfully deleted dosage history '$id' for user '$username'")
             call.respond(HttpStatusCode.NoContent)
         }.onLeft { error ->

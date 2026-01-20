@@ -33,6 +33,17 @@ class MedicineServiceTest : FunSpec({
     val json = Json { ignoreUnknownKeys = true }
     val environment = "test"
     val testUsername = "testuser"
+    val testUserId = UUID.fromString("00000000-0000-0000-0000-000000000001") // Fixed UUID for consistent testing
+
+    // Helper function to mock getUser() call
+    fun mockGetUser() {
+        val usernameIndexKey = "medicate:$environment:user:username:$testUsername"
+        val userKey = "medicate:$environment:user:id:$testUserId"
+        val userJson = """{"id":"$testUserId","username":"$testUsername","email":"test@example.com","passwordHash":"hash"}"""
+
+        every { mockAsyncCommands.get(usernameIndexKey) } returns createRedisFutureMock(testUserId.toString())
+        every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+    }
 
     beforeEach {
         mockConnection = mockk()
@@ -55,9 +66,10 @@ class MedicineServiceTest : FunSpec({
                 stock = 100.0
             )
             val medicineJson = json.encodeToString(medicine)
-            val key = "$environment:user:$testUsername:medicine:$medicineId"
+            val key = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(medicineJson)
 
             val result = redisService.getMedicine(testUsername, medicineId.toString())
@@ -68,15 +80,16 @@ class MedicineServiceTest : FunSpec({
             result.getOrNull()?.dose shouldBe 500.0
             result.getOrNull()?.stock shouldBe 100.0
 
-            verify(exactly = 1) { mockConnection.async() }
+            verify(atLeast = 1) { mockConnection.async() }
             verify(exactly = 1) { mockAsyncCommands.get(key) }
         }
 
         test("should return NotFound error when medicine doesn't exist") {
             val medicineId = UUID.randomUUID()
-            val key = "$environment:user:$testUsername:medicine:$medicineId"
+            val key = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(null as String?)
 
             val result = redisService.getMedicine(testUsername, medicineId.toString())
@@ -85,16 +98,17 @@ class MedicineServiceTest : FunSpec({
             result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
             result.leftOrNull()?.message shouldBe "Medicine with id $medicineId not found"
 
-            verify(exactly = 1) { mockConnection.async() }
+            verify(atLeast = 1) { mockConnection.async() }
             verify(exactly = 1) { mockAsyncCommands.get(key) }
         }
 
         test("should return SerializationError when medicine JSON is invalid") {
             val medicineId = UUID.randomUUID()
             val invalidJson = """{"invalid": "data"}"""
-            val key = "$environment:user:$testUsername:medicine:$medicineId"
+            val key = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(invalidJson)
 
             val result = redisService.getMedicine(testUsername, medicineId.toString())
@@ -103,15 +117,16 @@ class MedicineServiceTest : FunSpec({
             result.leftOrNull().shouldBeInstanceOf<RedisError.SerializationError>()
             result.leftOrNull()?.message?.contains("Failed to deserialize medicine") shouldBe true
 
-            verify(exactly = 1) { mockConnection.async() }
+            verify(atLeast = 1) { mockConnection.async() }
             verify(exactly = 1) { mockAsyncCommands.get(key) }
         }
 
         test("should handle RedisFuture that throws an exception") {
             val medicineId = UUID.randomUUID()
-            val key = "$environment:user:$testUsername:medicine:$medicineId"
+            val key = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createFailedRedisFutureMock(RuntimeException("Redis connection error"))
 
             val result = redisService.getMedicine(testUsername, medicineId.toString())
@@ -120,16 +135,17 @@ class MedicineServiceTest : FunSpec({
             result.leftOrNull().shouldBeInstanceOf<RedisError.NotFound>()
             result.leftOrNull()?.message shouldBe "Medicine with id $medicineId not found"
 
-            verify(exactly = 1) { mockConnection.async() }
+            verify(atLeast = 1) { mockConnection.async() }
             verify(exactly = 1) { mockAsyncCommands.get(key) }
         }
 
         test("should handle malformed JSON causing deserialization error") {
             val medicineId = UUID.randomUUID()
             val malformedJson = """not valid json at all"""
-            val key = "$environment:user:$testUsername:medicine:$medicineId"
+            val key = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(malformedJson)
 
             val result = redisService.getMedicine(testUsername, medicineId.toString())
@@ -138,7 +154,7 @@ class MedicineServiceTest : FunSpec({
             result.leftOrNull().shouldBeInstanceOf<RedisError.SerializationError>()
             result.leftOrNull()?.message?.contains("Failed to deserialize medicine") shouldBe true
 
-            verify(exactly = 1) { mockConnection.async() }
+            verify(atLeast = 1) { mockConnection.async() }
             verify(exactly = 1) { mockAsyncCommands.get(key) }
         }
 
@@ -152,9 +168,10 @@ class MedicineServiceTest : FunSpec({
                 stock = 50.5
             )
             val medicineJson = json.encodeToString(medicine)
-            val key = "$environment:user:$testUsername:medicine:$medicineId"
+            val key = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(medicineJson)
 
             val result = redisService.getMedicine(testUsername, medicineId.toString())
@@ -178,6 +195,7 @@ class MedicineServiceTest : FunSpec({
             )
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.set(any(), any()) } returns createRedisFutureMock("OK")
 
             val result = redisService.createMedicine(testUsername, medicineRequest)
@@ -201,6 +219,7 @@ class MedicineServiceTest : FunSpec({
             )
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.set(any(), any()) } returns createFailedRedisFutureMock(RuntimeException("Connection lost"))
 
             val result = redisService.createMedicine(testUsername, medicineRequest)
@@ -221,11 +240,12 @@ class MedicineServiceTest : FunSpec({
                 unit = "mg",
                 stock = 150.0
             )
-            val key = "$environment:user:$testUsername:medicine:$medicineId"
+            val key = "medicate:$environment:user:$testUserId:medicine:$medicineId"
             val existingJson = json.encodeToString(updatedMedicine.copy(name = "Aspirin"))
             val updatedJson = json.encodeToString(updatedMedicine)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(existingJson)
             every { mockAsyncCommands.set(key, updatedJson) } returns createRedisFutureMock("OK")
 
@@ -248,9 +268,10 @@ class MedicineServiceTest : FunSpec({
                 unit = "mg",
                 stock = 0.0
             )
-            val key = "$environment:user:$testUsername:medicine:$medicineId"
+            val key = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(null as String?)
 
             val result = redisService.updateMedicine(testUsername, medicineId.toString(), medicine)
@@ -263,9 +284,10 @@ class MedicineServiceTest : FunSpec({
     context("deleteMedicine") {
         test("should successfully delete an existing medicine") {
             val medicineId = UUID.randomUUID()
-            val key = "$environment:user:$testUsername:medicine:$medicineId"
+            val key = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.del(key) } returns createRedisFutureMock(1L)
 
             val result = redisService.deleteMedicine(testUsername, medicineId.toString())
@@ -277,9 +299,10 @@ class MedicineServiceTest : FunSpec({
 
         test("should return NotFound when deleting non-existent medicine") {
             val medicineId = UUID.randomUUID()
-            val key = "$environment:user:$testUsername:medicine:$medicineId"
+            val key = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.del(key) } returns createRedisFutureMock(0L)
 
             val result = redisService.deleteMedicine(testUsername, medicineId.toString())
@@ -290,9 +313,10 @@ class MedicineServiceTest : FunSpec({
 
         test("should return OperationError when delete fails") {
             val medicineId = UUID.randomUUID()
-            val key = "$environment:user:$testUsername:medicine:$medicineId"
+            val key = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.del(key) } returns createFailedRedisFutureMock(RuntimeException("Redis error"))
 
             val result = redisService.deleteMedicine(testUsername, medicineId.toString())
@@ -318,12 +342,13 @@ class MedicineServiceTest : FunSpec({
                 unit = "mg",
                 stock = 50.0
             )
-            val key1 = "$environment:user:$testUsername:medicine:${medicine1.id}"
-            val key2 = "$environment:user:$testUsername:medicine:${medicine2.id}"
+            val key1 = "medicate:$environment:user:$testUserId:medicine:${medicine1.id}"
+            val key2 = "medicate:$environment:user:$testUserId:medicine:${medicine2.id}"
             val json1 = json.encodeToString(medicine1)
             val json2 = json.encodeToString(medicine2)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns listOf(key1, key2)
@@ -361,12 +386,13 @@ class MedicineServiceTest : FunSpec({
                 unit = "mg",
                 stock = 20.0
             )
-            val key1 = "$environment:user:$testUsername:medicine:${medicine1.id}"
-            val key2 = "$environment:user:$testUsername:medicine:${medicine2.id}"
+            val key1 = "medicate:$environment:user:$testUserId:medicine:${medicine1.id}"
+            val key2 = "medicate:$environment:user:$testUserId:medicine:${medicine2.id}"
             val json1 = json.encodeToString(medicine1)
             val json2 = json.encodeToString(medicine2)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor1 = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor1.keys } returns listOf(key1)
@@ -397,6 +423,7 @@ class MedicineServiceTest : FunSpec({
 
         test("should return empty list when no medicines exist") {
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns emptyList()
@@ -417,11 +444,12 @@ class MedicineServiceTest : FunSpec({
                 unit = "mg",
                 stock = 10.0
             )
-            val keyValid = "$environment:user:$testUsername:medicine:${validMedicine.id}"
-            val keyInvalid = "$environment:user:$testUsername:medicine:invalid-key"
+            val keyValid = "medicate:$environment:user:$testUserId:medicine:${validMedicine.id}"
+            val keyInvalid = "medicate:$environment:user:$testUserId:medicine:invalid-key"
             val validJson = json.encodeToString(validMedicine)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns listOf(keyValid, keyInvalid)
@@ -440,6 +468,7 @@ class MedicineServiceTest : FunSpec({
 
         test("should return OperationError when scan fails") {
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createFailedRedisFutureMock(RuntimeException("Scan failed"))
 
             val result = redisService.getAllMedicines(testUsername)

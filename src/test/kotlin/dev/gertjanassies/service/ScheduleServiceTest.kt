@@ -33,6 +33,16 @@ class ScheduleServiceTest : FunSpec({
     val json = Json { ignoreUnknownKeys = true }
     val environment = "test"
     val testUsername = "testuser"
+    val testUserId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+
+    fun mockGetUser() {
+        val usernameIndexKey = "medicate:$environment:user:username:$testUsername"
+        val userKey = "medicate:$environment:user:id:$testUserId"
+        val userJson = """{"id":"$testUserId","username":"$testUsername","email":"test@example.com","passwordHash":"hash"}"""
+
+        every { mockAsyncCommands.get(usernameIndexKey) } returns createRedisFutureMock(testUserId.toString())
+        every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+    }
 
     beforeEach {
         mockConnection = mockk()
@@ -56,9 +66,10 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = emptyList()
             )
             val scheduleJson = json.encodeToString(schedule)
-            val key = "$environment:user:$testUsername:schedule:$scheduleId"
+            val key = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(scheduleJson)
 
             val result = redisService.getSchedule(testUsername, scheduleId.toString())
@@ -73,9 +84,10 @@ class ScheduleServiceTest : FunSpec({
 
         test("should return NotFound when schedule doesn't exist") {
             val scheduleId = UUID.randomUUID()
-            val key = "$environment:user:$testUsername:schedule:$scheduleId"
+            val key = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(null as String?)
 
             val result = redisService.getSchedule(testUsername, scheduleId.toString())
@@ -87,9 +99,10 @@ class ScheduleServiceTest : FunSpec({
         test("should handle invalid schedule JSON") {
             val scheduleId = UUID.randomUUID()
             val invalidJson = """{"invalid": "json"}"""
-            val key = "$environment:user:$testUsername:schedule:$scheduleId"
+            val key = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(invalidJson)
 
             val result = redisService.getSchedule(testUsername, scheduleId.toString())
@@ -110,6 +123,7 @@ class ScheduleServiceTest : FunSpec({
             )
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.set(any(), any()) } returns createRedisFutureMock("OK")
 
             val result = redisService.createSchedule(testUsername, scheduleRequest)
@@ -133,6 +147,7 @@ class ScheduleServiceTest : FunSpec({
             )
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.set(any(), any()) } returns createFailedRedisFutureMock(RuntimeException("Create failed"))
 
             val result = redisService.createSchedule(testUsername, scheduleRequest)
@@ -154,11 +169,12 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = emptyList()
             )
             val updatedSchedule = originalSchedule.copy(time = "09:00", amount = 2.0)
-            val key = "$environment:user:$testUsername:schedule:$scheduleId"
+            val key = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
             val originalJson = json.encodeToString(originalSchedule)
             val updatedJson = json.encodeToString(updatedSchedule)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(originalJson)
             every { mockAsyncCommands.set(key, updatedJson) } returns createRedisFutureMock("OK")
 
@@ -178,9 +194,10 @@ class ScheduleServiceTest : FunSpec({
                 amount = 1.0,
                 daysOfWeek = emptyList()
             )
-            val key = "$environment:user:$testUsername:schedule:$scheduleId"
+            val key = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.get(key) } returns createRedisFutureMock(null as String?)
 
             val result = redisService.updateSchedule(testUsername, scheduleId.toString(), schedule)
@@ -193,9 +210,10 @@ class ScheduleServiceTest : FunSpec({
     context("deleteSchedule") {
         test("should successfully delete an existing schedule") {
             val scheduleId = UUID.randomUUID()
-            val key = "$environment:user:$testUsername:schedule:$scheduleId"
+            val key = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.del(key) } returns createRedisFutureMock(1L)
 
             val result = redisService.deleteSchedule(testUsername, scheduleId.toString())
@@ -207,9 +225,10 @@ class ScheduleServiceTest : FunSpec({
 
         test("should return NotFound when deleting non-existent schedule") {
             val scheduleId = UUID.randomUUID()
-            val key = "$environment:user:$testUsername:schedule:$scheduleId"
+            val key = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
             every { mockAsyncCommands.del(key) } returns createRedisFutureMock(0L)
 
             val result = redisService.deleteSchedule(testUsername, scheduleId.toString())
@@ -236,12 +255,13 @@ class ScheduleServiceTest : FunSpec({
                 amount = 1.0,
                 daysOfWeek = emptyList()
             )
-            val key1 = "$environment:user:$testUsername:schedule:${schedule1.id}"
-            val key2 = "$environment:user:$testUsername:schedule:${schedule2.id}"
+            val key1 = "medicate:$environment:user:$testUserId:schedule:${schedule1.id}"
+            val key2 = "medicate:$environment:user:$testUserId:schedule:${schedule2.id}"
             val json1 = json.encodeToString(schedule1)
             val json2 = json.encodeToString(schedule2)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns listOf(key1, key2)
@@ -264,6 +284,7 @@ class ScheduleServiceTest : FunSpec({
 
         test("should return empty list when no schedules exist") {
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns emptyList()
@@ -284,11 +305,12 @@ class ScheduleServiceTest : FunSpec({
                 amount = 1.0,
                 daysOfWeek = emptyList()
             )
-            val keyValid = "$environment:user:$testUsername:schedule:${validSchedule.id}"
-            val keyInvalid = "$environment:user:$testUsername:schedule:invalid"
+            val keyValid = "medicate:$environment:user:$testUserId:schedule:${validSchedule.id}"
+            val keyInvalid = "medicate:$environment:user:$testUserId:schedule:invalid"
             val validJson = json.encodeToString(validSchedule)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns listOf(keyValid, keyInvalid)
@@ -344,10 +366,10 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(todayDayOfWeek)
             )
 
-            val scheduleKey1 = "$environment:user:$testUsername:schedule:${schedule1.id}"
-            val scheduleKey2 = "$environment:user:$testUsername:schedule:${schedule2.id}"
-            val medicineKey1 = "$environment:user:$testUsername:medicine:$medicineId1"
-            val medicineKey2 = "$environment:user:$testUsername:medicine:$medicineId2"
+            val scheduleKey1 = "medicate:$environment:user:$testUserId:schedule:${schedule1.id}"
+            val scheduleKey2 = "medicate:$environment:user:$testUserId:schedule:${schedule2.id}"
+            val medicineKey1 = "medicate:$environment:user:$testUserId:medicine:$medicineId1"
+            val medicineKey2 = "medicate:$environment:user:$testUserId:medicine:$medicineId2"
 
             val scheduleJson1 = json.encodeToString(schedule1)
             val scheduleJson2 = json.encodeToString(schedule2)
@@ -355,6 +377,7 @@ class ScheduleServiceTest : FunSpec({
             val medicineJson2 = json.encodeToString(medicine2)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             // Mock scan for schedules
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
@@ -414,15 +437,16 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(tomorrowDayOfWeek)
             )
 
-            val scheduleKeyToday = "$environment:user:$testUsername:schedule:${scheduleToday.id}"
-            val scheduleKeyTomorrow = "$environment:user:$testUsername:schedule:${scheduleTomorrow.id}"
-            val medicineKey = "$environment:user:$testUsername:medicine:$medicineId"
+            val scheduleKeyToday = "medicate:$environment:user:$testUserId:schedule:${scheduleToday.id}"
+            val scheduleKeyTomorrow = "medicate:$environment:user:$testUserId:schedule:${scheduleTomorrow.id}"
+            val medicineKey = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             val scheduleTodayJson = json.encodeToString(scheduleToday)
             val scheduleTomorrowJson = json.encodeToString(scheduleTomorrow)
             val medicineJson = json.encodeToString(medicine)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns listOf(scheduleKeyToday, scheduleKeyTomorrow)
@@ -459,13 +483,14 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = emptyList()  // Empty means everyday
             )
 
-            val scheduleKey = "$environment:user:$testUsername:schedule:${schedule.id}"
-            val medicineKey = "$environment:user:$testUsername:medicine:$medicineId"
+            val scheduleKey = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
+            val medicineKey = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             val scheduleJson = json.encodeToString(schedule)
             val medicineJson = json.encodeToString(medicine)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns listOf(scheduleKey)
@@ -520,10 +545,10 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(todayDayOfWeek)
             )
 
-            val scheduleKey1 = "$environment:user:$testUsername:schedule:${schedule1.id}"
-            val scheduleKey2 = "$environment:user:$testUsername:schedule:${schedule2.id}"
-            val medicineKey1 = "$environment:user:$testUsername:medicine:$medicineId1"
-            val medicineKey2 = "$environment:user:$testUsername:medicine:$medicineId2"
+            val scheduleKey1 = "medicate:$environment:user:$testUserId:schedule:${schedule1.id}"
+            val scheduleKey2 = "medicate:$environment:user:$testUserId:schedule:${schedule2.id}"
+            val medicineKey1 = "medicate:$environment:user:$testUserId:medicine:$medicineId1"
+            val medicineKey2 = "medicate:$environment:user:$testUserId:medicine:$medicineId2"
 
             val scheduleJson1 = json.encodeToString(schedule1)
             val scheduleJson2 = json.encodeToString(schedule2)
@@ -531,6 +556,7 @@ class ScheduleServiceTest : FunSpec({
             val medicineJson2 = json.encodeToString(medicine2)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns listOf(scheduleKey1, scheduleKey2)
@@ -581,16 +607,17 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(todayDayOfWeek)
             )
 
-            val scheduleKey1 = "$environment:user:$testUsername:schedule:${schedule1.id}"
-            val scheduleKey2 = "$environment:user:$testUsername:schedule:${schedule2.id}"
-            val medicineKey1 = "$environment:user:$testUsername:medicine:$medicineId1"
-            val medicineKey2 = "$environment:user:$testUsername:medicine:$medicineId2"
+            val scheduleKey1 = "medicate:$environment:user:$testUserId:schedule:${schedule1.id}"
+            val scheduleKey2 = "medicate:$environment:user:$testUserId:schedule:${schedule2.id}"
+            val medicineKey1 = "medicate:$environment:user:$testUserId:medicine:$medicineId1"
+            val medicineKey2 = "medicate:$environment:user:$testUserId:medicine:$medicineId2"
 
             val scheduleJson1 = json.encodeToString(schedule1)
             val scheduleJson2 = json.encodeToString(schedule2)
             val medicineJson1 = json.encodeToString(medicine1)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns listOf(scheduleKey1, scheduleKey2)
@@ -625,10 +652,11 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(tomorrowDayOfWeek)  // Only tomorrow
             )
 
-            val scheduleKey = "$environment:user:$testUsername:schedule:${schedule.id}"
+            val scheduleKey = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
             val scheduleJson = json.encodeToString(schedule)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns listOf(scheduleKey)
@@ -679,10 +707,10 @@ class ScheduleServiceTest : FunSpec({
                 daysOfWeek = listOf(todayDayOfWeek)
             )
 
-            val scheduleKey1 = "$environment:user:$testUsername:schedule:${schedule1.id}"
-            val scheduleKey2 = "$environment:user:$testUsername:schedule:${schedule2.id}"
-            val scheduleKey3 = "$environment:user:$testUsername:schedule:${schedule3.id}"
-            val medicineKey = "$environment:user:$testUsername:medicine:$medicineId"
+            val scheduleKey1 = "medicate:$environment:user:$testUserId:schedule:${schedule1.id}"
+            val scheduleKey2 = "medicate:$environment:user:$testUserId:schedule:${schedule2.id}"
+            val scheduleKey3 = "medicate:$environment:user:$testUserId:schedule:${schedule3.id}"
+            val medicineKey = "medicate:$environment:user:$testUserId:medicine:$medicineId"
 
             val scheduleJson1 = json.encodeToString(schedule1)
             val scheduleJson2 = json.encodeToString(schedule2)
@@ -690,6 +718,7 @@ class ScheduleServiceTest : FunSpec({
             val medicineJson = json.encodeToString(medicine)
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { mockScanCursor.keys } returns listOf(scheduleKey1, scheduleKey2, scheduleKey3)

@@ -7,7 +7,7 @@ import dev.gertjanassies.service.EmailError
 import dev.gertjanassies.service.EmailService
 import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisError
-import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.service.StorageService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("AuthRoutes")
 
-fun Route.authRoutes(redisService: RedisService, emailService: EmailService, jwtService: JwtService) {
+fun Route.authRoutes(storageService: StorageService, emailService: EmailService, jwtService: JwtService) {
     route("/auth") {
         /**
          * POST /api/auth/refresh
@@ -84,7 +84,7 @@ fun Route.authRoutes(redisService: RedisService, emailService: EmailService, jwt
             }
 
             // Get user by username
-            val userResult = redisService.getUser(request.username)
+            val userResult = storageService.getUser(request.username)
             val userError = userResult.leftOrNull()
             if (userError != null) {
                 logger.error("Failed to get user for password reset (username: '${request.username}'): ${userError.message}")
@@ -137,7 +137,7 @@ fun Route.authRoutes(redisService: RedisService, emailService: EmailService, jwt
                 return@post
             }
 
-            val result = redisService.verifyPasswordResetToken(request.token)
+            val result = storageService.verifyPasswordResetToken(request.token)
             val error = result.leftOrNull()
             if (error != null) {
                 logger.error("Failed to verify password reset token: ${error.message}")
@@ -179,7 +179,7 @@ fun Route.authRoutes(redisService: RedisService, emailService: EmailService, jwt
                 return@put
             }
 
-            val result = redisService.updatePassword(request.username, request.password)
+            val result = storageService.updatePassword(request.username, request.password)
 
             result.fold(
                 { error ->

@@ -16,6 +16,7 @@ import dev.gertjanassies.routes.userRoutes
 import dev.gertjanassies.service.EmailService
 import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.service.StorageService
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -84,10 +85,10 @@ fun Application.module() {
     val appEnvironment = environment.config.propertyOrNull("app.environment")?.getString()
         ?: System.getenv("APP_ENV") ?: "test"
 
-    val redisService = RedisService(redisHost, redisPort, appEnvironment)
+    val redisService: StorageService = RedisService(redisHost, redisPort, appEnvironment)
 
     // Attempt to connect to Redis (using functional error handling)
-    redisService.connect().fold(
+    (redisService as RedisService).connect().fold(
         ifLeft = { error ->
             this@module.log.warn("Failed to connect to Redis: $error. Continuing without Redis.")
         },
@@ -189,6 +190,6 @@ fun Application.module() {
 
     // Cleanup on shutdown
     environment.monitor.subscribe(ApplicationStopping) {
-        redisService.close()
+        (redisService as? RedisService)?.close()
     }
 }

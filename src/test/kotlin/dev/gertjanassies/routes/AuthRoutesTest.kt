@@ -44,7 +44,7 @@ class AuthRoutesTest : FunSpec({
             val username = "testuser"
             val email = "testuser@example.com"
             val request = PasswordResetRequest(username)
-            val user = User(username, email = email, passwordHash = "hashedpassword")
+            val user = User(id = java.util.UUID.randomUUID(), username = username, email = email, passwordHash = "hashedpassword")
             val emailId = "email-id-123"
 
             coEvery { mockRedisService.getUser(username) } returns user.right()
@@ -160,7 +160,7 @@ class AuthRoutesTest : FunSpec({
             val username = "testuser"
             val email = "invalid-email"
             val request = PasswordResetRequest(username)
-            val user = User(username, email = email, passwordHash = "hashedpassword")
+            val user = User(id = java.util.UUID.randomUUID(), username = username, email = email, passwordHash = "hashedpassword")
 
             coEvery { mockRedisService.getUser(username) } returns user.right()
             coEvery { mockEmailService.resetPassword(user) } returns EmailError.InvalidEmail(email).left()
@@ -191,7 +191,7 @@ class AuthRoutesTest : FunSpec({
             val username = "testuser"
             val email = "testuser@example.com"
             val request = PasswordResetRequest(username)
-            val user = User(username, email = email, passwordHash = "hashedpassword")
+            val user = User(id = java.util.UUID.randomUUID(), username = username, email = email, passwordHash = "hashedpassword")
 
             coEvery { mockRedisService.getUser(username) } returns user.right()
             coEvery { mockEmailService.resetPassword(user) } returns EmailError.SendFailed("SMTP error").left()
@@ -222,7 +222,7 @@ class AuthRoutesTest : FunSpec({
             val username = "testuser"
             val email = "testuser@example.com"
             val request = PasswordResetRequest(username)
-            val user = User(username, email = email, passwordHash = "hashedpassword")
+            val user = User(id = java.util.UUID.randomUUID(), username = username, email = email, passwordHash = "hashedpassword")
 
             coEvery { mockRedisService.getUser(username) } returns user.right()
             coEvery { mockEmailService.resetPassword(user) } returns EmailError.TokenGenerationFailed("Random generator failed").left()
