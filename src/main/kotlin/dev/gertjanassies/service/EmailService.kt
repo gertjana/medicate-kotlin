@@ -139,10 +139,19 @@ class EmailService(
                         display: inline-block;
                         padding: 12px 24px;
                         background-color: #4682b4;
-                        color: white;
+                        color: white !important;
                         text-decoration: none;
                         border-radius: 4px;
                         margin: 20px 0;
+                        font-weight: bold;
+                    }
+                    .button:visited {
+                        color: white !important;
+                        text-decoration: none;
+                    }
+                    .button:hover {
+                        color: white !important;
+                        text-decoration: none;
                     }
                     .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
                 </style>
