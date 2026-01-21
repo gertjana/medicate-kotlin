@@ -11,7 +11,16 @@
 	let loading = true;
 	let saving = false;
 	let error = '';
-	let successMessage = '';
+	let toastMessage = '';
+	let showToast = false;
+
+	function showToastNotification(message: string) {
+		toastMessage = message;
+		showToast = true;
+		setTimeout(() => {
+			showToast = false;
+		}, 3000);
+	}
 
 	onMount(async () => {
 		if (!$userStore) {
@@ -33,7 +42,6 @@
 
 	async function handleSubmit() {
 		error = '';
-		successMessage = '';
 
 		if (!email.trim()) {
 			error = 'Email is required';
@@ -64,10 +72,11 @@
 			user = updatedUser;
 			// Update user store
 			userStore.set(updatedUser);
-			successMessage = 'Profile updated successfully!';
+			showToastNotification('Profile updated successfully!');
+			// Redirect to main page after a short delay
 			setTimeout(() => {
-				successMessage = '';
-			}, 3000);
+				goto('/');
+			}, 1500);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to update profile';
 		} finally {
@@ -157,13 +166,6 @@
 					</div>
 				{/if}
 
-				<!-- Success Message -->
-				{#if successMessage}
-					<div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-						<p class="text-green-800 text-sm">{successMessage}</p>
-					</div>
-				{/if}
-
 				<!-- Submit Button -->
 				<div class="flex gap-2">
 					<button
@@ -185,3 +187,9 @@
 		</div>
 	{/if}
 </div>
+
+{#if showToast}
+	<div class="fixed top-4 right-4 bg-[steelblue] text-white px-6 py-3 rounded-tr-lg rounded-bl-lg shadow-lg transition-opacity z-50">
+		{toastMessage}
+	</div>
+{/if}
