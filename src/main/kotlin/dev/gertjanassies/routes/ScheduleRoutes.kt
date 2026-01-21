@@ -3,7 +3,7 @@ package dev.gertjanassies.routes
 import arrow.core.raise.either
 import dev.gertjanassies.model.Schedule
 import dev.gertjanassies.model.request.ScheduleRequest
-import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.service.StorageService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -26,7 +26,7 @@ private fun ApplicationCall.getUsername(): String? {
 /**
  * Schedule routes
  */
-fun Route.scheduleRoutes(redisService: RedisService) {
+fun Route.scheduleRoutes(storageService: StorageService) {
     // Get all schedules
     get("/schedule") {
         val username = call.getUsername() ?: run {
@@ -35,7 +35,7 @@ fun Route.scheduleRoutes(redisService: RedisService) {
         }
 
         either {
-            val schedules = redisService.getAllSchedules(username).bind()
+            val schedules = storageService.getAllSchedules(username).bind()
             logger.debug("Successfully retrieved ${schedules.size} schedules for user '$username'")
             call.respond(HttpStatusCode.OK, schedules)
         }.onLeft { error ->
@@ -57,7 +57,7 @@ fun Route.scheduleRoutes(redisService: RedisService) {
         }
 
         either {
-            val schedule = redisService.getSchedule(username, id).bind()
+            val schedule = storageService.getSchedule(username, id).bind()
             logger.debug("Successfully retrieved schedule '$id' for user '$username'")
             call.respond(HttpStatusCode.OK, schedule)
         }.onLeft { error ->
@@ -81,7 +81,7 @@ fun Route.scheduleRoutes(redisService: RedisService) {
         val request = call.receive<ScheduleRequest>()
 
         either {
-            val created = redisService.createSchedule(username, request).bind()
+            val created = storageService.createSchedule(username, request).bind()
             logger.debug("Successfully created schedule '${created.id}' for medicine '${created.medicineId}' for user '$username'")
             call.respond(HttpStatusCode.Created, created)
         }.onLeft { error ->
@@ -105,7 +105,7 @@ fun Route.scheduleRoutes(redisService: RedisService) {
         val schedule = call.receive<Schedule>()
 
         either {
-            val updated = redisService.updateSchedule(username, id, schedule).bind()
+            val updated = storageService.updateSchedule(username, id, schedule).bind()
             logger.debug("Successfully updated schedule '$id' for user '$username'")
             call.respond(HttpStatusCode.OK, updated)
         }.onLeft { error ->
@@ -132,7 +132,7 @@ fun Route.scheduleRoutes(redisService: RedisService) {
         }
 
         either {
-            redisService.deleteSchedule(username, id).bind()
+            storageService.deleteSchedule(username, id).bind()
             logger.debug("Successfully deleted schedule '$id' for user '$username'")
             call.respond(HttpStatusCode.NoContent)
         }.onLeft { error ->

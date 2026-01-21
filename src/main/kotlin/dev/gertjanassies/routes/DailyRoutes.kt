@@ -1,7 +1,7 @@
 package dev.gertjanassies.routes
 
 import arrow.core.raise.either
-import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.service.StorageService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -23,7 +23,7 @@ private fun ApplicationCall.getUsername(): String? {
 /**
  * Daily schedule routes
  */
-fun Route.dailyRoutes(redisService: RedisService) {
+fun Route.dailyRoutes(storageService: StorageService) {
     // Get daily schedule
     get("/daily") {
         val username = call.getUsername() ?: run {
@@ -32,7 +32,7 @@ fun Route.dailyRoutes(redisService: RedisService) {
         }
 
         either {
-            val dailySchedule = redisService.getDailySchedule(username).bind()
+            val dailySchedule = storageService.getDailySchedule(username).bind()
 
             logger.debug("Successfully retrieved daily schedule for user '$username' with ${dailySchedule.schedule.size} time slots")
             call.respond(HttpStatusCode.OK, dailySchedule)

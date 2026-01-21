@@ -4,7 +4,7 @@ import dev.gertjanassies.model.request.UserRequest
 import dev.gertjanassies.model.response.AuthResponse
 import dev.gertjanassies.model.response.toResponse
 import dev.gertjanassies.service.JwtService
-import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.service.StorageService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.jwt.JWTPrincipal
@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("UserRoutes")
 
-fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
+fun Route.userRoutes(storageService: StorageService, jwtService: JwtService) {
     route("/user") {
         /**
          * POST /api/user/register
@@ -45,7 +45,7 @@ fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
                 return@post
             }
 
-            val result = redisService.registerUser(request.username, request.email, request.password)
+            val result = storageService.registerUser(request.username, request.email, request.password)
 
             val left = result.leftOrNull()
             if (left != null) {
@@ -97,7 +97,7 @@ fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
                 return@post
             }
 
-            val loginResult = redisService.loginUser(request.username, request.password)
+            val loginResult = storageService.loginUser(request.username, request.password)
 
             val leftLogin = loginResult.leftOrNull()
             if (leftLogin != null) {
@@ -154,7 +154,7 @@ fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
                 return@put
             }
 
-            val result = redisService.updatePassword(request.username, request.password)
+            val result = storageService.updatePassword(request.username, request.password)
 
             result.fold(
                 { error ->
@@ -178,7 +178,7 @@ fun Route.userRoutes(redisService: RedisService, jwtService: JwtService) {
 /**
  * Protected user routes (require JWT authentication)
  */
-fun Route.protectedUserRoutes(redisService: RedisService) {
+fun Route.protectedUserRoutes(storageService: StorageService) {
     route("/user") {
         /**
          * GET /api/user/profile
@@ -190,7 +190,7 @@ fun Route.protectedUserRoutes(redisService: RedisService) {
                 return@get
             }
 
-            val result = redisService.getUser(username)
+            val result = storageService.getUser(username)
 
             result.fold(
                 { error ->
@@ -236,7 +236,7 @@ fun Route.protectedUserRoutes(redisService: RedisService) {
                 return@put
             }
 
-            val result = redisService.updateProfile(username, request.email, request.firstName, request.lastName)
+            val result = storageService.updateProfile(username, request.email, request.firstName, request.lastName)
 
             result.fold(
                 { error ->

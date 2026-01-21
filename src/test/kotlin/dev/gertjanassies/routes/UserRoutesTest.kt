@@ -51,7 +51,7 @@ class UserRoutesTest : FunSpec({
             val email = "testuser@example.com"
             val password = "password123"
             val request = UserRequest(username, email, password)
-            val user = User(username, email = email, passwordHash = "hashedpassword")
+            val user = User(id = java.util.UUID.randomUUID(), username = username, email = email, passwordHash = "hashedpassword")
             coEvery { mockRedisService.registerUser(username, email, password) } returns user.right()
 
             testApplication {
@@ -184,7 +184,7 @@ class UserRoutesTest : FunSpec({
             val username = "testuser"
             val password = "password123"
             val request = UserRequest(username, "", password)
-            val user = User(username, email = "", passwordHash = "hashedpassword")
+            val user = User(id = java.util.UUID.randomUUID(), username = username, email = "", passwordHash = "hashedpassword")
             coEvery { mockRedisService.loginUser(username, password) } returns user.right()
 
             testApplication {
@@ -436,7 +436,7 @@ class UserRoutesTest : FunSpec({
     context("Authentication Requirements") {
         test("POST /user/register should NOT require authentication (public endpoint)") {
             val request = UserRequest("testuser", "test@example.com", "password123")
-            val user = dev.gertjanassies.model.User("testuser", email = "test@example.com", passwordHash = "hashedpassword")
+            val user = User(id = java.util.UUID.randomUUID(), username = "testuser", email = "test@example.com", passwordHash = "hashedpassword")
             coEvery { mockRedisService.registerUser(any(), any(), any()) } returns user.right()
 
             testApplication {
@@ -461,7 +461,7 @@ class UserRoutesTest : FunSpec({
 
         test("POST /user/login should NOT require authentication (public endpoint)") {
             val request = UserRequest("testuser", "", "password123")
-            val user = dev.gertjanassies.model.User("testuser", email = "", passwordHash = "hashedpassword")
+            val user = User(id = java.util.UUID.randomUUID(), username = "testuser", email = "", passwordHash = "hashedpassword")
             coEvery { mockRedisService.loginUser(any(), any()) } returns user.right()
 
             testApplication {
@@ -513,6 +513,7 @@ class UserRoutesTest : FunSpec({
         test("should retrieve user profile successfully with valid JWT") {
             val username = "testuser"
             val user = User(
+                id = java.util.UUID.randomUUID(),
                 username = username,
                 email = "test@example.com",
                 firstName = "Test",
@@ -622,6 +623,7 @@ class UserRoutesTest : FunSpec({
                 lastName = "Name"
             )
             val updatedUser = User(
+                id = java.util.UUID.randomUUID(),
                 username = username,
                 email = updateRequest.email,
                 firstName = updateRequest.firstName,

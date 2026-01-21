@@ -1,7 +1,7 @@
 package dev.gertjanassies.routes
 
 import arrow.core.raise.either
-import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.service.StorageService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -23,7 +23,7 @@ private fun ApplicationCall.getUsername(): String? {
 /**
  * Adherence and analytics routes
  */
-fun Route.adherenceRoutes(redisService: RedisService) {
+fun Route.adherenceRoutes(storageService: StorageService) {
     // Get weekly adherence
     get("/adherence") {
         val username = call.getUsername() ?: run {
@@ -32,7 +32,7 @@ fun Route.adherenceRoutes(redisService: RedisService) {
         }
 
         either {
-            val weeklyAdherence = redisService.getWeeklyAdherence(username).bind()
+            val weeklyAdherence = storageService.getWeeklyAdherence(username).bind()
             logger.debug("Successfully retrieved weekly adherence for user '$username'")
             call.respond(HttpStatusCode.OK, weeklyAdherence)
         }.onLeft { error ->
@@ -71,7 +71,7 @@ fun Route.adherenceRoutes(redisService: RedisService) {
             parsed
         }
         either {
-            val lowStockMedicines = redisService.getLowStockMedicines(username, threshold).bind()
+            val lowStockMedicines = storageService.getLowStockMedicines(username, threshold).bind()
             logger.debug("Successfully retrieved ${lowStockMedicines.size} low stock medicines for user '$username' (threshold: $threshold)")
             call.respond(HttpStatusCode.OK, lowStockMedicines)
         }.onLeft { error ->

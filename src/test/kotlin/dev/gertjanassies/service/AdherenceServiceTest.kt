@@ -1,6 +1,7 @@
 package dev.gertjanassies.service
 
 import dev.gertjanassies.model.*
+import dev.gertjanassies.util.createRedisFutureMock
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -31,6 +32,16 @@ class AdherenceServiceTest : FunSpec({
     val json = Json { ignoreUnknownKeys = true }
     val environment = "test"
     val testUsername = "testuser"
+    val testUserId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+
+    fun mockGetUser() {
+        val usernameIndexKey = "medicate:$environment:user:username:$testUsername"
+        val userKey = "medicate:$environment:user:id:$testUserId"
+        val userJson = """{"id":"$testUserId","username":"$testUsername","email":"test@example.com","passwordHash":"hash"}"""
+
+        every { mockAsyncCommands.get(usernameIndexKey) } returns createRedisFutureMock(testUserId.toString())
+        every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+    }
 
     beforeEach {
         mockConnection = mockk()
@@ -109,16 +120,17 @@ class AdherenceServiceTest : FunSpec({
             }
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             // Mock schedule scan
             val scheduleScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
-            val scheduleKey = "$environment:user:$testUsername:schedule:${schedule.id}"
+            val scheduleKey = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
             every { scheduleScanCursor.keys } returns listOf(scheduleKey)
             every { scheduleScanCursor.isFinished } returns true
 
             // Mock dosage history scan
             val dosageScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
-            val dosageKeys = dosageHistories.map { "$environment:user:$testUsername:dosagehistory:${it.id}" }
+            val dosageKeys = dosageHistories.map { "medicate:$environment:user:$testUserId:dosagehistory:${it.id}" }
             every { dosageScanCursor.keys } returns dosageKeys
             every { dosageScanCursor.isFinished } returns true
 
@@ -176,15 +188,16 @@ class AdherenceServiceTest : FunSpec({
             )
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val scheduleScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
-            val scheduleKey1 = "$environment:user:$testUsername:schedule:${schedule1.id}"
-            val scheduleKey2 = "$environment:user:$testUsername:schedule:${schedule2.id}"
+            val scheduleKey1 = "medicate:$environment:user:$testUserId:schedule:${schedule1.id}"
+            val scheduleKey2 = "medicate:$environment:user:$testUserId:schedule:${schedule2.id}"
             every { scheduleScanCursor.keys } returns listOf(scheduleKey1, scheduleKey2)
             every { scheduleScanCursor.isFinished } returns true
 
             val dosageScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
-            val dosageKey = "$environment:user:$testUsername:dosagehistory:${dosageHistory.id}"
+            val dosageKey = "medicate:$environment:user:$testUserId:dosagehistory:${dosageHistory.id}"
             every { dosageScanCursor.keys } returns listOf(dosageKey)
             every { dosageScanCursor.isFinished } returns true
 
@@ -221,9 +234,10 @@ class AdherenceServiceTest : FunSpec({
             )
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val scheduleScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
-            val scheduleKey = "$environment:user:$testUsername:schedule:${schedule.id}"
+            val scheduleKey = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
             every { scheduleScanCursor.keys } returns listOf(scheduleKey)
             every { scheduleScanCursor.isFinished } returns true
 
@@ -266,9 +280,10 @@ class AdherenceServiceTest : FunSpec({
             )
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val scheduleScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
-            val scheduleKey = "$environment:user:$testUsername:schedule:${schedule.id}"
+            val scheduleKey = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
             every { scheduleScanCursor.keys } returns listOf(scheduleKey)
             every { scheduleScanCursor.isFinished } returns true
 
@@ -323,9 +338,10 @@ class AdherenceServiceTest : FunSpec({
             )
 
             val medicines = listOf(lowStockMedicine1, lowStockMedicine2, normalStockMedicine)
-            val keys = medicines.map { "$environment:medicine:${it.id}" }
+            val keys = medicines.map { "medicate:$environment:medicine:${it.id}" }
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val scanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { scanCursor.keys } returns keys
@@ -362,9 +378,10 @@ class AdherenceServiceTest : FunSpec({
             )
 
             val medicines = listOf(medicine1, medicine2)
-            val keys = medicines.map { "$environment:medicine:${it.id}" }
+            val keys = medicines.map { "medicate:$environment:medicine:${it.id}" }
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val scanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { scanCursor.keys } returns keys
@@ -393,9 +410,10 @@ class AdherenceServiceTest : FunSpec({
                 stock = 100.0
             )
 
-            val key = "$environment:medicine:${medicine.id}"
+            val key = "medicate:$environment:medicine:${medicine.id}"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val scanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { scanCursor.keys } returns listOf(key)
@@ -419,9 +437,10 @@ class AdherenceServiceTest : FunSpec({
                 stock = 0.0
             )
 
-            val key = "$environment:medicine:${outOfStock.id}"
+            val key = "medicate:$environment:medicine:${outOfStock.id}"
 
             every { mockConnection.async() } returns mockAsyncCommands
+            mockGetUser()
 
             val scanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { scanCursor.keys } returns listOf(key)
@@ -456,8 +475,9 @@ class AdherenceServiceTest : FunSpec({
                 daysOfWeek = emptyList() // every day
             )
             every { mockConnection.async() } returns mockAsyncCommands
-            val medKey = "$environment:user:$testUsername:medicine:${medicine.id}"
-            val schedKey = "$environment:user:$testUsername:schedule:${schedule.id}"
+            mockGetUser()
+            val medKey = "medicate:$environment:user:$testUserId:medicine:${medicine.id}"
+            val schedKey = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
             val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { medScanCursor.keys } returns listOf(medKey)
             every { medScanCursor.isFinished } returns true
@@ -483,7 +503,8 @@ class AdherenceServiceTest : FunSpec({
                 stock = 20.0
             )
             every { mockConnection.async() } returns mockAsyncCommands
-            val medKey = "$environment:user:$testUsername:medicine:${medicine.id}"
+            mockGetUser()
+            val medKey = "medicate:$environment:user:$testUserId:medicine:${medicine.id}"
             val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { medScanCursor.keys } returns listOf(medKey)
             every { medScanCursor.isFinished } returns true
@@ -514,8 +535,9 @@ class AdherenceServiceTest : FunSpec({
                 daysOfWeek = listOf(DayOfWeek.MONDAY) // once per week
             )
             every { mockConnection.async() } returns mockAsyncCommands
-            val medKey = "$environment:user:$testUsername:medicine:${medicine.id}"
-            val schedKey = "$environment:user:$testUsername:schedule:${schedule.id}"
+            mockGetUser()
+            val medKey = "medicate:$environment:user:$testUserId:medicine:${medicine.id}"
+            val schedKey = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
             val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { medScanCursor.keys } returns listOf(medKey)
             every { medScanCursor.isFinished } returns true
@@ -541,7 +563,8 @@ class AdherenceServiceTest : FunSpec({
                 stock = 0.0
             )
             every { mockConnection.async() } returns mockAsyncCommands
-            val medKey = "$environment:user:$testUsername:medicine:${medicine.id}"
+            mockGetUser()
+            val medKey = "medicate:$environment:user:$testUserId:medicine:${medicine.id}"
             val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { medScanCursor.keys } returns listOf(medKey)
             every { medScanCursor.isFinished } returns true

@@ -5,7 +5,7 @@ import dev.gertjanassies.model.Medicine
 import dev.gertjanassies.model.request.AddStockRequest
 import dev.gertjanassies.model.request.DosageHistoryRequest
 import dev.gertjanassies.model.request.MedicineRequest
-import dev.gertjanassies.service.RedisService
+import dev.gertjanassies.service.StorageService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -29,7 +29,7 @@ private fun ApplicationCall.getUsername(): String? {
 /**
  * Medicine routes
  */
-fun Route.medicineRoutes(redisService: RedisService) {
+fun Route.medicineRoutes(storageService: StorageService) {
     // Get all medicines
     get("/medicine") {
         val username = call.getUsername() ?: run {
@@ -38,7 +38,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
         }
 
         either {
-            val medicines = redisService.getAllMedicines(username).bind()
+            val medicines = storageService.getAllMedicines(username).bind()
             logger.debug("Successfully retrieved ${medicines.size} medicines for user '$username'")
             call.respond(HttpStatusCode.OK, medicines)
         }.onLeft { error ->
@@ -60,7 +60,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
         }
 
         either {
-            val medicine = redisService.getMedicine(username, id).bind()
+            val medicine = storageService.getMedicine(username, id).bind()
             logger.debug("Successfully retrieved medicine '$id' (${medicine.name}) for user '$username'")
             call.respond(HttpStatusCode.OK, medicine)
         }.onLeft { error ->
@@ -84,7 +84,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
         val request = call.receive<MedicineRequest>()
 
         either {
-            val created = redisService.createMedicine(username, request).bind()
+            val created = storageService.createMedicine(username, request).bind()
             logger.debug("Successfully created medicine '${created.name}' (${created.id}) for user '$username'")
             call.respond(HttpStatusCode.Created, created)
         }.onLeft { error ->
@@ -108,7 +108,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
         val medicine = call.receive<Medicine>()
 
         either {
-            val updated = redisService.updateMedicine(username, id, medicine).bind()
+            val updated = storageService.updateMedicine(username, id, medicine).bind()
             logger.debug("Successfully updated medicine '$id' (${updated.name}) for user '$username'")
             call.respond(HttpStatusCode.OK, updated)
         }.onLeft { error ->
@@ -135,7 +135,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
         }
 
         either {
-            redisService.deleteMedicine(username, id).bind()
+            storageService.deleteMedicine(username, id).bind()
             logger.debug("Successfully deleted medicine '$id' for user '$username'")
             call.respond(HttpStatusCode.NoContent)
         }.onLeft { error ->
@@ -159,7 +159,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
         val request = call.receive<DosageHistoryRequest>()
 
         either {
-            val dosageHistory = redisService.createDosageHistory(username, request.medicineId, request.amount, request.scheduledTime, request.datetime).bind()
+            val dosageHistory = storageService.createDosageHistory(username, request.medicineId, request.amount, request.scheduledTime, request.datetime).bind()
             logger.debug("Successfully recorded dose for medicine '${request.medicineId}' (amount: ${request.amount}) for user '$username'")
             call.respond(HttpStatusCode.Created, dosageHistory)
         }.onLeft { error ->
@@ -183,7 +183,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
         val request = call.receive<AddStockRequest>()
 
         either {
-            val updatedMedicine = redisService.addStock(username, request.medicineId, request.amount).bind()
+            val updatedMedicine = storageService.addStock(username, request.medicineId, request.amount).bind()
             logger.debug("Successfully added ${request.amount} stock to medicine '${request.medicineId}' for user '$username' (new stock: ${updatedMedicine.stock})")
             call.respond(HttpStatusCode.OK, updatedMedicine)
         }.onLeft { error ->
@@ -204,7 +204,7 @@ fun Route.medicineRoutes(redisService: RedisService) {
         }
 
         either {
-            val expiringMedicines = redisService.medicineExpiry(username).bind()
+            val expiringMedicines = storageService.medicineExpiry(username).bind()
             logger.debug("Successfully retrieved ${expiringMedicines.size} medicine expiry records for user '$username'")
             call.respond(HttpStatusCode.OK, expiringMedicines)
         }.onLeft { error ->

@@ -24,6 +24,7 @@ import java.time.LocalDateTime
 
 /**
  * Redis service using functional programming patterns with Arrow and async coroutines
+ * Implements StorageService interface for data persistence
  */
 class RedisService private constructor(
     private val host: String?,
@@ -31,10 +32,13 @@ class RedisService private constructor(
     private val environment: String,
     private var connection: StatefulRedisConnection<String, String>?,
     private val isConnectionOwner: Boolean
-) {
+) : StorageService {
     private var client: RedisClient? = null
     private val json = Json { ignoreUnknownKeys = true }
     private val logger = LoggerFactory.getLogger(RedisService::class.java)
+
+    // Use medicate prefix for all keys
+    private val keyPrefix = "medicate:$environment"
 
     /**
      * Primary constructor for production use
@@ -86,6 +90,13 @@ class RedisService private constructor(
     }.mapLeft { RedisError.OperationError(it.message ?: "Unknown error") }
 
     /**
+     * Helper function to get userId from username
+     */
+    private suspend fun getUserId(username: String): Either<RedisError, UUID> {
+        return getUser(username).map { it.id }
+    }
+
+    /**
      * Set a value in Redis with TTL (Time To Live) in seconds
      * The key will automatically be deleted after the specified time
      */
@@ -96,62 +107,45 @@ class RedisService private constructor(
     /**
      * Get a Medicine object from Redis by ID asynchronously for a specific user
      */
-    suspend fun getMedicine(username: String, id: String): Either<RedisError, Medicine> {
-        val key = "$environment:user:$username:medicine:$id"
-        val jsonString = get(key).getOrNull()
+    override suspend fun getMedicine(username: String, id: String): Either<RedisError, Medicine> {
+        return getUserId(username).fold(
+            { error -> error.left() },
+            { userId ->
+                val key = "$keyPrefix:user:$userId:medicine:$id"
+                val jsonString = get(key).getOrNull()
 
-        return when (jsonString) {
-            null -> RedisError.NotFound("Medicine with id $id not found").left()
-            else -> Either.catch {
-                json.decodeFromString<Medicine>(jsonString)
-            }.mapLeft { e ->
-                when (e) {
-                    is SerializationException -> RedisError.SerializationError("Failed to deserialize medicine: ${e.message}")
-                    else -> RedisError.OperationError("Failed to parse medicine: ${e.message}")
+                when (jsonString) {
+                    null -> RedisError.NotFound("Medicine with id $id not found").left()
+                    else -> Either.catch {
+                        json.decodeFromString<Medicine>(jsonString)
+                    }.mapLeft { e ->
+                        when (e) {
+                            is SerializationException -> RedisError.SerializationError("Failed to deserialize medicine: ${e.message}")
+                            else -> RedisError.OperationError("Failed to parse medicine: ${e.message}")
+                        }
+                    }
                 }
             }
-        }
+        )
     }
 
     /**
      * Create a new Medicine in Redis asynchronously
      */
-    suspend fun createMedicine(username: String, request: MedicineRequest): Either<RedisError, Medicine> {
-        val medicine = Medicine(
-            id = UUID.randomUUID(),
-            name = request.name,
-            dose = request.dose,
-            unit = request.unit,
-            stock = request.stock,
-            description = request.description
-        )
-        val key = "$environment:user:$username:medicine:${medicine.id}"
+    override suspend fun createMedicine(username: String, request: MedicineRequest): Either<RedisError, Medicine> {
+        return getUserId(username).fold(
+            { error -> error.left() },
+            { userId ->
+                val medicine = Medicine(
+                    id = UUID.randomUUID(),
+                    name = request.name,
+                    dose = request.dose,
+                    unit = request.unit,
+                    stock = request.stock,
+                    description = request.description
+                )
+                val key = "$keyPrefix:user:$userId:medicine:${medicine.id}"
 
-        return Either.catch {
-            val jsonString = json.encodeToString(medicine)
-            connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
-            medicine
-        }.mapLeft { e ->
-            when (e) {
-                is SerializationException -> RedisError.SerializationError("Failed to serialize medicine: ${e.message}")
-                else -> RedisError.OperationError("Failed to create medicine: ${e.message}")
-            }
-        }
-    }
-
-    /**
-     * Update an existing Medicine in Redis asynchronously
-     */
-    suspend fun updateMedicine(username: String, id: String, medicine: Medicine): Either<RedisError, Medicine> {
-        val key = "$environment:user:$username:medicine:$id"
-
-        // Check if medicine exists
-        val existing = get(key).getOrNull()
-
-        return when (existing) {
-            null -> RedisError.NotFound("Medicine with id $id not found").left()
-            else -> {
-                // Update the medicine
                 Either.catch {
                     val jsonString = json.encodeToString(medicine)
                     connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
@@ -159,69 +153,112 @@ class RedisService private constructor(
                 }.mapLeft { e ->
                     when (e) {
                         is SerializationException -> RedisError.SerializationError("Failed to serialize medicine: ${e.message}")
-                        else -> RedisError.OperationError("Failed to update medicine: ${e.message}")
+                        else -> RedisError.OperationError("Failed to create medicine: ${e.message}")
                     }
                 }
             }
-        }
+        )
+    }
+
+    /**
+     * Update an existing Medicine in Redis asynchronously
+     */
+    override suspend fun updateMedicine(username: String, id: String, medicine: Medicine): Either<RedisError, Medicine> {
+        return getUserId(username).fold(
+            { error -> error.left() },
+            { userId ->
+                val key = "$keyPrefix:user:$userId:medicine:$id"
+
+                // Check if medicine exists
+                val existing = get(key).getOrNull()
+
+                when (existing) {
+                    null -> RedisError.NotFound("Medicine with id $id not found").left()
+                    else -> {
+                        // Update the medicine
+                        Either.catch {
+                            val jsonString = json.encodeToString(medicine)
+                            connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
+                            medicine
+                        }.mapLeft { e ->
+                            when (e) {
+                                is SerializationException -> RedisError.SerializationError("Failed to serialize medicine: ${e.message}")
+                                else -> RedisError.OperationError("Failed to update medicine: ${e.message}")
+                            }
+                        }
+                    }
+                }
+            }
+        )
     }
 
     /**
      * Delete a Medicine from Redis asynchronously
      */
-    suspend fun deleteMedicine(username: String, id: String): Either<RedisError, Unit> {
-        val key = "$environment:user:$username:medicine:$id"
+    override suspend fun deleteMedicine(username: String, id: String): Either<RedisError, Unit> {
+        return getUserId(username).fold(
+            { error -> error.left() },
+            { userId ->
+                val key = "$keyPrefix:user:$userId:medicine:$id"
 
-        return Either.catch {
-            val deleted = connection?.async()?.del(key)?.await() ?: throw IllegalStateException("Not connected")
-            if (deleted == 0L) {
-                throw NoSuchElementException("Medicine with id $id not found")
+                Either.catch {
+                    val deleted = connection?.async()?.del(key)?.await() ?: throw IllegalStateException("Not connected")
+                    if (deleted == 0L) {
+                        throw NoSuchElementException("Medicine with id $id not found")
+                    }
+                }.mapLeft { e ->
+                    when (e) {
+                        is NoSuchElementException -> RedisError.NotFound(e.message ?: "Medicine not found")
+                        else -> RedisError.OperationError("Failed to delete medicine: ${e.message}")
+                    }
+                }
             }
-        }.mapLeft { e ->
-            when (e) {
-                is NoSuchElementException -> RedisError.NotFound(e.message ?: "Medicine not found")
-                else -> RedisError.OperationError("Failed to delete medicine: ${e.message}")
-            }
-        }
+        )
     }
 
     /**
      * Get all Medicines from Redis asynchronously for a specific user
      */
-    suspend fun getAllMedicines(username: String): Either<RedisError, List<Medicine>> {
-        return Either.catch {
-            val pattern = "$environment:user:$username:medicine:*"
-            val keys = mutableListOf<String>()
+    override suspend fun getAllMedicines(username: String): Either<RedisError, List<Medicine>> {
+        // First get the user ID from username
+        return getUser(username).fold(
+            { error -> error.left() },
+            { user ->
+                Either.catch {
+                    val pattern = "$keyPrefix:user:${user.id}:medicine:*"
+                    val keys = mutableListOf<String>()
 
-            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-            var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
+                    val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+                    var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
 
-            // Iterate through all cursor pages
-            while (true) {
-                keys.addAll(scanCursor.keys)
-                if (scanCursor.isFinished) break
-                scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
-            }
-
-            // Get all values for the keys
-            keys.mapNotNull { key ->
-                asyncCommands.get(key).await()?.let { jsonString ->
-                    try {
-                        json.decodeFromString<Medicine>(jsonString)
-                    } catch (_: Exception) {
-                        null // Skip invalid entries
+                    // Iterate through all cursor pages
+                    while (true) {
+                        keys.addAll(scanCursor.keys)
+                        if (scanCursor.isFinished) break
+                        scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
                     }
+
+                    // Get all values for the keys
+                    keys.mapNotNull { key ->
+                        asyncCommands.get(key).await()?.let { jsonString ->
+                            try {
+                                json.decodeFromString<Medicine>(jsonString)
+                            } catch (_: Exception) {
+                                null // Skip invalid entries
+                            }
+                        }
+                    }
+                }.mapLeft { e ->
+                    RedisError.OperationError("Failed to retrieve medicines: ${e.message}")
                 }
             }
-        }.mapLeft { e ->
-            RedisError.OperationError("Failed to retrieve medicines: ${e.message}")
-        }
+        )
     }
 
     /**
      * Get medicines with low stock (< threshold) for a specific user
      */
-    suspend fun getLowStockMedicines(username: String, threshold: Double = 10.0): Either<RedisError, List<Medicine>> {
+    override suspend fun getLowStockMedicines(username: String, threshold: Double): Either<RedisError, List<Medicine>> {
         return either {
             val allMedicines = getAllMedicines(username).bind()
             allMedicines.filter { it.stock < threshold }
@@ -233,61 +270,44 @@ class RedisService private constructor(
     /**
      * Get a Schedule object from Redis by ID asynchronously for a specific user
      */
-    suspend fun getSchedule(username: String, id: String): Either<RedisError, Schedule> {
-        val key = "$environment:user:$username:schedule:$id"
-        val jsonString = get(key).getOrNull()
+    override suspend fun getSchedule(username: String, id: String): Either<RedisError, Schedule> {
+        return getUserId(username).fold(
+            { error -> error.left() },
+            { userId ->
+                val key = "$keyPrefix:user:$userId:schedule:$id"
+                val jsonString = get(key).getOrNull()
 
-        return when (jsonString) {
-            null -> RedisError.NotFound("Schedule with id $id not found").left()
-            else -> Either.catch {
-                json.decodeFromString<Schedule>(jsonString)
-            }.mapLeft { e ->
-                when (e) {
-                    is SerializationException -> RedisError.SerializationError("Failed to deserialize schedule: ${e.message}")
-                    else -> RedisError.OperationError("Failed to parse schedule: ${e.message}")
+                when (jsonString) {
+                    null -> RedisError.NotFound("Schedule with id $id not found").left()
+                    else -> Either.catch {
+                        json.decodeFromString<Schedule>(jsonString)
+                    }.mapLeft { e ->
+                        when (e) {
+                            is SerializationException -> RedisError.SerializationError("Failed to deserialize schedule: ${e.message}")
+                            else -> RedisError.OperationError("Failed to parse schedule: ${e.message}")
+                        }
+                    }
                 }
             }
-        }
+        )
     }
 
     /**
      * Create a new Schedule in Redis asynchronously
      */
-    suspend fun createSchedule(username: String, request: ScheduleRequest): Either<RedisError, Schedule> {
-        val schedule = Schedule(
-            id = UUID.randomUUID(),
-            medicineId = request.medicineId,
-            time = request.time,
-            amount = request.amount,
-            daysOfWeek = request.daysOfWeek
-        )
-        val key = "$environment:user:$username:schedule:${schedule.id}"
+    override suspend fun createSchedule(username: String, request: ScheduleRequest): Either<RedisError, Schedule> {
+        return getUserId(username).fold(
+            { error -> error.left() },
+            { userId ->
+                val schedule = Schedule(
+                    id = UUID.randomUUID(),
+                    medicineId = request.medicineId,
+                    time = request.time,
+                    amount = request.amount,
+                    daysOfWeek = request.daysOfWeek
+                )
+                val key = "$keyPrefix:user:$userId:schedule:${schedule.id}"
 
-        return Either.catch {
-            val jsonString = json.encodeToString(schedule)
-            connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
-            schedule
-        }.mapLeft { e ->
-            when (e) {
-                is SerializationException -> RedisError.SerializationError("Failed to serialize schedule: ${e.message}")
-                else -> RedisError.OperationError("Failed to create schedule: ${e.message}")
-            }
-        }
-    }
-
-    /**
-     * Update an existing Schedule in Redis asynchronously
-     */
-    suspend fun updateSchedule(username: String, id: String, schedule: Schedule): Either<RedisError, Schedule> {
-        val key = "$environment:user:$username:schedule:$id"
-
-        // Check if schedule exists
-        val existing = get(key).getOrNull()
-
-        return when (existing) {
-            null -> RedisError.NotFound("Schedule with id $id not found").left()
-            else -> {
-                // Update the schedule
                 Either.catch {
                     val jsonString = json.encodeToString(schedule)
                     connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
@@ -295,69 +315,111 @@ class RedisService private constructor(
                 }.mapLeft { e ->
                     when (e) {
                         is SerializationException -> RedisError.SerializationError("Failed to serialize schedule: ${e.message}")
-                        else -> RedisError.OperationError("Failed to update schedule: ${e.message}")
+                        else -> RedisError.OperationError("Failed to create schedule: ${e.message}")
                     }
                 }
             }
-        }
+        )
+    }
+
+    /**
+     * Update an existing Schedule in Redis asynchronously
+     */
+    override suspend fun updateSchedule(username: String, id: String, schedule: Schedule): Either<RedisError, Schedule> {
+        return getUserId(username).fold(
+            { error -> error.left() },
+            { userId ->
+                val key = "$keyPrefix:user:$userId:schedule:$id"
+
+                // Check if schedule exists
+                val existing = get(key).getOrNull()
+
+                when (existing) {
+                    null -> RedisError.NotFound("Schedule with id $id not found").left()
+                    else -> {
+                        // Update the schedule
+                        Either.catch {
+                            val jsonString = json.encodeToString(schedule)
+                            connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
+                            schedule
+                        }.mapLeft { e ->
+                            when (e) {
+                                is SerializationException -> RedisError.SerializationError("Failed to serialize schedule: ${e.message}")
+                                else -> RedisError.OperationError("Failed to update schedule: ${e.message}")
+                            }
+                        }
+                    }
+                }
+            }
+        )
     }
 
     /**
      * Delete a Schedule from Redis asynchronously
      */
-    suspend fun deleteSchedule(username: String, id: String): Either<RedisError, Unit> {
-        val key = "$environment:user:$username:schedule:$id"
+    override suspend fun deleteSchedule(username: String, id: String): Either<RedisError, Unit> {
+        return getUserId(username).fold(
+            { error -> error.left() },
+            { userId ->
+                val key = "$keyPrefix:user:$userId:schedule:$id"
 
-        return Either.catch {
-            val deleted = connection?.async()?.del(key)?.await() ?: throw IllegalStateException("Not connected")
-            if (deleted == 0L) {
-                throw NoSuchElementException("Schedule with id $id not found")
+                Either.catch {
+                    val deleted = connection?.async()?.del(key)?.await() ?: throw IllegalStateException("Not connected")
+                    if (deleted == 0L) {
+                        throw NoSuchElementException("Schedule with id $id not found")
+                    }
+                }.mapLeft { e ->
+                    when (e) {
+                        is NoSuchElementException -> RedisError.NotFound(e.message ?: "Schedule not found")
+                        else -> RedisError.OperationError("Failed to delete schedule: ${e.message}")
+                    }
+                }
             }
-        }.mapLeft { e ->
-            when (e) {
-                is NoSuchElementException -> RedisError.NotFound(e.message ?: "Schedule not found")
-                else -> RedisError.OperationError("Failed to delete schedule: ${e.message}")
-            }
-        }
+        )
     }
 
     /**
      * Get all Schedules from Redis asynchronously for a specific user
      */
-    suspend fun getAllSchedules(username: String): Either<RedisError, List<Schedule>> {
-        return Either.catch {
-            val pattern = "$environment:user:$username:schedule:*"
-            val keys = mutableListOf<String>()
+    override suspend fun getAllSchedules(username: String): Either<RedisError, List<Schedule>> {
+        return getUser(username).fold(
+            { error -> error.left() },
+            { user ->
+                Either.catch {
+                    val pattern = "$keyPrefix:user:${user.id}:schedule:*"
+                    val keys = mutableListOf<String>()
 
-            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-            var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
+                    val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+                    var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
 
-            // Iterate through all cursor pages
-            while (true) {
-                keys.addAll(scanCursor.keys)
-                if (scanCursor.isFinished) break
-                scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
-            }
-
-            // Get all values for the keys
-            keys.mapNotNull { key ->
-                asyncCommands.get(key).await()?.let { jsonString ->
-                    try {
-                        json.decodeFromString<Schedule>(jsonString)
-                    } catch (_: Exception) {
-                        null // Skip invalid entries
+                    // Iterate through all cursor pages
+                    while (true) {
+                        keys.addAll(scanCursor.keys)
+                        if (scanCursor.isFinished) break
+                        scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
                     }
+
+                    // Get all values for the keys
+                    keys.mapNotNull { key ->
+                        asyncCommands.get(key).await()?.let { jsonString ->
+                            try {
+                                json.decodeFromString<Schedule>(jsonString)
+                            } catch (_: Exception) {
+                                null // Skip invalid entries
+                            }
+                        }
+                    }
+                }.mapLeft { e ->
+                    RedisError.OperationError("Failed to retrieve schedules: ${e.message}")
                 }
             }
-        }.mapLeft { e ->
-            RedisError.OperationError("Failed to retrieve schedules: ${e.message}")
-        }
+        )
     }
 
     /**
      * Get daily schedule with medicines grouped by time asynchronously for a specific user
      */
-    suspend fun getDailySchedule(username: String): Either<RedisError, DailySchedule> {
+    override suspend fun getDailySchedule(username: String): Either<RedisError, DailySchedule> {
         return either {
             val allSchedules = getAllSchedules(username).bind()
 
@@ -405,241 +467,252 @@ class RedisService private constructor(
      *       - [RedisError.OperationError] if persisting the dosage history or updating the medicine fails
      *         (e.g. connection issues or an invalid Redis state).
      */
-    suspend fun createDosageHistory(username: String, medicineId: UUID, amount: Double, scheduledTime: String? = null, datetime: java.time.LocalDateTime? = null): Either<RedisError, DosageHistory> {
-        return either {
-            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-            val medicineKey = "$environment:user:$username:medicine:$medicineId"
+    override suspend fun createDosageHistory(username: String, medicineId: UUID, amount: Double, scheduledTime: String?, datetime: java.time.LocalDateTime?): Either<RedisError, DosageHistory> {
+        return getUserId(username).fold(
+            { error -> error.left() },
+            { userId ->
+                either {
+                    val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+                    val medicineKey = "$keyPrefix:user:$userId:medicine:$medicineId"
 
-            // Retry loop for optimistic locking with WATCH
-            var retryCount = 0
-            val maxRetries = 10
+                    // Retry loop for optimistic locking with WATCH
+                    var retryCount = 0
+                    val maxRetries = 10
 
-            while (retryCount < maxRetries) {
-                Either.catch {
-                    // Watch the medicine key for changes
-                    asyncCommands.watch(medicineKey).await()
+                    while (retryCount < maxRetries) {
+                        Either.catch {
+                            // Watch the medicine key for changes
+                            asyncCommands.watch(medicineKey).await()
 
-                    // Get medicine and verify it exists
-                    val medicineJson = asyncCommands.get(medicineKey).await()
-                        ?: throw NoSuchElementException("Medicine with id $medicineId not found")
+                            // Get medicine and verify it exists
+                            val medicineJson = asyncCommands.get(medicineKey).await()
+                                ?: throw NoSuchElementException("Medicine with id $medicineId not found")
 
-                    val medicine = json.decodeFromString<Medicine>(medicineJson)
+                            val medicine = json.decodeFromString<Medicine>(medicineJson)
 
-                    // Create dosage history
-                    val dosageHistory = DosageHistory(
-                        id = UUID.randomUUID(),
-                        datetime = datetime ?: java.time.LocalDateTime.now(),
-                        medicineId = medicineId,
-                        amount = amount,
-                        scheduledTime = scheduledTime
-                    )
+                            // Create dosage history
+                            val dosageHistory = DosageHistory(
+                                id = UUID.randomUUID(),
+                                datetime = datetime ?: java.time.LocalDateTime.now(),
+                                medicineId = medicineId,
+                                amount = amount,
+                                scheduledTime = scheduledTime
+                            )
 
-                    val dosageKey = "$environment:user:$username:dosagehistory:${dosageHistory.id}"
-                    val updatedMedicine = medicine.copy(stock = medicine.stock - amount)
+                            val dosageKey = "$keyPrefix:user:$userId:dosagehistory:${dosageHistory.id}"
+                            val updatedMedicine = medicine.copy(stock = medicine.stock - amount)
 
-                    // Start transaction
-                    asyncCommands.multi().await()
+                            // Start transaction
+                            asyncCommands.multi().await()
 
-                    val updatedMedicineJson = json.encodeToString(updatedMedicine)
-                    val dosageHistoryJson = json.encodeToString(dosageHistory)
+                            val updatedMedicineJson = json.encodeToString(updatedMedicine)
+                            val dosageHistoryJson = json.encodeToString(dosageHistory)
 
-                    // Queue commands in the transaction.
-                    // Note: In Lettuce, commands between MULTI and EXEC are queued on the Redis server
-                    // and the returned RedisFuture objects only complete when EXEC is called.
-                    // We intentionally do NOT await these futures here - they will complete after EXEC.
-                    // See: https://redis.github.io/lettuce/user-guide/transactions-multi/
-                    asyncCommands.set(medicineKey, updatedMedicineJson)
-                    asyncCommands.set(dosageKey, dosageHistoryJson)
+                            // Queue commands in the transaction.
+                            asyncCommands.set(medicineKey, updatedMedicineJson)
+                            asyncCommands.set(dosageKey, dosageHistoryJson)
 
-                    // Execute transaction - this atomically executes all queued commands
-                    // and completes all the RedisFuture objects from the queued commands
-                    val result = asyncCommands.exec().await()
+                            // Execute transaction
+                            val result = asyncCommands.exec().await()
 
-                    if (result.wasDiscarded()) {
-                        // Transaction failed due to concurrent modification, retry
-                        retryCount++
-                        null
-                    } else {
-                        // Success
-                        return@either dosageHistory
+                            if (result.wasDiscarded()) {
+                                // Transaction failed due to concurrent modification, retry
+                                retryCount++
+                                null
+                            } else {
+                                // Success
+                                return@either dosageHistory
+                            }
+                        }.mapLeft { e ->
+                            runCatching { asyncCommands.unwatch().await() }
+                            when (e) {
+                                is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Medicine not found"))
+                                is SerializationException -> raise(RedisError.SerializationError("Failed to serialize: ${e.message}"))
+                                else -> raise(RedisError.OperationError("Failed to create dosage history: ${e.message}"))
+                            }
+                        }.bind()
                     }
-                }.mapLeft { e ->
-                    runCatching { asyncCommands.unwatch().await() }
-                    when (e) {
-                        is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Medicine not found"))
-                        is SerializationException -> raise(RedisError.SerializationError("Failed to serialize: ${e.message}"))
-                        else -> raise(RedisError.OperationError("Failed to create dosage history: ${e.message}"))
-                    }
-                }.bind()
+
+                    // Max retries exceeded
+                    raise(RedisError.OperationError("Failed to create dosage history after $maxRetries retries due to concurrent modifications"))
+                }
             }
-
-            // Max retries exceeded
-            raise(RedisError.OperationError("Failed to create dosage history after $maxRetries retries due to concurrent modifications"))
-        }
+        )
     }
 
     /**
      * Add stock to a medicine using Redis WATCH for optimistic locking asynchronously
      */
-    suspend fun addStock(username: String, medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
-        return either {
-            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-            val medicineKey = "$environment:user:$username:medicine:$medicineId"
+    override suspend fun addStock(username: String, medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
+        return getUserId(username).fold(
+            { error -> error.left() },
+            { userId ->
+                either {
+                    val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+                    val medicineKey = "$keyPrefix:user:$userId:medicine:$medicineId"
 
-            // Retry loop for optimistic locking with WATCH
-            var retryCount = 0
-            val maxRetries = 10
+                    // Retry loop for optimistic locking with WATCH
+                    var retryCount = 0
+                    val maxRetries = 10
 
-            while (retryCount < maxRetries) {
-                Either.catch {
-                    // Watch the medicine key for changes
-                    asyncCommands.watch(medicineKey).await()
+                    while (retryCount < maxRetries) {
+                        Either.catch {
+                            // Watch the medicine key for changes
+                            asyncCommands.watch(medicineKey).await()
 
-                    // Get medicine and verify it exists
-                    val medicineJson = asyncCommands.get(medicineKey).await()
-                        ?: throw NoSuchElementException("Medicine with id $medicineId not found")
+                            // Get medicine and verify it exists
+                            val medicineJson = asyncCommands.get(medicineKey).await()
+                                ?: throw NoSuchElementException("Medicine with id $medicineId not found")
 
-                    val medicine = json.decodeFromString<Medicine>(medicineJson)
-                    val updatedMedicine = medicine.copy(stock = medicine.stock + amount)
+                            val medicine = json.decodeFromString<Medicine>(medicineJson)
+                            val updatedMedicine = medicine.copy(stock = medicine.stock + amount)
 
-                    // Start transaction
-                    asyncCommands.multi().await()
+                            // Start transaction
+                            asyncCommands.multi().await()
 
-                    val updatedMedicineJson = json.encodeToString(updatedMedicine)
+                            val updatedMedicineJson = json.encodeToString(updatedMedicine)
 
-                    // Queue command in the transaction.
-                    // Note: In Lettuce, commands between MULTI and EXEC are queued on the Redis server
-                    // and the returned RedisFuture only completes when EXEC is called.
-                    // We intentionally do NOT await this future here - it will complete after EXEC.
-                    asyncCommands.set(medicineKey, updatedMedicineJson)
+                            asyncCommands.set(medicineKey, updatedMedicineJson)
 
-                    // Execute transaction - this atomically executes all queued commands
-                    val result = asyncCommands.exec().await()
+                            // Execute transaction
+                            val result = asyncCommands.exec().await()
 
-                    if (result.wasDiscarded()) {
-                        // Transaction failed due to concurrent modification, retry
-                        retryCount++
-                        null
-                    } else {
-                        // Success
-                        return@either updatedMedicine
+                            if (result.wasDiscarded()) {
+                                // Transaction failed due to concurrent modification, retry
+                                retryCount++
+                                null
+                            } else {
+                                // Success
+                                return@either updatedMedicine
+                            }
+                        }.mapLeft { e ->
+                            runCatching { asyncCommands.unwatch().await() }
+                            when (e) {
+                                is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Medicine not found"))
+                                is SerializationException -> raise(RedisError.SerializationError("Failed to serialize medicine: ${e.message}"))
+                                else -> raise(RedisError.OperationError("Failed to add stock: ${e.message}"))
+                            }
+                        }.bind()
                     }
-                }.mapLeft { e ->
-                    runCatching { asyncCommands.unwatch().await() }
-                    when (e) {
-                        is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Medicine not found"))
-                        is SerializationException -> raise(RedisError.SerializationError("Failed to serialize medicine: ${e.message}"))
-                        else -> raise(RedisError.OperationError("Failed to add stock: ${e.message}"))
-                    }
-                }.bind()
+
+                    // Max retries exceeded
+                    raise(RedisError.OperationError("Failed to add stock after $maxRetries retries due to concurrent modifications"))
+                }
             }
-
-            // Max retries exceeded
-            raise(RedisError.OperationError("Failed to add stock after $maxRetries retries due to concurrent modifications"))
-        }
+        )
     }
 
     /**
      * Get all DosageHistory entries from Redis asynchronously for a specific user
      */
-    suspend fun getAllDosageHistories(username: String): Either<RedisError, List<DosageHistory>> {
-        return Either.catch {
-            val pattern = "$environment:user:$username:dosagehistory:*"
-            val keys = mutableListOf<String>()
+    override suspend fun getAllDosageHistories(username: String): Either<RedisError, List<DosageHistory>> {
+        return getUser(username).fold(
+            { error -> error.left() },
+            { user ->
+                Either.catch {
+                    val pattern = "$keyPrefix:user:${user.id}:dosagehistory:*"
+                    val keys = mutableListOf<String>()
 
-            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-            var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
+                    val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+                    var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
 
-            // Iterate through all cursor pages
-            while (true) {
-                keys.addAll(scanCursor.keys)
-                if (scanCursor.isFinished) break
-                scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
-            }
-
-            // Get all values for the keys and sort by datetime descending
-            val list = keys.mapNotNull { key ->
-                asyncCommands.get(key).await()?.let { jsonString ->
-                    try {
-                        json.decodeFromString<DosageHistory>(jsonString)
-                    } catch (_: Exception) {
-                        null // Skip invalid entries
+                    // Iterate through all cursor pages
+                    while (true) {
+                        keys.addAll(scanCursor.keys)
+                        if (scanCursor.isFinished) break
+                        scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
                     }
+
+                    // Get all values for the keys and sort by datetime descending
+                    val list = keys.mapNotNull { key ->
+                        asyncCommands.get(key).await()?.let { jsonString ->
+                            try {
+                                json.decodeFromString<DosageHistory>(jsonString)
+                            } catch (_: Exception) {
+                                null // Skip invalid entries
+                            }
+                        }
+                    }
+
+                    list.sortedByDescending { it.datetime }
+                }.mapLeft { e ->
+                    RedisError.OperationError("Failed to retrieve dosage histories: ${e.message}")
                 }
             }
-
-            list.sortedByDescending { it.datetime }
-        }.mapLeft { e ->
-            RedisError.OperationError("Failed to retrieve dosage histories: ${e.message}")
-        }
+        )
     }
 
     /**
      * Delete a DosageHistory entry and restore the stock to the medicine
      */
-    suspend fun deleteDosageHistory(username: String, dosageHistoryId: UUID): Either<RedisError, Unit> {
-        return either {
-            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-            val dosageKey = "$environment:user:$username:dosagehistory:$dosageHistoryId"
+    override suspend fun deleteDosageHistory(username: String, dosageHistoryId: UUID): Either<RedisError, Unit> {
+        return getUserId(username).fold(
+            { error -> error.left() },
+            { userId ->
+                either {
+                    val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+                    val dosageKey = "$keyPrefix:user:$userId:dosagehistory:$dosageHistoryId"
 
-            // Retry loop for optimistic locking with WATCH
-            var retryCount = 0
-            val maxRetries = 10
+                    // Retry loop for optimistic locking with WATCH
+                    var retryCount = 0
+                    val maxRetries = 10
 
-            while (retryCount < maxRetries) {
-                Either.catch {
-                    // Get the dosage history first
-                    val dosageJson = asyncCommands.get(dosageKey).await()
-                        ?: throw NoSuchElementException("Dosage history with id $dosageHistoryId not found")
+                    while (retryCount < maxRetries) {
+                        Either.catch {
+                            // Get the dosage history first
+                            val dosageJson = asyncCommands.get(dosageKey).await()
+                                ?: throw NoSuchElementException("Dosage history with id $dosageHistoryId not found")
 
-                    val dosageHistory = json.decodeFromString<DosageHistory>(dosageJson)
-                    val medicineKey = "$environment:user:$username:medicine:${dosageHistory.medicineId}"
+                            val dosageHistory = json.decodeFromString<DosageHistory>(dosageJson)
+                            val medicineKey = "$keyPrefix:user:$userId:medicine:${dosageHistory.medicineId}"
 
-                    // Watch both keys for changes
-                    asyncCommands.watch(medicineKey, dosageKey).await()
+                            // Watch both keys for changes
+                            asyncCommands.watch(medicineKey, dosageKey).await()
 
-                    // Get medicine
-                    val medicineJson = asyncCommands.get(medicineKey).await()
-                        ?: throw NoSuchElementException("Medicine with id ${dosageHistory.medicineId} not found")
+                            // Get medicine
+                            val medicineJson = asyncCommands.get(medicineKey).await()
+                                ?: throw NoSuchElementException("Medicine with id ${dosageHistory.medicineId} not found")
 
-                    val medicine = json.decodeFromString<Medicine>(medicineJson)
+                            val medicine = json.decodeFromString<Medicine>(medicineJson)
 
-                    // Restore stock to medicine
-                    val updatedMedicine = medicine.copy(stock = medicine.stock + dosageHistory.amount)
+                            // Restore stock to medicine
+                            val updatedMedicine = medicine.copy(stock = medicine.stock + dosageHistory.amount)
 
-                    // Start transaction
-                    asyncCommands.multi().await()
+                            // Start transaction
+                            asyncCommands.multi().await()
 
-                    val updatedMedicineJson = json.encodeToString(updatedMedicine)
+                            val updatedMedicineJson = json.encodeToString(updatedMedicine)
 
-                    // Queue commands in the transaction
-                    asyncCommands.set(medicineKey, updatedMedicineJson)
-                    asyncCommands.del(dosageKey)
+                            // Queue commands in the transaction
+                            asyncCommands.set(medicineKey, updatedMedicineJson)
+                            asyncCommands.del(dosageKey)
 
-                    // Execute transaction
-                    val result = asyncCommands.exec().await()
+                            // Execute transaction
+                            val result = asyncCommands.exec().await()
 
-                    if (result.wasDiscarded()) {
-                        // Transaction failed due to concurrent modification, retry
-                        retryCount++
-                        null
-                    } else {
-                        // Success
-                        return@either Unit
+                            if (result.wasDiscarded()) {
+                                // Transaction failed due to concurrent modification, retry
+                                retryCount++
+                                null
+                            } else {
+                                // Success
+                                return@either Unit
+                            }
+                        }.mapLeft { e ->
+                            runCatching { asyncCommands.unwatch().await() }
+                            when (e) {
+                                is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Dosage history or medicine not found"))
+                                is SerializationException -> raise(RedisError.SerializationError("Failed to serialize: ${e.message}"))
+                                else -> raise(RedisError.OperationError("Failed to delete dosage history: ${e.message}"))
+                            }
+                        }.bind()
                     }
-                }.mapLeft { e ->
-                    runCatching { asyncCommands.unwatch().await() }
-                    when (e) {
-                        is NoSuchElementException -> raise(RedisError.NotFound(e.message ?: "Dosage history or medicine not found"))
-                        is SerializationException -> raise(RedisError.SerializationError("Failed to serialize: ${e.message}"))
-                        else -> raise(RedisError.OperationError("Failed to delete dosage history: ${e.message}"))
-                    }
-                }.bind()
+
+                    // Max retries exceeded
+                    raise(RedisError.OperationError("Failed to delete dosage history after $maxRetries retries due to concurrent modifications"))
+                }
             }
-
-            // Max retries exceeded
-            raise(RedisError.OperationError("Failed to delete dosage history after $maxRetries retries due to concurrent modifications"))
-        }
+        )
     }
 
     /**
@@ -658,44 +731,49 @@ class RedisService private constructor(
         startDate: java.time.LocalDate,
         endDate: java.time.LocalDate
     ): Either<RedisError, List<DosageHistory>> {
-        return Either.catch {
-            val pattern = "$environment:user:$username:dosagehistory:*"
-            val keys = mutableListOf<String>()
+        return getUser(username).fold(
+            { error -> error.left() },
+            { user ->
+                Either.catch {
+                    val pattern = "$keyPrefix:user:${user.id}:dosagehistory:*"
+                    val keys = mutableListOf<String>()
 
-            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-            var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
+                    val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+                    var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
 
-            // Iterate through all cursor pages
-            while (true) {
-                keys.addAll(scanCursor.keys)
-                if (scanCursor.isFinished) break
-                scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
-            }
-
-            // Get values for the keys, filter by date range, and sort by datetime descending
-            val list = keys.mapNotNull { key ->
-                asyncCommands.get(key).await()?.let { jsonString ->
-                    try {
-                        json.decodeFromString<DosageHistory>(jsonString)
-                    } catch (_: Exception) {
-                        null // Skip invalid entries
+                    // Iterate through all cursor pages
+                    while (true) {
+                        keys.addAll(scanCursor.keys)
+                        if (scanCursor.isFinished) break
+                        scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
                     }
+
+                    // Get values for the keys, filter by date range, and sort by datetime descending
+                    val list = keys.mapNotNull { key ->
+                        asyncCommands.get(key).await()?.let { jsonString ->
+                            try {
+                                json.decodeFromString<DosageHistory>(jsonString)
+                            } catch (_: Exception) {
+                                null // Skip invalid entries
+                            }
+                        }
+                    }
+
+                    list.filter { history ->
+                        val historyDate = history.datetime.toLocalDate()
+                        !historyDate.isBefore(startDate) && !historyDate.isAfter(endDate)
+                    }.sortedByDescending { it.datetime }
+                }.mapLeft { e ->
+                    RedisError.OperationError("Failed to retrieve dosage histories in date range: ${e.message}")
                 }
             }
-
-            list.filter { history ->
-                val historyDate = history.datetime.toLocalDate()
-                !historyDate.isBefore(startDate) && !historyDate.isAfter(endDate)
-            }.sortedByDescending { it.datetime }
-        }.mapLeft { e ->
-            RedisError.OperationError("Failed to retrieve dosage histories in date range: ${e.message}")
-        }
+        )
     }
 
     /**
      * Get weekly adherence (last 7 days, excluding today) for a specific user
      */
-    suspend fun getWeeklyAdherence(username: String): Either<RedisError, WeeklyAdherence> {
+    override suspend fun getWeeklyAdherence(username: String): Either<RedisError, WeeklyAdherence> {
         return either {
             val allSchedules = getAllSchedules(username).bind()
 
@@ -747,10 +825,28 @@ class RedisService private constructor(
     }
 
     /**
-     * Get a user by username
+     * Get a user by username (uses username index to find user ID)
      */
-    suspend fun getUser(username: String): Either<RedisError, User> {
-        val key = "$environment:user:$username"
+    override suspend fun getUser(username: String): Either<RedisError, User> {
+        // First, get user ID from username index
+        val usernameIndexKey = "$keyPrefix:user:username:$username"
+
+        return get(usernameIndexKey).fold(
+            { error -> error.left() },
+            { userId ->
+                when (userId) {
+                    null -> RedisError.NotFound("User not found").left()
+                    else -> getUserById(userId)
+                }
+            }
+        )
+    }
+
+    /**
+     * Get user by ID
+     */
+    override suspend fun getUserById(userId: String): Either<RedisError, User> {
+        val key = "$keyPrefix:user:id:$userId"
 
         return get(key).fold(
             { error -> error.left() },
@@ -773,60 +869,79 @@ class RedisService private constructor(
     /**
      * Register a new user with username, email and password
      */
-    suspend fun registerUser(username: String, email: String, password: String): Either<RedisError, User> {
-        val key = "$environment:user:$username"
+    override suspend fun registerUser(username: String, email: String, password: String): Either<RedisError, User> {
+        val usernameIndexKey = "$keyPrefix:user:username:$username"
+        val emailIndexKey = "$keyPrefix:user:email:${email.lowercase()}"
 
-        // Check if user already exists
-        val existing = get(key).getOrNull()
+        // Check if username already exists
+        val existingUsername = get(usernameIndexKey).getOrNull()
+        if (existingUsername != null) {
+            return RedisError.OperationError("Username already exists").left()
+        }
 
-        return when (existing) {
-            null -> {
-                // Hash the password using BCrypt
-                val passwordHash = BCrypt.hashpw(password, BCrypt.gensalt())
-
-                // Create new user including email
-                val user = User(username = username, email = email, passwordHash = passwordHash)
-                Either.catch {
-                    val jsonString = json.encodeToString(user)
-                    connection?.async()?.set(key, jsonString)?.await() ?: throw IllegalStateException("Not connected")
-                    user
-                }.mapLeft { e ->
-                    when (e) {
-                        is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
-                        else -> RedisError.OperationError("Failed to register user: ${e.message}")
-                    }
-                }
+        // Check if email already exists
+        if (email.isNotBlank()) {
+            val existingEmail = get(emailIndexKey).getOrNull()
+            if (existingEmail != null) {
+                return RedisError.OperationError("Email already in use").left()
             }
-            else -> RedisError.OperationError("Username already exists").left()
+        }
+
+        return Either.catch {
+            // Generate new user ID
+            val userId = UUID.randomUUID()
+            val userKey = "$keyPrefix:user:id:$userId"
+
+            // Hash the password using BCrypt
+            val passwordHash = BCrypt.hashpw(password, BCrypt.gensalt())
+
+            // Create new user with UUID
+            val user = User(id = userId, username = username, email = email, passwordHash = passwordHash)
+            val jsonString = json.encodeToString(user)
+
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+
+            // Use transaction to ensure atomicity
+            asyncCommands.multi().await()
+
+            // Store user data
+            asyncCommands.set(userKey, jsonString)
+            // Create username index
+            asyncCommands.set(usernameIndexKey, userId.toString())
+            // Create email index if email provided
+            if (email.isNotBlank()) {
+                asyncCommands.set(emailIndexKey, userId.toString())
+            }
+
+            asyncCommands.exec().await()
+
+            user
+        }.mapLeft { e ->
+            when (e) {
+                is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
+                else -> RedisError.OperationError("Failed to register user: ${e.message}")
+            }
         }
     }
 
     /**
      * Login user by verifying password hash
      */
-    suspend fun loginUser(username: String, password: String): Either<RedisError, User> {
-        val key = "$environment:user:$username"
-
-        return get(key).fold(
+    override suspend fun loginUser(username: String, password: String): Either<RedisError, User> {
+        return getUser(username).fold(
             { error -> error.left() },
-            { jsonString ->
-                when (jsonString) {
-                    null -> RedisError.NotFound("User not found").left()
-                    else -> Either.catch {
-                        val user = json.decodeFromString<User>(jsonString)
-
-                        // Verify password against stored hash
-                        if (BCrypt.checkpw(password, user.passwordHash)) {
-                            user
-                        } else {
-                            throw IllegalArgumentException("Invalid password")
-                        }
-                    }.mapLeft { e ->
-                        when (e) {
-                            is SerializationException -> RedisError.SerializationError("Failed to deserialize user: ${e.message}")
-                            is IllegalArgumentException -> RedisError.OperationError("Invalid credentials")
-                            else -> RedisError.OperationError("Failed to login: ${e.message}")
-                        }
+            { user ->
+                Either.catch {
+                    // Verify password against stored hash
+                    if (BCrypt.checkpw(password, user.passwordHash)) {
+                        user
+                    } else {
+                        throw IllegalArgumentException("Invalid password")
+                    }
+                }.mapLeft { e ->
+                    when (e) {
+                        is IllegalArgumentException -> RedisError.OperationError("Invalid credentials")
+                        else -> RedisError.OperationError("Failed to login: ${e.message}")
                     }
                 }
             }
@@ -836,26 +951,21 @@ class RedisService private constructor(
     /**
      * Update user password
      */
-    suspend fun updatePassword(username: String, newPassword: String): Either<RedisError, Unit> {
-        val key = "$environment:user:$username"
-
-        return get(key).fold(
+    override suspend fun updatePassword(username: String, newPassword: String): Either<RedisError, Unit> {
+        return getUser(username).fold(
             { error -> error.left() },
-            { jsonString ->
-                when (jsonString) {
-                    null -> RedisError.NotFound("User not found").left()
-                    else -> Either.catch {
-                        val user = json.decodeFromString<User>(jsonString)
-                        val newPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt())
-                        val updatedUser = user.copy(passwordHash = newPasswordHash)
-                        val updatedJsonString = json.encodeToString(updatedUser)
-                        connection?.async()?.set(key, updatedJsonString)?.await() ?: throw IllegalStateException("Not connected")
-                        Unit
-                    }.mapLeft { e ->
-                        when (e) {
-                            is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
-                            else -> RedisError.OperationError("Failed to update password: ${e.message}")
-                        }
+            { user ->
+                Either.catch {
+                    val userKey = "$keyPrefix:user:id:${user.id}"
+                    val newPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt())
+                    val updatedUser = user.copy(passwordHash = newPasswordHash)
+                    val updatedJsonString = json.encodeToString(updatedUser)
+                    connection?.async()?.set(userKey, updatedJsonString)?.await() ?: throw IllegalStateException("Not connected")
+                    Unit
+                }.mapLeft { e ->
+                    when (e) {
+                        is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
+                        else -> RedisError.OperationError("Failed to update password: ${e.message}")
                     }
                 }
             }
@@ -865,84 +975,85 @@ class RedisService private constructor(
     /**
      * Check if an email is already in use by a different user
      */
-    private suspend fun isEmailInUseByOtherUser(email: String, currentUsername: String): Either<RedisError, Boolean> {
-        return Either.catch {
-            val pattern = "$environment:user:*"
-            val keys = mutableListOf<String>()
-
-            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-            var scanCursor = asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
-
-            // Iterate through all cursor pages
-            while (true) {
-                keys.addAll(scanCursor.keys)
-                if (scanCursor.isFinished) break
-                scanCursor = asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
-            }
-
-            // Check if any user (other than current user) has this email
-            keys.any { key ->
-                // Skip the current user's key
-                if (key == "$environment:user:$currentUsername") {
-                    false
-                } else {
-                    asyncCommands.get(key).await()?.let { jsonString ->
-                        try {
-                            val user = json.decodeFromString<User>(jsonString)
-                            user.email.equals(email, ignoreCase = true)
-                        } catch (e: SerializationException) {
-                            // Log and skip malformed user data
-                            logger.warn("Failed to deserialize user from key $key: ${e.message}")
-                            false
-                        }
-                    } ?: false
-                }
-            }
-        }.mapLeft { e ->
-            RedisError.OperationError("Failed to check email uniqueness: ${e.message}")
+    private suspend fun isEmailInUseByOtherUser(email: String, currentUserId: UUID): Either<RedisError, Boolean> {
+        if (email.isBlank()) {
+            return false.right()
         }
-    }
 
-    /**
-     * Update user profile (email, firstName, lastName)
-     */
-    suspend fun updateProfile(username: String, email: String, firstName: String, lastName: String): Either<RedisError, User> {
-        val key = "$environment:user:$username"
+        val emailIndexKey = "$keyPrefix:user:email:${email.lowercase()}"
 
-        // Check if email is already in use by another user
-        return isEmailInUseByOtherUser(email, username).fold(
+        return get(emailIndexKey).fold(
             { error -> error.left() },
-            { emailInUse ->
-                if (emailInUse) {
-                    RedisError.OperationError("Email is already in use by another user").left()
-                } else {
-                    get(key).fold(
-                        { error -> error.left() },
-                        { jsonString ->
-                            when (jsonString) {
-                                null -> RedisError.NotFound("User not found").left()
-                                else -> Either.catch {
-                                    val user = json.decodeFromString<User>(jsonString)
-                                    val updatedUser = user.copy(email = email, firstName = firstName, lastName = lastName)
-                                    val updatedJsonString = json.encodeToString(updatedUser)
-                                    connection?.async()?.set(key, updatedJsonString)?.await() ?: throw IllegalStateException("Not connected")
-                                    updatedUser
-                                }.mapLeft { e ->
-                                    when (e) {
-                                        is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
-                                        else -> RedisError.OperationError("Failed to update profile: ${e.message}")
-                                    }
-                                }
-                            }
-                        }
-                    )
+            { userId ->
+                when (userId) {
+                    null -> false.right() // Email not in use
+                    currentUserId.toString() -> false.right() // Same user
+                    else -> true.right() // Different user has this email
                 }
             }
         )
     }
 
+    /**
+     * Update user profile (email, firstName, lastName)
+     */
+    override suspend fun updateProfile(username: String, email: String, firstName: String, lastName: String): Either<RedisError, User> {
+        return getUser(username).fold(
+            { error -> error.left() },
+            { user ->
+                // Check if email is already in use by another user
+                isEmailInUseByOtherUser(email, user.id).fold(
+                    { error -> error.left() },
+                    { emailInUse ->
+                        if (emailInUse) {
+                            RedisError.OperationError("Email is already in use by another user").left()
+                        } else {
+                            Either.catch {
+                                val userKey = "$keyPrefix:user:id:${user.id}"
+                                val oldEmailIndexKey = "$keyPrefix:user:email:${user.email.lowercase()}"
+                                val newEmailIndexKey = "$keyPrefix:user:email:${email.lowercase()}"
+
+                                val updatedUser = user.copy(email = email, firstName = firstName, lastName = lastName)
+                                val updatedJsonString = json.encodeToString(updatedUser)
+
+                                val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+
+                                // Use transaction to update user and email index atomically
+                                asyncCommands.multi().await()
+
+                                // Update user data
+                                asyncCommands.set(userKey, updatedJsonString)
+
+                                // Update email index if email changed
+                                if (!user.email.equals(email, ignoreCase = true)) {
+                                    // Delete old email index
+                                    if (user.email.isNotBlank()) {
+                                        asyncCommands.del(oldEmailIndexKey)
+                                    }
+                                    // Create new email index
+                                    if (email.isNotBlank()) {
+                                        asyncCommands.set(newEmailIndexKey, user.id.toString())
+                                    }
+                                }
+
+                                asyncCommands.exec().await()
+
+                                updatedUser
+                            }.mapLeft { e ->
+                                when (e) {
+                                    is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
+                                    else -> RedisError.OperationError("Failed to update profile: ${e.message}")
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+        )
+    }
+
     suspend fun validateToken(username: String, token: String): Either<RedisError, Boolean> {
-        val key = "$environment:user:$username:token:$token"
+        val key = "$keyPrefix:user:$username:token:$token"
 
         return get(key).fold(
             { error -> error.left() },
@@ -962,7 +1073,7 @@ class RedisService private constructor(
         val code = secureRandom.nextInt(900000) + 100000 // Range: 100000-999999
         val token = code.toString()
 
-        val key = "$environment:user:$username:token:$token"
+        val key = "$keyPrefix:user:$username:token:$token"
 
         return Either.catch {
             connection?.async()?.setex(key, tokenExpirySeconds, "valid")?.await() ?: throw IllegalStateException("Not connected")
@@ -986,7 +1097,7 @@ class RedisService private constructor(
     /**
      * Calculate expiry date for each medicine based on schedules and stock
      */
-    suspend fun medicineExpiry(username: String, now: java.time.LocalDateTime = java.time.LocalDateTime.now()): Either<RedisError, List<MedicineWithExpiry>> = either {
+    override suspend fun medicineExpiry(username: String, now: java.time.LocalDateTime): Either<RedisError, List<MedicineWithExpiry>> = either {
         val medicines = getAllMedicines(username).bind()
         val schedules = getAllSchedules(username).bind()
         medicines
@@ -1028,10 +1139,10 @@ class RedisService private constructor(
      * Verify password reset token and return associated username
      * Token is single-use and will be deleted after successful verification
      */
-    suspend fun verifyPasswordResetToken(token: String): Either<RedisError, String> = either {
+    override suspend fun verifyPasswordResetToken(token: String): Either<RedisError, String> = either {
         // Scan for keys matching: password_reset:*:token
         // This will find the key password_reset:username:token
-        val pattern = "$environment:password_reset:*:$token"
+        val pattern = "$keyPrefix:password_reset:*:$token"
         logger.debug("Verifying password reset token, scanning for password_reset keys")
         val keys = mutableListOf<String>()
 
