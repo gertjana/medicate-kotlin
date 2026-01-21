@@ -40,43 +40,4 @@ fun Route.adherenceRoutes(storageService: StorageService) {
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
-
-    // Get low stock medicines
-    get("/lowstock") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
-            return@get
-        }
-
-        val thresholdParam = call.request.queryParameters["threshold"]
-
-        val threshold = if (thresholdParam == null) {
-            10.0
-        } else {
-            val parsed = thresholdParam.toDoubleOrNull()
-            if (parsed == null) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to "Invalid threshold value. It must be a positive number.")
-                )
-                return@get
-            }
-            if (parsed <= 0.0) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to "Threshold must be greater than 0.")
-                )
-                return@get
-            }
-            parsed
-        }
-        either {
-            val lowStockMedicines = storageService.getLowStockMedicines(username, threshold).bind()
-            logger.debug("Successfully retrieved ${lowStockMedicines.size} low stock medicines for user '$username' (threshold: $threshold)")
-            call.respond(HttpStatusCode.OK, lowStockMedicines)
-        }.onLeft { error ->
-            logger.error("Failed to get low stock medicines for user '$username': ${error.message}")
-            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
-        }
-    }
 }

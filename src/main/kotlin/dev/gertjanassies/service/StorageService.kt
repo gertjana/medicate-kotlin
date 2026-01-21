@@ -76,10 +76,6 @@ interface StorageService {
      */
     suspend fun getAllMedicines(username: String): Either<RedisError, List<Medicine>>
 
-    /**
-     * Get medicines with low stock (below threshold) for a user
-     */
-    suspend fun getLowStockMedicines(username: String, threshold: Double = 10.0): Either<RedisError, List<Medicine>>
 
     // Schedule operations
 

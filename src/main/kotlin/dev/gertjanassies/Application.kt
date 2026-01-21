@@ -57,10 +57,8 @@ fun Application.module() {
             allowMethod(HttpMethod.Patch)
             allowHeader(HttpHeaders.Authorization)
             allowHeader(HttpHeaders.ContentType)
-            // Allow requests from localhost:5173 for local development
             allowHost("localhost:5173", schemes = listOf("http", "https"))
             allowHost("127.0.0.1:5173", schemes = listOf("http", "https"))
-            allowHost("medicate-kotlin.onrender.com", schemes = listOf("https"))
         }
     }
 

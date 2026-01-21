@@ -35,10 +35,12 @@
 
 ## Production Rollout
 
+ - [ ] Low stock should be based on schedule (< 7 days = red, < 14 days = yellow), not stock count
  - [ ] Allow people to have the same username, but different emails
  - [ ] Activate User with email confirmation after registration
  - [ ] Allow users to delete their accounts
- - [ ] Add rate limiting to prevent brute-force attacks
+ - [ ] Add rate limiting to register/login to prevent brute-force attacks
+ - [ ] Optional, implement Postgres StorageService for production instead of Redis
 
 
 ---

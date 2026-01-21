@@ -255,15 +255,6 @@ class RedisService private constructor(
         )
     }
 
-    /**
-     * Get medicines with low stock (< threshold) for a specific user
-     */
-    override suspend fun getLowStockMedicines(username: String, threshold: Double): Either<RedisError, List<Medicine>> {
-        return either {
-            val allMedicines = getAllMedicines(username).bind()
-            allMedicines.filter { it.stock < threshold }
-        }
-    }
 
     // Schedule operations
 

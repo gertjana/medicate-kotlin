@@ -4,7 +4,6 @@ import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.AdherenceStatus
 import dev.gertjanassies.model.DayAdherence
-import dev.gertjanassies.model.Medicine
 import dev.gertjanassies.model.WeeklyAdherence
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
@@ -23,7 +22,6 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import io.mockk.*
-import java.util.*
 
 class AdherenceRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
@@ -125,165 +123,6 @@ class AdherenceRoutesTest : FunSpec({
 
                 response.status shouldBe HttpStatusCode.InternalServerError
                 coVerify { mockRedisService.getWeeklyAdherence(testUsername) }
-            }
-        }
-    }
-
-    context("GET /lowstock") {
-        test("should return low stock medicines with default threshold") {
-            val medicines = listOf(
-                Medicine(UUID.randomUUID(), "Low Stock Med 1", 100.0, "mg", 5.0),
-                Medicine(UUID.randomUUID(), "Low Stock Med 2", 200.0, "mg", 3.0)
-            )
-            coEvery { mockRedisService.getLowStockMedicines(testUsername, 10.0) } returns medicines.right()
-
-            testApplication {
-                environment { config = MapApplicationConfig() }
-                application {
-                    install(ContentNegotiation) { json() }
-                    installTestJwtAuth()
-                }
-                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
-
-                val client = createClient {
-                    install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
-                        json()
-                    }
-                }
-
-                val response = client.get("/lowstock") {
-                    header("Authorization", "Bearer $jwtToken")
-                }
-
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<List<Medicine>>()
-                body.size shouldBe 2
-                body[0].stock shouldBe 5.0
-                body[1].stock shouldBe 3.0
-                coVerify { mockRedisService.getLowStockMedicines(testUsername, 10.0) }
-            }
-        }
-
-        test("should return low stock medicines with custom threshold") {
-            val medicines = listOf(
-                Medicine(UUID.randomUUID(), "Low Stock Med", 100.0, "mg", 15.0)
-            )
-            coEvery { mockRedisService.getLowStockMedicines(testUsername, 20.0) } returns medicines.right()
-
-            testApplication {
-                environment { config = MapApplicationConfig() }
-                application {
-                    install(ContentNegotiation) { json() }
-                    installTestJwtAuth()
-                }
-                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
-
-                val client = createClient {
-                    install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
-                        json()
-                    }
-                }
-
-                val response = client.get("/lowstock?threshold=20.0") {
-                    header("Authorization", "Bearer $jwtToken")
-                }
-
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<List<Medicine>>()
-                body.size shouldBe 1
-                body[0].stock shouldBe 15.0
-                coVerify { mockRedisService.getLowStockMedicines(testUsername, 20.0) }
-            }
-        }
-
-        test("should return 400 for invalid threshold") {
-            testApplication {
-                environment { config = MapApplicationConfig() }
-                application {
-                    install(ContentNegotiation) { json() }
-                    installTestJwtAuth()
-                }
-                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
-
-                val response = client.get("/lowstock?threshold=invalid") {
-                    header("Authorization", "Bearer $jwtToken")
-                }
-
-                response.status shouldBe HttpStatusCode.BadRequest
-                coVerify(exactly = 0) { mockRedisService.getLowStockMedicines(any(), any()) }
-            }
-        }
-
-        test("should return 400 for negative threshold") {
-            testApplication {
-                environment { config = MapApplicationConfig() }
-                application {
-                    install(ContentNegotiation) { json() }
-                    installTestJwtAuth()
-                }
-                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
-
-                val response = client.get("/lowstock?threshold=-5.0") {
-                    header("Authorization", "Bearer $jwtToken")
-                }
-
-                response.status shouldBe HttpStatusCode.BadRequest
-                coVerify(exactly = 0) { mockRedisService.getLowStockMedicines(any(), any()) }
-            }
-        }
-
-        test("should return 400 for zero threshold") {
-            testApplication {
-                environment { config = MapApplicationConfig() }
-                application {
-                    install(ContentNegotiation) { json() }
-                    installTestJwtAuth()
-                }
-                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
-
-                val response = client.get("/lowstock?threshold=0") {
-                    header("Authorization", "Bearer $jwtToken")
-                }
-
-                response.status shouldBe HttpStatusCode.BadRequest
-                coVerify(exactly = 0) { mockRedisService.getLowStockMedicines(any(), any()) }
-            }
-        }
-
-        test("should return 401 if no username header") {
-            testApplication {
-                environment { config = MapApplicationConfig() }
-                application {
-                    install(ContentNegotiation) { json() }
-                    installTestJwtAuth()
-                }
-                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
-
-                val response = client.get("/lowstock")
-
-                response.status shouldBe HttpStatusCode.Unauthorized
-                coVerify(exactly = 0) { mockRedisService.getLowStockMedicines(any(), any()) }
-            }
-        }
-
-        test("should return 500 on service error") {
-            coEvery { mockRedisService.getLowStockMedicines(testUsername, 10.0) } returns
-                RedisError.OperationError("Database error").left()
-
-            testApplication {
-                environment { config = MapApplicationConfig() }
-                application {
-                    install(ContentNegotiation) { json() }
-                    installTestJwtAuth()
-                }
-                routing { authenticate("auth-jwt") { adherenceRoutes(mockRedisService) } }
-
-                val response = client.get("/lowstock") {
-                    header("Authorization", "Bearer $jwtToken")
-                }
-
-                response.status shouldBe HttpStatusCode.InternalServerError
-                coVerify { mockRedisService.getLowStockMedicines(testUsername, 10.0) }
             }
         }
     }
