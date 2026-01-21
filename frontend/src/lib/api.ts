@@ -71,6 +71,7 @@ export interface MedicineExpiry {
 	unit: string;
 	stock: number;
 	description?: string;
+	expiryDate?: string;
 }
 
 // Determine API base URL based on environment
@@ -313,11 +314,6 @@ export async function getWeeklyAdherence(): Promise<WeeklyAdherence> {
 	});
 }
 
-export async function getLowStockMedicines(threshold: number = 10): Promise<Medicine[]> {
-	return authenticatedFetch(`${API_BASE}/lowstock?threshold=${threshold}`, {
-		cache: 'no-store'
-	});
-}
 
 // User authentication API
 export async function registerUser(username: string, password: string, email?: string): Promise<User> {

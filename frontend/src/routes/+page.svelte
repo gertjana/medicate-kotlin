@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { userStore } from '$lib/stores/user';
-	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, getLowStockMedicines, takeDose, deleteDosageHistory, getMedicineExpiry, getMedicines, getSchedules, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine, type MedicineExpiry, type Schedule } from '$lib/api';
+	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, takeDose, deleteDosageHistory, getMedicineExpiry, getMedicines, getSchedules, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine, type MedicineExpiry, type Schedule } from '$lib/api';
 
 	// SvelteKit props - using const since they're not used internally
 	export const data = {};
@@ -11,11 +11,10 @@
 	let dailySchedule: DailySchedule | null = null;
 	let dosageHistories: DosageHistory[] = [];
 	let weeklyAdherence: WeeklyAdherence | null = null;
-	let lowStockMedicines: Medicine[] = [];
 	let medicineExpiry: MedicineExpiry[] = [];
 	let medicines: Medicine[] = [];
 	let schedules: Schedule[] = [];
-	let suppressedLowStockIds: Set<string> = new Set();
+	let suppressedExpiringIds: Set<string> = new Set();
 	let loading = true;
 	let expiryLoading = false;
 	let error = '';
@@ -27,12 +26,12 @@
 	// Load suppressed IDs from localStorage
 	function loadSuppressedIds() {
 		if (!browser) return;
-		const stored = localStorage.getItem('suppressedLowStock');
+		const stored = localStorage.getItem('suppressedExpiring');
 		if (stored) {
 			try {
-				suppressedLowStockIds = new Set(JSON.parse(stored));
+				suppressedExpiringIds = new Set(JSON.parse(stored));
 			} catch (e) {
-				suppressedLowStockIds = new Set();
+				suppressedExpiringIds = new Set();
 			}
 		}
 	}
@@ -40,16 +39,25 @@
 	// Save suppressed IDs to localStorage
 	function saveSuppressedIds() {
 		if (!browser) return;
-		localStorage.setItem('suppressedLowStock', JSON.stringify(Array.from(suppressedLowStockIds)));
+		localStorage.setItem('suppressedExpiring', JSON.stringify(Array.from(suppressedExpiringIds)));
 	}
 
-	// Filter out suppressed medicines from low stock list
-	$: visibleLowStockMedicines = lowStockMedicines.filter(m => !suppressedLowStockIds.has(m.id));
+	// Calculate medicines expiring within 7 days
+	$: expiringMedicines = medicineExpiry.filter(m => {
+		if (!m.expiryDate) return false;
+		const expiryDate = new Date(m.expiryDate);
+		const now = new Date();
+		const daysUntilExpiry = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+		return daysUntilExpiry <= 7 && daysUntilExpiry >= 0;
+	});
 
-	// Suppress current low stock medicines
-	function suppressLowStockWarning() {
-		lowStockMedicines.forEach(m => suppressedLowStockIds.add(m.id));
-		suppressedLowStockIds = suppressedLowStockIds; // Trigger reactivity
+	// Filter out suppressed medicines from expiring list
+	$: visibleExpiringMedicines = expiringMedicines.filter(m => !suppressedExpiringIds.has(m.id));
+
+	// Suppress current expiring medicines
+	function suppressExpiringWarning() {
+		expiringMedicines.forEach(m => suppressedExpiringIds.add(m.id));
+		suppressedExpiringIds = suppressedExpiringIds; // Trigger reactivity
 		saveSuppressedIds();
 	}
 
@@ -83,14 +91,15 @@
 		loading = true;
 		error = '';
 		try {
-			[dailySchedule, dosageHistories, weeklyAdherence, lowStockMedicines, medicines, schedules] = await Promise.all([
+			[dailySchedule, dosageHistories, weeklyAdherence, medicines, schedules] = await Promise.all([
 				getDailySchedule(),
 				getDosageHistories(),
 				getWeeklyAdherence(),
-				getLowStockMedicines(10),
 				getMedicines(),
 				getSchedules()
 			]);
+			// Load medicine expiry separately after main data is loaded
+			await loadMedicineExpiry();
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load schedule';
 		} finally {
@@ -246,8 +255,8 @@
 	</div>
 {:else}
 <div class="max-w-4xl">
-	<!-- Low Stock Warning Banner -->
-	{#if !loading && visibleLowStockMedicines.length > 0}
+	<!-- Medicine Expiring Warning Banner -->
+	{#if !loading && visibleExpiringMedicines.length > 0}
 		<div class="bg-yellow-50 border-2 border-yellow-400 rounded-lg mb-6 p-4">
 			<div class="flex items-start gap-3">
 				<svg class="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -255,18 +264,19 @@
 				</svg>
 				<div class="flex-1">
 					<p class="font-semibold text-yellow-800">
-						Low Stock Warning: {visibleLowStockMedicines.length} medicine{visibleLowStockMedicines.length > 1 ? 's' : ''} running low
+						Running Low: {visibleExpiringMedicines.length} medicine{visibleExpiringMedicines.length > 1 ? 's' : ''} expiring within 7 days
 					</p>
 					<div class="text-sm text-yellow-700 mt-1">
-						{#each visibleLowStockMedicines as medicine, i}
+						{#each visibleExpiringMedicines as medicine, i}
 							<span>
-								<strong>{medicine.name}</strong> {medicine.dose} {medicine.unit} ({medicine.stock} remaining){#if i < visibleLowStockMedicines.length - 1}, {/if}
+								<strong>{medicine.name}</strong> {medicine.dose} {medicine.unit}
+								({medicine.stock} remaining, expires {medicine.expiryDate ? new Date(medicine.expiryDate).toLocaleDateString() : 'soon'}){#if i < visibleExpiringMedicines.length - 1}, {/if}
 							</span>
 						{/each}
 					</div>
 				</div>
 				<button
-					on:click={suppressLowStockWarning}
+					on:click={suppressExpiringWarning}
 					class="text-yellow-700 hover:text-yellow-900 transition-colors flex-shrink-0"
 					title="Dismiss this warning"
 				>
