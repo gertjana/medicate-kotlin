@@ -36,9 +36,9 @@ class UserRoutesTest : FunSpec({
         mockRedisService = mockk()
         mockJwtService = mockk()
 
-        // Mock JWT token generation
-        every { mockJwtService.generateAccessToken(any()) } returns "test-access-token-123"
-        every { mockJwtService.generateRefreshToken(any()) } returns "test-refresh-token-456"
+        // Mock JWT token generation with any username and userId
+        every { mockJwtService.generateAccessToken(any(), any()) } returns "test-access-token-123"
+        every { mockJwtService.generateRefreshToken(any(), any()) } returns "test-refresh-token-456"
     }
 
     afterEach {
@@ -50,8 +50,9 @@ class UserRoutesTest : FunSpec({
             val username = "testuser"
             val email = "testuser@example.com"
             val password = "password123"
+            val userId = java.util.UUID.randomUUID()
             val request = UserRequest(username, email, password)
-            val user = User(id = java.util.UUID.randomUUID(), username = username, email = email, passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = email, passwordHash = "hashedpassword")
             coEvery { mockRedisService.registerUser(username, email, password) } returns user.right()
 
             testApplication {
@@ -83,8 +84,8 @@ class UserRoutesTest : FunSpec({
                 refreshCookie?.httpOnly shouldBe true
 
                 coVerify { mockRedisService.registerUser(username, email, password) }
-                verify { mockJwtService.generateAccessToken(username) }
-                verify { mockJwtService.generateRefreshToken(username) }
+                verify { mockJwtService.generateAccessToken(username, userId.toString()) }
+                verify { mockJwtService.generateRefreshToken(username, userId.toString()) }
             }
         }
 
@@ -183,8 +184,9 @@ class UserRoutesTest : FunSpec({
         test("should login user successfully and return JWT token") {
             val username = "testuser"
             val password = "password123"
+            val userId = java.util.UUID.randomUUID()
             val request = UserRequest(username, "", password)
-            val user = User(id = java.util.UUID.randomUUID(), username = username, email = "", passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = "", passwordHash = "hashedpassword")
             coEvery { mockRedisService.loginUser(username, password) } returns user.right()
 
             testApplication {
@@ -215,8 +217,8 @@ class UserRoutesTest : FunSpec({
                 refreshCookie?.httpOnly shouldBe true
 
                 coVerify { mockRedisService.loginUser(username, password) }
-                verify { mockJwtService.generateAccessToken(username) }
-                verify { mockJwtService.generateRefreshToken(username) }
+                verify { mockJwtService.generateAccessToken(username, userId.toString()) }
+                verify { mockJwtService.generateRefreshToken(username, userId.toString()) }
             }
         }
 
@@ -512,8 +514,9 @@ class UserRoutesTest : FunSpec({
     context("GET /user/profile") {
         test("should retrieve user profile successfully with valid JWT") {
             val username = "testuser"
+            val userId = java.util.UUID.randomUUID()
             val user = User(
-                id = java.util.UUID.randomUUID(),
+                id = userId,
                 username = username,
                 email = "test@example.com",
                 firstName = "Test",
@@ -521,7 +524,7 @@ class UserRoutesTest : FunSpec({
                 passwordHash = "hashedpassword"
             )
 
-            coEvery { mockRedisService.getUser(username) } returns user.right()
+            coEvery { mockRedisService.getUserById(userId.toString()) } returns user.right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -535,7 +538,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username, userId.toString())
                 val client = createClient { install(ClientContentNegotiation) { json() } }
 
                 val response = client.get("/user/profile") {
@@ -549,14 +552,15 @@ class UserRoutesTest : FunSpec({
                 body.firstName shouldBe "Test"
                 body.lastName shouldBe "User"
 
-                coVerify { mockRedisService.getUser(username) }
+                coVerify { mockRedisService.getUserById(userId.toString()) }
             }
         }
 
         test("should return 404 when user not found") {
             val username = "nonexistent"
+            val userId = java.util.UUID.randomUUID()
 
-            coEvery { mockRedisService.getUser(username) } returns
+            coEvery { mockRedisService.getUserById(userId.toString()) } returns
                 RedisError.NotFound("User not found").left()
 
             testApplication {
@@ -571,7 +575,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username, userId.toString())
                 val client = createClient { install(ClientContentNegotiation) { json() } }
 
                 val response = client.get("/user/profile") {
@@ -579,14 +583,15 @@ class UserRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.NotFound
-                coVerify { mockRedisService.getUser(username) }
+                coVerify { mockRedisService.getUserById(userId.toString()) }
             }
         }
 
         test("should return 500 on Redis error") {
             val username = "testuser"
+            val userId = java.util.UUID.randomUUID()
 
-            coEvery { mockRedisService.getUser(username) } returns
+            coEvery { mockRedisService.getUserById(userId.toString()) } returns
                 RedisError.OperationError("Redis connection failed").left()
 
             testApplication {
@@ -601,7 +606,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username, userId.toString())
                 val client = createClient { install(ClientContentNegotiation) { json() } }
 
                 val response = client.get("/user/profile") {
@@ -609,7 +614,7 @@ class UserRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
-                coVerify { mockRedisService.getUser(username) }
+                coVerify { mockRedisService.getUserById(userId.toString()) }
             }
         }
     }
@@ -617,13 +622,22 @@ class UserRoutesTest : FunSpec({
     context("PUT /user/profile") {
         test("should update user profile successfully with valid JWT") {
             val username = "testuser"
+            val userId = java.util.UUID.randomUUID()
             val updateRequest = UpdateProfileRequest(
                 email = "updated@example.com",
                 firstName = "Updated",
                 lastName = "Name"
             )
+            val existingUser = User(
+                id = userId,
+                username = username,
+                email = "old@example.com",
+                firstName = "Old",
+                lastName = "Name",
+                passwordHash = "hashedpassword"
+            )
             val updatedUser = User(
-                id = java.util.UUID.randomUUID(),
+                id = userId,
                 username = username,
                 email = updateRequest.email,
                 firstName = updateRequest.firstName,
@@ -631,6 +645,9 @@ class UserRoutesTest : FunSpec({
                 passwordHash = "hashedpassword"
             )
 
+            // Mock getUserById first (called to get username)
+            coEvery { mockRedisService.getUserById(userId.toString()) } returns existingUser.right()
+            // Then mock updateProfile
             coEvery {
                 mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName)
             } returns updatedUser.right()
@@ -647,7 +664,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username, userId.toString())
                 val client = createClient { install(ClientContentNegotiation) { json() } }
 
                 val response = client.put("/user/profile") {
@@ -663,6 +680,7 @@ class UserRoutesTest : FunSpec({
                 body.firstName shouldBe updateRequest.firstName
                 body.lastName shouldBe updateRequest.lastName
 
+                coVerify { mockRedisService.getUserById(userId.toString()) }
                 coVerify { mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) }
             }
         }
@@ -771,15 +789,16 @@ class UserRoutesTest : FunSpec({
 
         test("should return 404 when user not found") {
             val username = "nonexistent"
+            val userId = java.util.UUID.randomUUID()
             val updateRequest = UpdateProfileRequest(
                 email = "test@example.com",
                 firstName = "Test",
                 lastName = "User"
             )
 
-            coEvery {
-                mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName)
-            } returns RedisError.NotFound("User not found").left()
+            // Mock getUserById to return NotFound (user doesn't exist)
+            coEvery { mockRedisService.getUserById(userId.toString()) } returns
+                RedisError.NotFound("User not found").left()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -793,7 +812,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username, userId.toString())
                 val client = createClient { install(ClientContentNegotiation) { json() } }
 
                 val response = client.put("/user/profile") {
@@ -803,18 +822,32 @@ class UserRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.NotFound
-                coVerify { mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) }
+                coVerify { mockRedisService.getUserById(userId.toString()) }
+                // updateProfile should not be called since getUserById failed
+                coVerify(exactly = 0) { mockRedisService.updateProfile(any(), any(), any(), any()) }
             }
         }
 
         test("should return 500 on Redis error") {
             val username = "testuser"
+            val userId = java.util.UUID.randomUUID()
             val updateRequest = UpdateProfileRequest(
                 email = "test@example.com",
                 firstName = "Test",
                 lastName = "User"
             )
+            val existingUser = User(
+                id = userId,
+                username = username,
+                email = "old@example.com",
+                firstName = "Old",
+                lastName = "Name",
+                passwordHash = "hashedpassword"
+            )
 
+            // Mock getUserById to succeed
+            coEvery { mockRedisService.getUserById(userId.toString()) } returns existingUser.right()
+            // Mock updateProfile to fail with OperationError
             coEvery {
                 mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName)
             } returns RedisError.OperationError("Redis connection failed").left()
@@ -831,7 +864,7 @@ class UserRoutesTest : FunSpec({
                     }
                 }
 
-                val token = TestJwtConfig.generateToken(username)
+                val token = TestJwtConfig.generateToken(username, userId.toString())
                 val client = createClient { install(ClientContentNegotiation) { json() } }
 
                 val response = client.put("/user/profile") {
@@ -841,6 +874,7 @@ class UserRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
+                coVerify { mockRedisService.getUserById(userId.toString()) }
                 coVerify { mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) }
             }
         }

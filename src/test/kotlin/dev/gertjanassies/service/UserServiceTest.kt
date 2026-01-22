@@ -76,24 +76,37 @@ class UserServiceTest : FunSpec({
             verify(exactly = 1) { mockAsyncCommands.exec() }
         }
 
-        test("should return error when username already exists") {
+        test("should allow registration with same username but different email") {
             val username = "existinguser"
-            val email = "existing@example.com"
+            val email = "new@example.com"
             val password = "password123"
             val usernameIndexKey = "medicate:$environment:user:username:$username"
+            val emailIndexKey = "medicate:$environment:user:email:${email.lowercase()}"
             val existingUserId = java.util.UUID.randomUUID().toString()
 
             every { mockConnection.async() } returns mockAsyncCommands
-            // Mock username index returns existing userId
+            // Mock username index returns existing userId (will be appended to)
             every { mockAsyncCommands.get(usernameIndexKey) } returns createRedisFutureMock(existingUserId)
+            // Email doesn't exist yet
+            every { mockAsyncCommands.get(emailIndexKey) } returns createRedisFutureMock(null as String?)
+            // Mock transaction
+            every { mockAsyncCommands.multi() } returns createRedisFutureMock("OK")
+            every { mockAsyncCommands.set(any(), any()) } returns createRedisFutureMock("OK")
+            val mockTransactionResult = mockk<TransactionResult>()
+            every { mockTransactionResult.wasDiscarded() } returns false
+            every { mockAsyncCommands.exec() } returns createRedisFutureMock(mockTransactionResult)
 
             val result = redisService.registerUser(username, email, password)
 
-            result.isLeft() shouldBe true
-            result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
-            result.leftOrNull()?.message shouldBe "Username already exists"
+            result.isRight() shouldBe true
+            val user = result.getOrNull()!!
+            user.username shouldBe username
+            user.email shouldBe email
 
             verify(exactly = 1) { mockAsyncCommands.get(usernameIndexKey) }
+            verify(exactly = 1) { mockAsyncCommands.get(emailIndexKey) }
+            // Verify the username index was updated with comma-separated IDs
+            verify(exactly = 1) { mockAsyncCommands.set(usernameIndexKey, match { it.contains(",") }) }
         }
 
         test("should return error when registration fails") {
@@ -118,7 +131,7 @@ class UserServiceTest : FunSpec({
             result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
         }
 
-        test("should proceed with registration when checking existing user fails") {
+        test("should return error when checking existing user fails") {
             val username = "testuser"
             val email = "test@example.com"
             val password = "password123"
@@ -126,24 +139,17 @@ class UserServiceTest : FunSpec({
             val emailIndexKey = "medicate:$environment:user:email:${email.lowercase()}"
 
             every { mockConnection.async() } returns mockAsyncCommands
-            // When username check fails, getOrNull() returns null, so it proceeds
+            // When username check fails, the whole registration fails now
             every { mockAsyncCommands.get(usernameIndexKey) } returns
                 createFailedRedisFutureMock(RuntimeException("Connection error"))
-            // Email check succeeds
+            // Email check not reached due to username check failure
             every { mockAsyncCommands.get(emailIndexKey) } returns createRedisFutureMock(null as String?)
-            // Transaction succeeds
-            every { mockAsyncCommands.multi() } returns createRedisFutureMock("OK")
-            every { mockAsyncCommands.set(any(), any()) } returns createRedisFutureMock("OK")
-            val mockTransactionResult = mockk<TransactionResult>()
-            every { mockTransactionResult.wasDiscarded() } returns false
-            every { mockAsyncCommands.exec() } returns createRedisFutureMock(mockTransactionResult)
 
             val result = redisService.registerUser(username, email, password)
 
-            // Due to getOrNull(), the username check error is swallowed and registration proceeds
-            result.isRight() shouldBe true
-            val user = result.getOrNull()!!
-            user.username shouldBe username
+            // Registration should fail when username index check fails
+            result.isLeft() shouldBe true
+            result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
         }
     }
 
@@ -249,14 +255,16 @@ class UserServiceTest : FunSpec({
             every { mockConnection.async() } returns mockAsyncCommands
             // Mock username index lookup
             every { mockAsyncCommands.get(usernameIndexKey) } returns createRedisFutureMock(userId.toString())
-            // Mock invalid JSON in user data
+            // Mock invalid JSON in user data - getUserById will fail with SerializationError
             every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock("invalid json")
 
             val result = redisService.loginUser(username, password)
 
             result.isLeft() shouldBe true
-            // getUserById returns SerializationError for invalid JSON
-            result.leftOrNull().shouldBeInstanceOf<RedisError.SerializationError>()
+            // loginUser continues to next user if one fails, so if all fail it returns "Invalid credentials"
+            // In this case there's only one user with invalid JSON, so it returns OperationError
+            result.leftOrNull().shouldBeInstanceOf<RedisError.OperationError>()
+            result.leftOrNull()?.message shouldBe "Invalid credentials"
         }
     }
 
@@ -430,6 +438,55 @@ class UserServiceTest : FunSpec({
             verify(exactly = 1) { mockAsyncCommands.get(emailIndexKey) }
             verify(exactly = 0) { mockAsyncCommands.multi() }
             verify(exactly = 0) { mockAsyncCommands.exec() }
+        }
+    }
+
+    context("Same username with different emails") {
+        test("username index supports storing multiple user IDs for same username") {
+            // This test documents that the implementation supports multiple users
+            // with the same username by storing comma-separated user IDs.
+            // Full integration testing would require a real Redis instance.
+
+            val username = "john"
+            val email = "john@example.com"
+            val password = "password123"
+            val usernameIndexKey = "medicate:$environment:user:username:$username"
+            val emailIndexKey = "medicate:$environment:user:email:${email.lowercase()}"
+
+            // The key behavior verified here:
+            // 1. registerUser does NOT reject duplicate usernames (removed the check)
+            // 2. registerUser appends to existing username index (comma-separated IDs)
+            // 3. loginUser checks passwords against ALL users with that username
+
+            // For this simplified test, we just verify registration succeeds
+            // when username already exists (demonstrating no rejection)
+
+            val existingUserId = java.util.UUID.randomUUID().toString()
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            // Email doesn't exist
+            every { mockAsyncCommands.get(emailIndexKey) } returns createRedisFutureMock(null as String?)
+            // Username DOES exist (has existing user)
+            every { mockAsyncCommands.get(usernameIndexKey) } returns createRedisFutureMock(existingUserId)
+            // Transaction succeeds
+            every { mockAsyncCommands.multi() } returns createRedisFutureMock("OK")
+            every { mockAsyncCommands.set(any(), any()) } returns createRedisFutureMock("OK")
+            val mockTransactionResult = mockk<TransactionResult>()
+            every { mockTransactionResult.wasDiscarded() } returns false
+            every { mockAsyncCommands.exec() } returns createRedisFutureMock(mockTransactionResult)
+
+            val result = redisService.registerUser(username, email, password)
+
+            // Should succeed even though username exists
+            result.isRight() shouldBe true
+
+            // Verify the username index was updated with comma-separated list containing both the existing and new user
+            verify {
+                mockAsyncCommands.set(
+                    usernameIndexKey,
+                    match { it.startsWith(existingUserId) && it.contains(",") }
+                )
+            }
         }
     }
 })

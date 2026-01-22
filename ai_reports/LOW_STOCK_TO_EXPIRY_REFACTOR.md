@@ -95,6 +95,15 @@ All tests pass successfully:
 - No failing tests
 - Code coverage maintained
 
+## Additional Fixes
+
+### Email Styling
+- Fixed password reset email button styling to ensure text is:
+  - White color (with `!important` to override email client defaults)
+  - Bold font weight
+  - No underline (text-decoration: none)
+  - Consistent styling for `:visited` and `:hover` states
+
 ## Migration Notes
 
 For users upgrading:

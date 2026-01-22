@@ -14,13 +14,6 @@ import java.util.*
 
 private val logger = LoggerFactory.getLogger("DosageHistoryRoutes")
 
-/**
- * Helper function to extract username from JWT token
- */
-private fun ApplicationCall.getUsername(): String? {
-    val principal = principal<JWTPrincipal>()
-    return principal?.payload?.getClaim("username")?.asString()
-}
 
 /**
  * Dosage history routes
@@ -28,25 +21,25 @@ private fun ApplicationCall.getUsername(): String? {
 fun Route.dosageHistoryRoutes(storageService: StorageService) {
     // Get all dosage histories
     get("/history") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@get
         }
 
         either {
-            val histories = storageService.getAllDosageHistories(username).bind()
-            logger.debug("Successfully retrieved ${histories.size} dosage histories for user '$username'")
+            val histories = storageService.getAllDosageHistories(userId).bind()
+            logger.debug("Successfully retrieved ${histories.size} dosage histories for user ID: $userId")
             call.respond(HttpStatusCode.OK, histories)
         }.onLeft { error ->
-            logger.error("Failed to get dosage histories for user '$username': ${error.message}")
+            logger.error("Failed to get dosage histories for user ID '$userId': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
 
     // Delete a dosage history (undo dose)
     delete("/history/{id}") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@delete
         }
 
@@ -63,11 +56,11 @@ fun Route.dosageHistoryRoutes(storageService: StorageService) {
         }
 
         either {
-            storageService.deleteDosageHistory(username, dosageHistoryId).bind()
-            logger.debug("Successfully deleted dosage history '$id' for user '$username'")
+            storageService.deleteDosageHistory(userId, dosageHistoryId).bind()
+            logger.debug("Successfully deleted dosage history '$id' for user ID: $userId")
             call.respond(HttpStatusCode.NoContent)
         }.onLeft { error ->
-            logger.error("Failed to delete dosage history '$id' for user '$username': ${error.message}")
+            logger.error("Failed to delete dosage history '$id' for user ID '$userId': ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))

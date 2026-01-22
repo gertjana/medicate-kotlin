@@ -57,8 +57,8 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService) {
             val user = result.getOrNull()!!
 
             // Generate JWT tokens for newly registered user
-            val accessToken = jwtService.generateAccessToken(user.username)
-            val refreshToken = jwtService.generateRefreshToken(user.username)
+            val accessToken = jwtService.generateAccessToken(user.username, user.id.toString())
+            val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString())
 
             // Set refresh token as HttpOnly cookie
             call.response.cookies.append(
@@ -109,8 +109,8 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService) {
             val user = loginResult.getOrNull()!!
 
             // Generate JWT tokens for logged in user
-            val accessToken = jwtService.generateAccessToken(user.username)
-            val refreshToken = jwtService.generateRefreshToken(user.username)
+            val accessToken = jwtService.generateAccessToken(user.username, user.id.toString())
+            val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString())
 
             // Set refresh token as HttpOnly cookie
             call.response.cookies.append(
@@ -185,16 +185,16 @@ fun Route.protectedUserRoutes(storageService: StorageService) {
          * Get current user's profile
          */
         get("/profile") {
-            val username = call.principal<JWTPrincipal>()?.payload?.getClaim("username")?.asString() ?: run {
+            val userId = call.getUserId() ?: run {
                 call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Not authenticated"))
                 return@get
             }
 
-            val result = storageService.getUser(username)
+            val result = storageService.getUserById(userId)
 
             result.fold(
                 { error ->
-                    logger.error("Failed to get profile for user '$username': ${error.message}")
+                    logger.error("Failed to get profile for user ID '$userId': ${error.message}")
                     when (error) {
                         is dev.gertjanassies.service.RedisError.NotFound ->
                             call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -203,7 +203,7 @@ fun Route.protectedUserRoutes(storageService: StorageService) {
                     }
                 },
                 { user ->
-                    logger.debug("Successfully retrieved profile for user '$username'")
+                    logger.debug("Successfully retrieved profile for user ID '$userId' (username: '${user.username}')")
                     call.respond(HttpStatusCode.OK, user.toResponse())
                 }
             )
@@ -214,7 +214,7 @@ fun Route.protectedUserRoutes(storageService: StorageService) {
          * Update current user's profile (email, firstName, lastName)
          */
         put("/profile") {
-            val username = call.principal<JWTPrincipal>()?.payload?.getClaim("username")?.asString() ?: run {
+            val userId = call.getUserId() ?: run {
                 call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Not authenticated"))
                 return@put
             }
@@ -235,6 +235,15 @@ fun Route.protectedUserRoutes(storageService: StorageService) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Last name cannot be empty"))
                 return@put
             }
+
+            // Get user to obtain username for updateProfile (still needs username parameter)
+            val userResult = storageService.getUserById(userId)
+            if (userResult.isLeft()) {
+                logger.error("Failed to get user by ID '$userId' for profile update")
+                call.respond(HttpStatusCode.NotFound, mapOf("error" to "User not found"))
+                return@put
+            }
+            val username = userResult.getOrNull()!!.username
 
             val result = storageService.updateProfile(username, request.email, request.firstName, request.lastName)
 

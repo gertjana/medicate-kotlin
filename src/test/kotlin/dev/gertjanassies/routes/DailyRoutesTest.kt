@@ -26,7 +26,8 @@ import java.util.*
 class DailyRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
-    val jwtToken = TestJwtConfig.generateToken(testUsername)
+    val testUserId = UUID.randomUUID()
+    val jwtToken = TestJwtConfig.generateToken(testUsername, testUserId.toString())
 
     beforeEach {
         mockRedisService = mockk()
@@ -34,6 +35,19 @@ class DailyRoutesTest : FunSpec({
 
     afterEach {
         clearAllMocks()
+    }
+
+    // Helper function to mock getUserById call
+    fun mockGetUser() {
+        val testUser = User(
+            id = testUserId,
+            username = testUsername,
+            email = "test@example.com",
+            firstName = "Test",
+            lastName = "User",
+            passwordHash = "hashedpassword"
+        )
+        coEvery { mockRedisService.getUserById(testUserId.toString()) } returns testUser.right()
     }
 
     context("GET /daily") {
@@ -61,7 +75,8 @@ class DailyRoutesTest : FunSpec({
                 )
             )
 
-            coEvery { mockRedisService.getDailySchedule(testUsername) } returns dailySchedule.right()
+            mockGetUser()
+            coEvery { mockRedisService.getDailySchedule(testUserId.toString()) } returns dailySchedule.right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -87,12 +102,13 @@ class DailyRoutesTest : FunSpec({
                 body.schedule[0].medicines.size shouldBe 2
                 body.schedule[1].time shouldBe "12:00"
                 body.schedule[1].medicines.size shouldBe 1
-                coVerify { mockRedisService.getDailySchedule(testUsername) }
+                coVerify { mockRedisService.getDailySchedule(testUserId.toString()) }
             }
         }
 
         test("should return 500 on error") {
-            coEvery { mockRedisService.getDailySchedule(testUsername) } returns
+            mockGetUser()
+            coEvery { mockRedisService.getDailySchedule(testUserId.toString()) } returns
                 RedisError.OperationError("Failed to retrieve schedule").left()
 
             testApplication {

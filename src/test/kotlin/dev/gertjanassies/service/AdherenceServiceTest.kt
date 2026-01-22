@@ -34,14 +34,6 @@ class AdherenceServiceTest : FunSpec({
     val testUsername = "testuser"
     val testUserId = UUID.fromString("00000000-0000-0000-0000-000000000001")
 
-    fun mockGetUser() {
-        val usernameIndexKey = "medicate:$environment:user:username:$testUsername"
-        val userKey = "medicate:$environment:user:id:$testUserId"
-        val userJson = """{"id":"$testUserId","username":"$testUsername","email":"test@example.com","passwordHash":"hash"}"""
-
-        every { mockAsyncCommands.get(usernameIndexKey) } returns createRedisFutureMock(testUserId.toString())
-        every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
-    }
 
     beforeEach {
         mockConnection = mockk()
@@ -120,7 +112,6 @@ class AdherenceServiceTest : FunSpec({
             }
 
             every { mockConnection.async() } returns mockAsyncCommands
-            mockGetUser()
 
             // Mock schedule scan
             val scheduleScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
@@ -144,7 +135,7 @@ class AdherenceServiceTest : FunSpec({
                 every { mockAsyncCommands.get(dosageKeys[index]) } returns createRedisFutureMock(json.encodeToString(dosage))
             }
 
-            val result = redisService.getWeeklyAdherence(testUsername)
+            val result = redisService.getWeeklyAdherence(testUserId.toString())
 
             result.isRight() shouldBe true
             val weeklyAdherence = result.getOrNull()!!
@@ -188,7 +179,6 @@ class AdherenceServiceTest : FunSpec({
             )
 
             every { mockConnection.async() } returns mockAsyncCommands
-            mockGetUser()
 
             val scheduleScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             val scheduleKey1 = "medicate:$environment:user:$testUserId:schedule:${schedule1.id}"
@@ -209,7 +199,7 @@ class AdherenceServiceTest : FunSpec({
             every { mockAsyncCommands.get(scheduleKey2) } returns createRedisFutureMock(json.encodeToString(schedule2))
             every { mockAsyncCommands.get(dosageKey) } returns createRedisFutureMock(json.encodeToString(dosageHistory))
 
-            val result = redisService.getWeeklyAdherence(testUsername)
+            val result = redisService.getWeeklyAdherence(testUserId.toString())
 
             result.isRight() shouldBe true
             val weeklyAdherence = result.getOrNull()!!
@@ -234,7 +224,6 @@ class AdherenceServiceTest : FunSpec({
             )
 
             every { mockConnection.async() } returns mockAsyncCommands
-            mockGetUser()
 
             val scheduleScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             val scheduleKey = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
@@ -251,7 +240,7 @@ class AdherenceServiceTest : FunSpec({
 
             every { mockAsyncCommands.get(scheduleKey) } returns createRedisFutureMock(json.encodeToString(schedule))
 
-            val result = redisService.getWeeklyAdherence(testUsername)
+            val result = redisService.getWeeklyAdherence(testUserId.toString())
 
             result.isRight() shouldBe true
             val weeklyAdherence = result.getOrNull()!!
@@ -280,7 +269,6 @@ class AdherenceServiceTest : FunSpec({
             )
 
             every { mockConnection.async() } returns mockAsyncCommands
-            mockGetUser()
 
             val scheduleScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             val scheduleKey = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
@@ -297,7 +285,7 @@ class AdherenceServiceTest : FunSpec({
 
             every { mockAsyncCommands.get(scheduleKey) } returns createRedisFutureMock(json.encodeToString(schedule))
 
-            val result = redisService.getWeeklyAdherence(testUsername)
+            val result = redisService.getWeeklyAdherence(testUserId.toString())
 
             result.isRight() shouldBe true
             val weeklyAdherence = result.getOrNull()!!
@@ -330,7 +318,6 @@ class AdherenceServiceTest : FunSpec({
                 daysOfWeek = emptyList() // every day
             )
             every { mockConnection.async() } returns mockAsyncCommands
-            mockGetUser()
             val medKey = "medicate:$environment:user:$testUserId:medicine:${medicine.id}"
             val schedKey = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
             val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
@@ -342,7 +329,7 @@ class AdherenceServiceTest : FunSpec({
             every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(medScanCursor) andThen createRedisFutureMock(schedScanCursor)
             every { mockAsyncCommands.get(medKey) } returns createRedisFutureMock(json.encodeToString(medicine))
             every { mockAsyncCommands.get(schedKey) } returns createRedisFutureMock(json.encodeToString(schedule))
-            val result = redisService.medicineExpiry(testUsername, today.atStartOfDay())
+            val result = redisService.medicineExpiry(testUserId.toString(), today.atStartOfDay())
             result.isRight() shouldBe true
             val expiry = result.getOrNull()!!
             expiry.size shouldBe 1
@@ -358,7 +345,6 @@ class AdherenceServiceTest : FunSpec({
                 stock = 20.0
             )
             every { mockConnection.async() } returns mockAsyncCommands
-            mockGetUser()
             val medKey = "medicate:$environment:user:$testUserId:medicine:${medicine.id}"
             val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { medScanCursor.keys } returns listOf(medKey)
@@ -368,7 +354,7 @@ class AdherenceServiceTest : FunSpec({
             every { schedScanCursor.isFinished } returns true
             every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(medScanCursor) andThen createRedisFutureMock(schedScanCursor)
             every { mockAsyncCommands.get(medKey) } returns createRedisFutureMock(json.encodeToString(medicine))
-            val result = redisService.medicineExpiry(testUsername, LocalDate.of(2026, 1, 13).atStartOfDay())
+            val result = redisService.medicineExpiry(testUserId.toString(), LocalDate.of(2026, 1, 13).atStartOfDay())
             result.isRight() shouldBe true
             val expiry = result.getOrNull()!!
             expiry.size shouldBe 0 // Should not include medicine with no schedule
@@ -390,7 +376,6 @@ class AdherenceServiceTest : FunSpec({
                 daysOfWeek = listOf(DayOfWeek.MONDAY) // once per week
             )
             every { mockConnection.async() } returns mockAsyncCommands
-            mockGetUser()
             val medKey = "medicate:$environment:user:$testUserId:medicine:${medicine.id}"
             val schedKey = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
             val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
@@ -402,7 +387,7 @@ class AdherenceServiceTest : FunSpec({
             every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(medScanCursor) andThen createRedisFutureMock(schedScanCursor)
             every { mockAsyncCommands.get(medKey) } returns createRedisFutureMock(json.encodeToString(medicine))
             every { mockAsyncCommands.get(schedKey) } returns createRedisFutureMock(json.encodeToString(schedule))
-            val result = redisService.medicineExpiry(testUsername, today.atStartOfDay())
+            val result = redisService.medicineExpiry(testUserId.toString(), today.atStartOfDay())
             result.isRight() shouldBe true
             val expiry = result.getOrNull()!!
             expiry.size shouldBe 1
@@ -418,7 +403,6 @@ class AdherenceServiceTest : FunSpec({
                 stock = 0.0
             )
             every { mockConnection.async() } returns mockAsyncCommands
-            mockGetUser()
             val medKey = "medicate:$environment:user:$testUserId:medicine:${medicine.id}"
             val medScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
             every { medScanCursor.keys } returns listOf(medKey)
@@ -428,7 +412,7 @@ class AdherenceServiceTest : FunSpec({
             every { schedScanCursor.isFinished } returns true
             every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(medScanCursor) andThen createRedisFutureMock(schedScanCursor)
             every { mockAsyncCommands.get(medKey) } returns createRedisFutureMock(json.encodeToString(medicine))
-            val result = redisService.medicineExpiry(testUsername, LocalDate.of(2026, 1, 13).atStartOfDay())
+            val result = redisService.medicineExpiry(testUserId.toString(), LocalDate.of(2026, 1, 13).atStartOfDay())
             result.isRight() shouldBe true
             val expiry = result.getOrNull()!!
             expiry.size shouldBe 0 // Should not include medicine with zero stock and no schedule

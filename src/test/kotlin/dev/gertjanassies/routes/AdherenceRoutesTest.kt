@@ -4,6 +4,7 @@ import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.AdherenceStatus
 import dev.gertjanassies.model.DayAdherence
+import dev.gertjanassies.model.User
 import dev.gertjanassies.model.WeeklyAdherence
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
@@ -22,11 +23,13 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import io.mockk.*
+import java.util.UUID
 
 class AdherenceRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
-    val jwtToken = TestJwtConfig.generateToken(testUsername)
+    val testUserId = UUID.randomUUID()
+    val jwtToken = TestJwtConfig.generateToken(testUsername, testUserId.toString())
 
     beforeEach {
         mockRedisService = mockk()
@@ -34,6 +37,19 @@ class AdherenceRoutesTest : FunSpec({
 
     afterEach {
         clearAllMocks()
+    }
+
+    // Helper function to mock getUserById call
+    fun mockGetUser() {
+        val testUser = User(
+            id = testUserId,
+            username = testUsername,
+            email = "test@example.com",
+            firstName = "Test",
+            lastName = "User",
+            passwordHash = "hashedpassword"
+        )
+        coEvery { mockRedisService.getUserById(testUserId.toString()) } returns testUser.right()
     }
 
     context("GET /adherence") {
@@ -60,7 +76,8 @@ class AdherenceRoutesTest : FunSpec({
                     )
                 )
             )
-            coEvery { mockRedisService.getWeeklyAdherence(testUsername) } returns weeklyAdherence.right()
+            mockGetUser()
+            coEvery { mockRedisService.getWeeklyAdherence(testUserId.toString()) } returns weeklyAdherence.right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -85,7 +102,7 @@ class AdherenceRoutesTest : FunSpec({
                 body.days.size shouldBe 2
                 body.days[0].status shouldBe AdherenceStatus.COMPLETE
                 body.days[1].status shouldBe AdherenceStatus.PARTIAL
-                coVerify { mockRedisService.getWeeklyAdherence(testUsername) }
+                coVerify { mockRedisService.getWeeklyAdherence(testUserId.toString()) }
             }
         }
 
@@ -106,7 +123,8 @@ class AdherenceRoutesTest : FunSpec({
         }
 
         test("should return 500 on service error") {
-            coEvery { mockRedisService.getWeeklyAdherence(testUsername) } returns
+            mockGetUser()
+            coEvery { mockRedisService.getWeeklyAdherence(testUserId.toString()) } returns
                 RedisError.OperationError("Database error").left()
 
             testApplication {
@@ -122,7 +140,7 @@ class AdherenceRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
-                coVerify { mockRedisService.getWeeklyAdherence(testUsername) }
+                coVerify { mockRedisService.getWeeklyAdherence(testUserId.toString()) }
             }
         }
     }

@@ -92,12 +92,12 @@ class EmailServiceTest : FunSpec({
             val emailId = result.getOrNull()!!
             emailId shouldBe "email_123456"
 
-            // Verify Redis setex was called with TTL and username
+            // Verify Redis setex was called with TTL and user ID (not username)
             verify(exactly = 1) {
                 mockAsyncCommands.setex(
-                    match { it.startsWith("test:password_reset:testuser:") },
+                    match { it.startsWith("medicate:test:password_reset:${user.id}:") },
                     3600L, // 1 hour TTL
-                    "testuser" // Store username as value
+                    user.id.toString() // Store user ID as value (changed from username)
                 )
             }
         }
@@ -261,7 +261,7 @@ class EmailServiceTest : FunSpec({
             emailService.resetPassword(user)
 
             // Verify tokens are different (extracted from keys)
-            // Keys are in format: "test:password_reset:testuser:TOKEN"
+            // Keys are in format: "medicate:test:password_reset:{userId}:TOKEN"
             val token1 = capturedKeys[0].substringAfterLast(":")
             val token2 = capturedKeys[1].substringAfterLast(":")
             token1.isNotBlank() shouldBe true

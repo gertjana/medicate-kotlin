@@ -3,6 +3,7 @@ package dev.gertjanassies.routes
 import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.MedicineWithExpiry
+import dev.gertjanassies.model.User
 import dev.gertjanassies.model.serializer.LocalDateTimeSerializer
 import dev.gertjanassies.model.serializer.UUIDSerializer
 import dev.gertjanassies.service.RedisService
@@ -30,13 +31,28 @@ import kotlinx.serialization.modules.contextual
 class MedicineExpiryRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
-    val jwtToken = TestJwtConfig.generateToken(testUsername)
+    val testUserId = UUID.randomUUID()
+    val jwtToken = TestJwtConfig.generateToken(testUsername, testUserId.toString())
 
     beforeEach { mockRedisService = mockk(relaxed = true) }
     afterEach { clearAllMocks() }
 
+    // Helper function to mock getUserById call
+    fun mockGetUser() {
+        val testUser = User(
+            id = testUserId,
+            username = testUsername,
+            email = "test@example.com",
+            firstName = "Test",
+            lastName = "User",
+            passwordHash = "hashedpassword"
+        )
+        coEvery { mockRedisService.getUserById(testUserId.toString()) } returns testUser.right()
+    }
+
     context("GET /medicineExpiry") {
         test("should return expiry list for user") {
+            mockGetUser()
             val now = LocalDateTime.of(2026, 1, 20, 0, 0)
             val medicines = listOf(
                 MedicineWithExpiry(
@@ -58,7 +74,7 @@ class MedicineExpiryRoutesTest : FunSpec({
                     expiryDate = now.plusDays(3)
                 )
             )
-            coEvery { mockRedisService.medicineExpiry(testUsername, any()) } returns medicines.right()
+            coEvery { mockRedisService.medicineExpiry(testUserId.toString(), any()) } returns medicines.right()
 
             val customJson = Json {
                 serializersModule = SerializersModule {
@@ -95,12 +111,13 @@ class MedicineExpiryRoutesTest : FunSpec({
                 body.size shouldBe 2
                 body[0].name shouldBe "Aspirin"
                 body[1].name shouldBe "Ibuprofen"
-                coVerify { mockRedisService.medicineExpiry(testUsername, any()) }
+                coVerify { mockRedisService.medicineExpiry(testUserId.toString(), any()) }
             }
         }
 
         test("should return empty list when no medicines expiring") {
-            coEvery { mockRedisService.medicineExpiry(testUsername, any()) } returns emptyList<MedicineWithExpiry>().right()
+            mockGetUser()
+            coEvery { mockRedisService.medicineExpiry(testUserId.toString(), any()) } returns emptyList<MedicineWithExpiry>().right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -119,7 +136,7 @@ class MedicineExpiryRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.OK
-                coVerify { mockRedisService.medicineExpiry(testUsername, any()) }
+                coVerify { mockRedisService.medicineExpiry(testUserId.toString(), any()) }
             }
         }
 
@@ -144,7 +161,8 @@ class MedicineExpiryRoutesTest : FunSpec({
         }
 
         test("should return 500 on service error") {
-            coEvery { mockRedisService.medicineExpiry(testUsername, any()) } returns
+            mockGetUser()
+            coEvery { mockRedisService.medicineExpiry(testUserId.toString(), any()) } returns
                 dev.gertjanassies.service.RedisError.OperationError("Database error").left()
 
             testApplication {
@@ -164,7 +182,7 @@ class MedicineExpiryRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
-                coVerify { mockRedisService.medicineExpiry(testUsername, any()) }
+                coVerify { mockRedisService.medicineExpiry(testUserId.toString(), any()) }
             }
         }
     }

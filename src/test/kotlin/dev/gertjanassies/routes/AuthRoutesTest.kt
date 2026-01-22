@@ -43,11 +43,11 @@ class AuthRoutesTest : FunSpec({
         test("should send reset password email successfully") {
             val username = "testuser"
             val email = "testuser@example.com"
-            val request = PasswordResetRequest(username)
+            val request = PasswordResetRequest(email)
             val user = User(id = java.util.UUID.randomUUID(), username = username, email = email, passwordHash = "hashedpassword")
             val emailId = "email-id-123"
 
-            coEvery { mockRedisService.getUser(username) } returns user.right()
+            coEvery { mockRedisService.getUserByEmail(email) } returns user.right()
             coEvery { mockEmailService.resetPassword(user) } returns emailId.right()
 
             testApplication {
@@ -70,12 +70,12 @@ class AuthRoutesTest : FunSpec({
                 body["emailId"] shouldBe emailId
                 body["message"] shouldContain "Password reset email sent"
 
-                coVerify { mockRedisService.getUser(username) }
+                coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify { mockEmailService.resetPassword(user) }
             }
         }
 
-        test("should return 400 when username is blank") {
+        test("should return 400 when email is blank") {
             val request = PasswordResetRequest("")
 
             testApplication {
@@ -93,18 +93,18 @@ class AuthRoutesTest : FunSpec({
 
                 response.status shouldBe HttpStatusCode.BadRequest
                 val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Username cannot be empty"
+                body["error"] shouldContain "Email cannot be empty"
 
-                coVerify(exactly = 0) { mockRedisService.getUser(any()) }
+                coVerify(exactly = 0) { mockRedisService.getUserByEmail(any()) }
                 coVerify(exactly = 0) { mockEmailService.resetPassword(any()) }
             }
         }
 
-        test("should return 404 when user not found") {
-            val username = "nonexistent"
-            val request = PasswordResetRequest(username)
+        test("should return 404 when user not found by email") {
+            val email = "nonexistent@example.com"
+            val request = PasswordResetRequest(email)
 
-            coEvery { mockRedisService.getUser(username) } returns RedisError.NotFound("User not found").left()
+            coEvery { mockRedisService.getUserByEmail(email) } returns RedisError.NotFound("No user found with email: $email").left()
 
             testApplication {
                 environment {
@@ -121,18 +121,18 @@ class AuthRoutesTest : FunSpec({
 
                 response.status shouldBe HttpStatusCode.NotFound
                 val body = response.body<Map<String, String>>()
-                body["error"] shouldBe "User not found"
+                body["error"] shouldContain "No account found"
 
-                coVerify { mockRedisService.getUser(username) }
+                coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify(exactly = 0) { mockEmailService.resetPassword(any()) }
             }
         }
 
         test("should return 500 when Redis operation fails") {
-            val username = "testuser"
-            val request = PasswordResetRequest(username)
+            val email = "testuser@example.com"
+            val request = PasswordResetRequest(email)
 
-            coEvery { mockRedisService.getUser(username) } returns RedisError.OperationError("Redis connection failed").left()
+            coEvery { mockRedisService.getUserByEmail(email) } returns RedisError.OperationError("Redis connection failed").left()
 
             testApplication {
                 environment {
@@ -151,7 +151,7 @@ class AuthRoutesTest : FunSpec({
                 val body = response.body<Map<String, String>>()
                 body["error"] shouldContain "Redis connection failed"
 
-                coVerify { mockRedisService.getUser(username) }
+                coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify(exactly = 0) { mockEmailService.resetPassword(any()) }
             }
         }
@@ -159,10 +159,10 @@ class AuthRoutesTest : FunSpec({
         test("should return 400 when email is invalid") {
             val username = "testuser"
             val email = "invalid-email"
-            val request = PasswordResetRequest(username)
+            val request = PasswordResetRequest(email)
             val user = User(id = java.util.UUID.randomUUID(), username = username, email = email, passwordHash = "hashedpassword")
 
-            coEvery { mockRedisService.getUser(username) } returns user.right()
+            coEvery { mockRedisService.getUserByEmail(email) } returns user.right()
             coEvery { mockEmailService.resetPassword(user) } returns EmailError.InvalidEmail(email).left()
 
             testApplication {
@@ -182,7 +182,7 @@ class AuthRoutesTest : FunSpec({
                 val body = response.body<Map<String, String>>()
                 body["error"] shouldContain "Invalid email address"
 
-                coVerify { mockRedisService.getUser(username) }
+                coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify { mockEmailService.resetPassword(user) }
             }
         }
@@ -190,10 +190,10 @@ class AuthRoutesTest : FunSpec({
         test("should return 500 when email send fails") {
             val username = "testuser"
             val email = "testuser@example.com"
-            val request = PasswordResetRequest(username)
+            val request = PasswordResetRequest(email)
             val user = User(id = java.util.UUID.randomUUID(), username = username, email = email, passwordHash = "hashedpassword")
 
-            coEvery { mockRedisService.getUser(username) } returns user.right()
+            coEvery { mockRedisService.getUserByEmail(email) } returns user.right()
             coEvery { mockEmailService.resetPassword(user) } returns EmailError.SendFailed("SMTP error").left()
 
             testApplication {
@@ -213,7 +213,7 @@ class AuthRoutesTest : FunSpec({
                 val body = response.body<Map<String, String>>()
                 body["error"] shouldContain "Failed to send email"
 
-                coVerify { mockRedisService.getUser(username) }
+                coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify { mockEmailService.resetPassword(user) }
             }
         }
@@ -221,10 +221,10 @@ class AuthRoutesTest : FunSpec({
         test("should return 500 when token generation fails") {
             val username = "testuser"
             val email = "testuser@example.com"
-            val request = PasswordResetRequest(username)
+            val request = PasswordResetRequest(email)
             val user = User(id = java.util.UUID.randomUUID(), username = username, email = email, passwordHash = "hashedpassword")
 
-            coEvery { mockRedisService.getUser(username) } returns user.right()
+            coEvery { mockRedisService.getUserByEmail(email) } returns user.right()
             coEvery { mockEmailService.resetPassword(user) } returns EmailError.TokenGenerationFailed("Random generator failed").left()
 
             testApplication {
@@ -244,7 +244,7 @@ class AuthRoutesTest : FunSpec({
                 val body = response.body<Map<String, String>>()
                 body["error"] shouldContain "Failed to generate token"
 
-                coVerify { mockRedisService.getUser(username) }
+                coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify { mockEmailService.resetPassword(user) }
             }
         }
@@ -254,10 +254,13 @@ class AuthRoutesTest : FunSpec({
         test("should refresh access token with valid refresh token") {
             val refreshToken = "valid-refresh-token"
             val username = "testuser"
+            val userId = java.util.UUID.randomUUID()
+            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = "hash")
             val newAccessToken = "new-access-token"
 
             every { mockJwtService.validateRefreshToken(refreshToken) } returns username
-            every { mockJwtService.generateAccessToken(username) } returns newAccessToken
+            coEvery { mockRedisService.getUser(username) } returns user.right()
+            every { mockJwtService.generateAccessToken(username, userId.toString()) } returns newAccessToken
 
             testApplication {
                 environment {
@@ -279,7 +282,8 @@ class AuthRoutesTest : FunSpec({
                 (body.containsKey("refreshToken")) shouldBe false
 
                 verify { mockJwtService.validateRefreshToken(refreshToken) }
-                verify { mockJwtService.generateAccessToken(username) }
+                coVerify { mockRedisService.getUser(username) }
+                verify { mockJwtService.generateAccessToken(username, userId.toString()) }
             }
         }
 
@@ -307,7 +311,7 @@ class AuthRoutesTest : FunSpec({
                 body["error"] shouldContain "Invalid or expired refresh token"
 
                 verify { mockJwtService.validateRefreshToken(invalidToken) }
-                verify(exactly = 0) { mockJwtService.generateAccessToken(any()) }
+                coVerify(exactly = 0) { mockRedisService.getUser(any()) }
             }
         }
 
@@ -330,7 +334,7 @@ class AuthRoutesTest : FunSpec({
                 body["error"] shouldContain "Refresh token is required"
 
                 verify(exactly = 0) { mockJwtService.validateRefreshToken(any()) }
-                verify(exactly = 0) { mockJwtService.generateAccessToken(any()) }
+                coVerify(exactly = 0) { mockRedisService.getUser(any()) }
             }
         }
 
@@ -353,7 +357,7 @@ class AuthRoutesTest : FunSpec({
                 body["error"] shouldContain "Refresh token is required"
 
                 verify(exactly = 0) { mockJwtService.validateRefreshToken(any()) }
-                verify(exactly = 0) { mockJwtService.generateAccessToken(any()) }
+                coVerify(exactly = 0) { mockRedisService.getUser(any()) }
             }
         }
     }

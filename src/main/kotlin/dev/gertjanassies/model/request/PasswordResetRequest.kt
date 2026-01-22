@@ -4,5 +4,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class PasswordResetRequest(
-    val username: String
+    val email: String
 )

@@ -184,7 +184,7 @@ class RedisService private constructor(
      * Update an existing Medicine in Redis asynchronously
      */
     override suspend fun updateMedicine(username: String, id: String, medicine: Medicine): Either<RedisError, Medicine> {
-        return validateUserId(username).fold(
+        return getUserId(username).fold(
             { error -> error.left() },
             { userId ->
                 val key = "$keyPrefix:user:$userId:medicine:$id"
@@ -216,7 +216,7 @@ class RedisService private constructor(
      * Delete a Medicine from Redis asynchronously
      */
     override suspend fun deleteMedicine(username: String, id: String): Either<RedisError, Unit> {
-        return validateUserId(username).fold(
+        return getUserId(username).fold(
             { error -> error.left() },
             { userId ->
                 val key = "$keyPrefix:user:$userId:medicine:$id"
@@ -279,7 +279,7 @@ class RedisService private constructor(
      * Get a Schedule object from Redis by ID asynchronously for a specific user
      */
     override suspend fun getSchedule(username: String, id: String): Either<RedisError, Schedule> {
-        return validateUserId(username).fold(
+        return getUserId(username).fold(
             { error -> error.left() },
             { userId ->
                 val key = "$keyPrefix:user:$userId:schedule:$id"
@@ -304,7 +304,7 @@ class RedisService private constructor(
      * Create a new Schedule in Redis asynchronously
      */
     override suspend fun createSchedule(username: String, request: ScheduleRequest): Either<RedisError, Schedule> {
-        return validateUserId(username).fold(
+        return getUserId(username).fold(
             { error -> error.left() },
             { userId ->
                 val schedule = Schedule(
@@ -334,7 +334,7 @@ class RedisService private constructor(
      * Update an existing Schedule in Redis asynchronously
      */
     override suspend fun updateSchedule(username: String, id: String, schedule: Schedule): Either<RedisError, Schedule> {
-        return validateUserId(username).fold(
+        return getUserId(username).fold(
             { error -> error.left() },
             { userId ->
                 val key = "$keyPrefix:user:$userId:schedule:$id"
@@ -366,7 +366,7 @@ class RedisService private constructor(
      * Delete a Schedule from Redis asynchronously
      */
     override suspend fun deleteSchedule(username: String, id: String): Either<RedisError, Unit> {
-        return validateUserId(username).fold(
+        return getUserId(username).fold(
             { error -> error.left() },
             { userId ->
                 val key = "$keyPrefix:user:$userId:schedule:$id"
@@ -389,12 +389,12 @@ class RedisService private constructor(
     /**
      * Get all Schedules from Redis asynchronously for a specific user
      */
-    override suspend fun getAllSchedules(userId: String): Either<RedisError, List<Schedule>> {
-        return validateUserId(userId).fold(
+    override suspend fun getAllSchedules(username: String): Either<RedisError, List<Schedule>> {
+        return getUser(username).fold(
             { error -> error.left() },
-            { userUuid ->
+            { user ->
                 Either.catch {
-                    val pattern = "$keyPrefix:user:${userUuid}:schedule:*"
+                    val pattern = "$keyPrefix:user:${user.id}:schedule:*"
                     val keys = mutableListOf<String>()
 
                     val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
@@ -427,9 +427,9 @@ class RedisService private constructor(
     /**
      * Get daily schedule with medicines grouped by time asynchronously for a specific user
      */
-    override suspend fun getDailySchedule(userId: String): Either<RedisError, DailySchedule> {
+    override suspend fun getDailySchedule(username: String): Either<RedisError, DailySchedule> {
         return either {
-            val allSchedules = getAllSchedules(userId).bind()
+            val allSchedules = getAllSchedules(username).bind()
 
             // Get current day of week as enum
             val today = java.time.LocalDate.now()
@@ -446,7 +446,7 @@ class RedisService private constructor(
             // For each time slot, get the medicines
             val timeSlots = groupedByTime.map { (time, schedulesAtTime) ->
                 val medicineItems = schedulesAtTime.mapNotNull { schedule ->
-                    getMedicine(userId, schedule.medicineId.toString()).getOrNull()?.let { medicine ->
+                    getMedicine(username, schedule.medicineId.toString()).getOrNull()?.let { medicine ->
                         MedicineScheduleItem(medicine, schedule.amount)
                     }
                 }
@@ -476,7 +476,7 @@ class RedisService private constructor(
      *         (e.g. connection issues or an invalid Redis state).
      */
     override suspend fun createDosageHistory(username: String, medicineId: UUID, amount: Double, scheduledTime: String?, datetime: java.time.LocalDateTime?): Either<RedisError, DosageHistory> {
-        return validateUserId(username).fold(
+        return getUserId(username).fold(
             { error -> error.left() },
             { userId ->
                 either {
@@ -552,7 +552,7 @@ class RedisService private constructor(
      * Add stock to a medicine using Redis WATCH for optimistic locking asynchronously
      */
     override suspend fun addStock(username: String, medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
-        return validateUserId(username).fold(
+        return getUserId(username).fold(
             { error -> error.left() },
             { userId ->
                 either {
@@ -613,12 +613,12 @@ class RedisService private constructor(
     /**
      * Get all DosageHistory entries from Redis asynchronously for a specific user
      */
-    override suspend fun getAllDosageHistories(userId: String): Either<RedisError, List<DosageHistory>> {
-        return validateUserId(userId).fold(
+    override suspend fun getAllDosageHistories(username: String): Either<RedisError, List<DosageHistory>> {
+        return getUser(username).fold(
             { error -> error.left() },
-            { userUuid ->
+            { user ->
                 Either.catch {
-                    val pattern = "$keyPrefix:user:${userUuid}:dosagehistory:*"
+                    val pattern = "$keyPrefix:user:${user.id}:dosagehistory:*"
                     val keys = mutableListOf<String>()
 
                     val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
@@ -654,7 +654,7 @@ class RedisService private constructor(
      * Delete a DosageHistory entry and restore the stock to the medicine
      */
     override suspend fun deleteDosageHistory(username: String, dosageHistoryId: UUID): Either<RedisError, Unit> {
-        return validateUserId(username).fold(
+        return getUserId(username).fold(
             { error -> error.left() },
             { userId ->
                 either {
@@ -735,15 +735,15 @@ class RedisService private constructor(
      * as scores or a time-series data structure.
      */
     suspend fun getDosageHistoriesInDateRange(
-        userId: String,
+        username: String,
         startDate: java.time.LocalDate,
         endDate: java.time.LocalDate
     ): Either<RedisError, List<DosageHistory>> {
-        return validateUserId(userId).fold(
+        return getUser(username).fold(
             { error -> error.left() },
-            { userUuid ->
+            { user ->
                 Either.catch {
-                    val pattern = "$keyPrefix:user:${userUuid}:dosagehistory:*"
+                    val pattern = "$keyPrefix:user:${user.id}:dosagehistory:*"
                     val keys = mutableListOf<String>()
 
                     val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
@@ -1158,9 +1158,9 @@ class RedisService private constructor(
     /**
      * Calculate expiry date for each medicine based on schedules and stock
      */
-    override suspend fun medicineExpiry(userId: String, now: java.time.LocalDateTime): Either<RedisError, List<MedicineWithExpiry>> = either {
-        val medicines = getAllMedicines(userId).bind()
-        val schedules = getAllSchedules(userId).bind()
+    override suspend fun medicineExpiry(username: String, now: java.time.LocalDateTime): Either<RedisError, List<MedicineWithExpiry>> = either {
+        val medicines = getAllMedicines(username).bind()
+        val schedules = getAllSchedules(username).bind()
         medicines
             .mapNotNull { medicine ->
                 val medSchedules = schedules.filter { it.medicineId == medicine.id }

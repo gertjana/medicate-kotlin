@@ -33,6 +33,23 @@
 	let forgotPasswordError = '';
 	let forgotPasswordSuccess = '';
 
+	// Toast notification state - support multiple stacked toasts
+	interface Toast {
+		id: number;
+		message: string;
+		type: 'success' | 'error' | 'info';
+	}
+	let toasts: Toast[] = [];
+	let toastIdCounter = 0;
+
+	function showToastNotification(message: string, type: 'success' | 'error' | 'info' = 'info') {
+		const id = toastIdCounter++;
+		toasts = [...toasts, { id, message, type }];
+		setTimeout(() => {
+			toasts = toasts.filter(t => t.id !== id);
+		}, 6000);
+	}
+
 	$: profileInlineStyle = profileUseFixed
 		? `position:fixed; right:${profileRight}px; top:${profileTop}px; min-width:24rem; min-height:8rem; width:auto; max-width:calc(100vw - 2rem);`
 		: `right:0; top:calc(100% + 0.5rem); min-width:24rem; min-height:8rem; width:auto; max-width:calc(100vw - 2rem);`;
@@ -94,15 +111,19 @@
 		// Close profile popup
 		showProfile = false;
 
-		if (!$userStore?.username) {
+		if (!$userStore?.email) {
+			showToastNotification('No email address found for your account', 'error');
 			return;
 		}
 
+		// Show immediate feedback that email is being sent
+		showToastNotification('Sending password reset email...', 'info');
+
 		try {
-			await requestPasswordReset($userStore.username);
-			alert('Password reset email sent! Check your inbox for instructions.');
+			await requestPasswordReset($userStore.email);
+			showToastNotification('Password reset email sent! Check your inbox for instructions.', 'success');
 		} catch (e) {
-			alert(e instanceof Error ? e.message : 'Failed to send password reset email');
+			showToastNotification(e instanceof Error ? e.message : 'Failed to send password reset email', 'error');
 		}
 	}
 
@@ -127,7 +148,13 @@
 		forgotPasswordSuccess = '';
 
 		if (!forgotPasswordUsername.trim()) {
-			forgotPasswordError = 'Username is required';
+			forgotPasswordError = 'Email address is required';
+			return;
+		}
+
+		// Basic email validation
+		if (!forgotPasswordUsername.includes('@')) {
+			forgotPasswordError = 'Please enter a valid email address';
 			return;
 		}
 
@@ -349,16 +376,16 @@
 			<h3 class="text-xl font-bold mb-4">Reset Password</h3>
 			<form on:submit|preventDefault={handleForgotPassword}>
 				<div class="mb-4">
-					<label for="forgot-username" class="block mb-1 font-semibold">Username</label>
+					<label for="forgot-email" class="block mb-1 font-semibold">Email Address</label>
 					<input
-						id="forgot-username"
-						type="text"
+						id="forgot-email"
+						type="email"
 						bind:value={forgotPasswordUsername}
 						class="input w-full"
-						placeholder="Enter your username"
+						placeholder="Enter your email address"
 						required
 					/>
-					<p class="text-xs text-gray-600 mt-1">We'll send a password reset link to your email</p>
+					<p class="text-xs text-gray-600 mt-1">We'll send a password reset link to this email</p>
 				</div>
 				{#if forgotPasswordError}
 					<div class="mb-4 p-3 bg-red-50 border border-red-300 text-red-800 text-sm rounded">
@@ -382,3 +409,14 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Toast Notifications - stacked -->
+<div class="fixed top-[4.125rem] right-4 z-50 flex flex-col gap-2">
+	{#each toasts as toast (toast.id)}
+		<div class="animate-slide-up">
+			<div class="p-4 rounded-lg shadow-lg border-2 {toast.type === 'success' ? 'bg-green-50 border-green-500 text-green-800' : toast.type === 'error' ? 'bg-red-50 border-red-500 text-red-800' : 'bg-blue-50 border-blue-500 text-blue-800'}">
+				{toast.message}
+			</div>
+		</div>
+	{/each}
+</div>
