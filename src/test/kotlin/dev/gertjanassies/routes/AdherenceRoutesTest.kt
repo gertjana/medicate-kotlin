@@ -77,7 +77,7 @@ class AdherenceRoutesTest : FunSpec({
                 )
             )
             mockGetUser()
-            coEvery { mockRedisService.getWeeklyAdherence(testUsername) } returns weeklyAdherence.right()
+            coEvery { mockRedisService.getWeeklyAdherence(testUserId.toString()) } returns weeklyAdherence.right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -102,7 +102,7 @@ class AdherenceRoutesTest : FunSpec({
                 body.days.size shouldBe 2
                 body.days[0].status shouldBe AdherenceStatus.COMPLETE
                 body.days[1].status shouldBe AdherenceStatus.PARTIAL
-                coVerify { mockRedisService.getWeeklyAdherence(testUsername) }
+                coVerify { mockRedisService.getWeeklyAdherence(testUserId.toString()) }
             }
         }
 
@@ -124,7 +124,7 @@ class AdherenceRoutesTest : FunSpec({
 
         test("should return 500 on service error") {
             mockGetUser()
-            coEvery { mockRedisService.getWeeklyAdherence(testUsername) } returns
+            coEvery { mockRedisService.getWeeklyAdherence(testUserId.toString()) } returns
                 RedisError.OperationError("Database error").left()
 
             testApplication {
@@ -140,7 +140,7 @@ class AdherenceRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
-                coVerify { mockRedisService.getWeeklyAdherence(testUsername) }
+                coVerify { mockRedisService.getWeeklyAdherence(testUserId.toString()) }
             }
         }
     }

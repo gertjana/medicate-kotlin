@@ -23,21 +23,12 @@ fun Route.adherenceRoutes(storageService: StorageService) {
             return@get
         }
 
-        // Get user to obtain username
-        val userResult = storageService.getUserById(userId)
-        if (userResult.isLeft()) {
-            logger.error("User with ID '$userId' not found")
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
-            return@get
-        }
-        val username = userResult.getOrNull()!!.username
-
         either {
-            val weeklyAdherence = storageService.getWeeklyAdherence(username).bind()
-            logger.debug("Successfully retrieved weekly adherence for user '$username' (ID: $userId)")
+            val weeklyAdherence = storageService.getWeeklyAdherence(userId).bind()
+            logger.debug("Successfully retrieved weekly adherence for user ID: $userId")
             call.respond(HttpStatusCode.OK, weeklyAdherence)
         }.onLeft { error ->
-            logger.error("Failed to get weekly adherence for user '$username' (ID: $userId): ${error.message}")
+            logger.error("Failed to get weekly adherence for user ID '$userId': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }

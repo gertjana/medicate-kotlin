@@ -74,7 +74,7 @@ class MedicineExpiryRoutesTest : FunSpec({
                     expiryDate = now.plusDays(3)
                 )
             )
-            coEvery { mockRedisService.medicineExpiry(testUsername, any()) } returns medicines.right()
+            coEvery { mockRedisService.medicineExpiry(testUserId.toString(), any()) } returns medicines.right()
 
             val customJson = Json {
                 serializersModule = SerializersModule {
@@ -111,13 +111,13 @@ class MedicineExpiryRoutesTest : FunSpec({
                 body.size shouldBe 2
                 body[0].name shouldBe "Aspirin"
                 body[1].name shouldBe "Ibuprofen"
-                coVerify { mockRedisService.medicineExpiry(testUsername, any()) }
+                coVerify { mockRedisService.medicineExpiry(testUserId.toString(), any()) }
             }
         }
 
         test("should return empty list when no medicines expiring") {
             mockGetUser()
-            coEvery { mockRedisService.medicineExpiry(testUsername, any()) } returns emptyList<MedicineWithExpiry>().right()
+            coEvery { mockRedisService.medicineExpiry(testUserId.toString(), any()) } returns emptyList<MedicineWithExpiry>().right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -136,7 +136,7 @@ class MedicineExpiryRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.OK
-                coVerify { mockRedisService.medicineExpiry(testUsername, any()) }
+                coVerify { mockRedisService.medicineExpiry(testUserId.toString(), any()) }
             }
         }
 
@@ -162,7 +162,7 @@ class MedicineExpiryRoutesTest : FunSpec({
 
         test("should return 500 on service error") {
             mockGetUser()
-            coEvery { mockRedisService.medicineExpiry(testUsername, any()) } returns
+            coEvery { mockRedisService.medicineExpiry(testUserId.toString(), any()) } returns
                 dev.gertjanassies.service.RedisError.OperationError("Database error").left()
 
             testApplication {
@@ -182,7 +182,7 @@ class MedicineExpiryRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.InternalServerError
-                coVerify { mockRedisService.medicineExpiry(testUsername, any()) }
+                coVerify { mockRedisService.medicineExpiry(testUserId.toString(), any()) }
             }
         }
     }

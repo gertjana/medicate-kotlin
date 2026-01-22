@@ -114,7 +114,7 @@ class ScheduleRoutesTest : FunSpec({
             val scheduleId = UUID.randomUUID()
             val medicineId = UUID.randomUUID()
             val schedule = Schedule(scheduleId, medicineId, "08:00", 1.0)
-            coEvery { mockRedisService.getSchedule(testUsername, scheduleId.toString()) } returns schedule.right()
+            coEvery { mockRedisService.getSchedule(testUserId.toString(), scheduleId.toString()) } returns schedule.right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -143,7 +143,7 @@ class ScheduleRoutesTest : FunSpec({
         test("should return 404 when schedule not found") {
             mockGetUser()
             val scheduleId = UUID.randomUUID()
-            coEvery { mockRedisService.getSchedule(testUsername, scheduleId.toString()) } returns
+            coEvery { mockRedisService.getSchedule(testUserId.toString(), scheduleId.toString()) } returns
                 RedisError.NotFound("Schedule not found").left()
 
             testApplication {
@@ -173,7 +173,7 @@ class ScheduleRoutesTest : FunSpec({
             val medicineId = UUID.randomUUID()
             val createdSchedule = Schedule(UUID.randomUUID(), medicineId, "08:00", 1.0)
             val request = ScheduleRequest(medicineId, "08:00", 1.0)
-            coEvery { mockRedisService.createSchedule(testUsername, any()) } returns createdSchedule.right()
+            coEvery { mockRedisService.createSchedule(testUserId.toString(), any()) } returns createdSchedule.right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -197,7 +197,7 @@ class ScheduleRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.Created
                 val body = response.body<Schedule>()
                 body.time shouldBe "08:00"
-                coVerify { mockRedisService.createSchedule(testUsername, any()) }
+                coVerify { mockRedisService.createSchedule(testUserId.toString(), any()) }
             }
         }
 

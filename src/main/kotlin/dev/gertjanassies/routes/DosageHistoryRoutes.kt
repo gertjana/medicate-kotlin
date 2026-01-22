@@ -26,21 +26,12 @@ fun Route.dosageHistoryRoutes(storageService: StorageService) {
             return@get
         }
 
-        // Get user to obtain username
-        val userResult = storageService.getUserById(userId)
-        if (userResult.isLeft()) {
-            logger.error("User with ID '$userId' not found")
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
-            return@get
-        }
-        val username = userResult.getOrNull()!!.username
-
         either {
-            val histories = storageService.getAllDosageHistories(username).bind()
-            logger.debug("Successfully retrieved ${histories.size} dosage histories for user '$username' (ID: $userId)")
+            val histories = storageService.getAllDosageHistories(userId).bind()
+            logger.debug("Successfully retrieved ${histories.size} dosage histories for user ID: $userId")
             call.respond(HttpStatusCode.OK, histories)
         }.onLeft { error ->
-            logger.error("Failed to get dosage histories for user '$username' (ID: $userId): ${error.message}")
+            logger.error("Failed to get dosage histories for user ID '$userId': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
@@ -51,15 +42,6 @@ fun Route.dosageHistoryRoutes(storageService: StorageService) {
             call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@delete
         }
-
-        // Get user to obtain username
-        val userResult = storageService.getUserById(userId)
-        if (userResult.isLeft()) {
-            logger.error("User with ID '$userId' not found")
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
-            return@delete
-        }
-        val username = userResult.getOrNull()!!.username
 
         val id = call.parameters["id"] ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing id parameter"))
@@ -74,11 +56,11 @@ fun Route.dosageHistoryRoutes(storageService: StorageService) {
         }
 
         either {
-            storageService.deleteDosageHistory(username, dosageHistoryId).bind()
-            logger.debug("Successfully deleted dosage history '$id' for user '$username'")
+            storageService.deleteDosageHistory(userId, dosageHistoryId).bind()
+            logger.debug("Successfully deleted dosage history '$id' for user ID: $userId")
             call.respond(HttpStatusCode.NoContent)
         }.onLeft { error ->
-            logger.error("Failed to delete dosage history '$id' for user '$username': ${error.message}")
+            logger.error("Failed to delete dosage history '$id' for user ID '$userId': ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))

@@ -24,22 +24,13 @@ fun Route.dailyRoutes(storageService: StorageService) {
             return@get
         }
 
-        // Get user to obtain username
-        val userResult = storageService.getUserById(userId)
-        if (userResult.isLeft()) {
-            logger.error("User with ID '$userId' not found")
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
-            return@get
-        }
-        val username = userResult.getOrNull()!!.username
-
         either {
-            val dailySchedule = storageService.getDailySchedule(username).bind()
+            val dailySchedule = storageService.getDailySchedule(userId).bind()
 
-            logger.debug("Successfully retrieved daily schedule for user '$username' (ID: $userId) with ${dailySchedule.schedule.size} time slots")
+            logger.debug("Successfully retrieved daily schedule for user ID: $userId with ${dailySchedule.schedule.size} time slots")
             call.respond(HttpStatusCode.OK, dailySchedule)
         }.onLeft { error ->
-            logger.error("Failed to get daily schedule for user '$username' (ID: $userId): ${error.message}")
+            logger.error("Failed to get daily schedule for user ID '$userId': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }

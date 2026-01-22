@@ -59,27 +59,27 @@ interface StorageService {
     /**
      * Get medicine by ID for a specific user
      */
-    suspend fun getMedicine(username: String, id: String): Either<RedisError, Medicine>
+    suspend fun getMedicine(userId: String, id: String): Either<RedisError, Medicine>
 
     /**
      * Create a new medicine for a user
      */
-    suspend fun createMedicine(username: String, request: MedicineRequest): Either<RedisError, Medicine>
+    suspend fun createMedicine(userId: String, request: MedicineRequest): Either<RedisError, Medicine>
 
     /**
      * Update an existing medicine
      */
-    suspend fun updateMedicine(username: String, id: String, medicine: Medicine): Either<RedisError, Medicine>
+    suspend fun updateMedicine(userId: String, id: String, medicine: Medicine): Either<RedisError, Medicine>
 
     /**
      * Delete a medicine
      */
-    suspend fun deleteMedicine(username: String, id: String): Either<RedisError, Unit>
+    suspend fun deleteMedicine(userId: String, id: String): Either<RedisError, Unit>
 
     /**
      * Get all medicines for a user
      */
-    suspend fun getAllMedicines(username: String): Either<RedisError, List<Medicine>>
+    suspend fun getAllMedicines(userId: String): Either<RedisError, List<Medicine>>
 
 
     // Schedule operations
@@ -87,32 +87,32 @@ interface StorageService {
     /**
      * Get schedule by ID for a specific user
      */
-    suspend fun getSchedule(username: String, id: String): Either<RedisError, Schedule>
+    suspend fun getSchedule(userId: String, id: String): Either<RedisError, Schedule>
 
     /**
      * Create a new schedule for a user
      */
-    suspend fun createSchedule(username: String, request: ScheduleRequest): Either<RedisError, Schedule>
+    suspend fun createSchedule(userId: String, request: ScheduleRequest): Either<RedisError, Schedule>
 
     /**
      * Update an existing schedule
      */
-    suspend fun updateSchedule(username: String, id: String, schedule: Schedule): Either<RedisError, Schedule>
+    suspend fun updateSchedule(userId: String, id: String, schedule: Schedule): Either<RedisError, Schedule>
 
     /**
      * Delete a schedule
      */
-    suspend fun deleteSchedule(username: String, id: String): Either<RedisError, Unit>
+    suspend fun deleteSchedule(userId: String, id: String): Either<RedisError, Unit>
 
     /**
      * Get all schedules for a user
      */
-    suspend fun getAllSchedules(username: String): Either<RedisError, List<Schedule>>
+    suspend fun getAllSchedules(userId: String): Either<RedisError, List<Schedule>>
 
     /**
      * Get daily schedule for a user (grouped by time)
      */
-    suspend fun getDailySchedule(username: String): Either<RedisError, DailySchedule>
+    suspend fun getDailySchedule(userId: String): Either<RedisError, DailySchedule>
 
     // Dosage History operations
 
@@ -120,7 +120,7 @@ interface StorageService {
      * Create a dosage history record and update medicine stock
      */
     suspend fun createDosageHistory(
-        username: String,
+        userId: String,
         medicineId: UUID,
         amount: Double,
         scheduledTime: String? = null,
@@ -130,27 +130,27 @@ interface StorageService {
     /**
      * Add stock to a medicine
      */
-    suspend fun addStock(username: String, medicineId: UUID, amount: Double): Either<RedisError, Medicine>
+    suspend fun addStock(userId: String, medicineId: UUID, amount: Double): Either<RedisError, Medicine>
 
     /**
      * Get all dosage histories for a user
      */
-    suspend fun getAllDosageHistories(username: String): Either<RedisError, List<DosageHistory>>
+    suspend fun getAllDosageHistories(userId: String): Either<RedisError, List<DosageHistory>>
 
     /**
      * Delete a dosage history record and restore medicine stock
      */
-    suspend fun deleteDosageHistory(username: String, dosageHistoryId: UUID): Either<RedisError, Unit>
+    suspend fun deleteDosageHistory(userId: String, dosageHistoryId: UUID): Either<RedisError, Unit>
 
     // Analytics operations
 
     /**
      * Get weekly adherence statistics for a user
      */
-    suspend fun getWeeklyAdherence(username: String): Either<RedisError, WeeklyAdherence>
+    suspend fun getWeeklyAdherence(userId: String): Either<RedisError, WeeklyAdherence>
 
     /**
      * Calculate medicine expiry dates based on current stock and schedules
      */
-    suspend fun medicineExpiry(username: String, now: LocalDateTime = LocalDateTime.now()): Either<RedisError, List<MedicineWithExpiry>>
+    suspend fun medicineExpiry(userId: String, now: LocalDateTime = LocalDateTime.now()): Either<RedisError, List<MedicineWithExpiry>>
 }
