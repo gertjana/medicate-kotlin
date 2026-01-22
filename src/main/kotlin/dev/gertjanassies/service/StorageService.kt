@@ -35,6 +35,11 @@ interface StorageService {
     suspend fun getUserById(userId: String): Either<RedisError, User>
 
     /**
+     * Get user by email address
+     */
+    suspend fun getUserByEmail(email: String): Either<RedisError, User>
+
+    /**
      * Update user profile
      */
     suspend fun updateProfile(username: String, email: String, firstName: String, lastName: String): Either<RedisError, User>

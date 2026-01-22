@@ -366,11 +366,11 @@ export async function loginUser(username: string, password: string): Promise<Use
 	return authResponse.user;
 }
 
-export async function requestPasswordReset(username: string): Promise<{ message: string; emailId: string }> {
+export async function requestPasswordReset(email: string): Promise<{ message: string; emailId: string }> {
 	const response = await fetch(`${API_BASE}/auth/resetPassword`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ username })
+		body: JSON.stringify({ email })
 	});
 	if (!response.ok) {
 		const error = await response.json();

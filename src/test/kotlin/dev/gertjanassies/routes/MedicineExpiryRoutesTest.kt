@@ -3,6 +3,7 @@ package dev.gertjanassies.routes
 import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.MedicineWithExpiry
+import dev.gertjanassies.model.User
 import dev.gertjanassies.model.serializer.LocalDateTimeSerializer
 import dev.gertjanassies.model.serializer.UUIDSerializer
 import dev.gertjanassies.service.RedisService
@@ -30,13 +31,28 @@ import kotlinx.serialization.modules.contextual
 class MedicineExpiryRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
-    val jwtToken = TestJwtConfig.generateToken(testUsername)
+    val testUserId = UUID.randomUUID()
+    val jwtToken = TestJwtConfig.generateToken(testUsername, testUserId.toString())
 
     beforeEach { mockRedisService = mockk(relaxed = true) }
     afterEach { clearAllMocks() }
 
+    // Helper function to mock getUserById call
+    fun mockGetUser() {
+        val testUser = User(
+            id = testUserId,
+            username = testUsername,
+            email = "test@example.com",
+            firstName = "Test",
+            lastName = "User",
+            passwordHash = "hashedpassword"
+        )
+        coEvery { mockRedisService.getUserById(testUserId.toString()) } returns testUser.right()
+    }
+
     context("GET /medicineExpiry") {
         test("should return expiry list for user") {
+            mockGetUser()
             val now = LocalDateTime.of(2026, 1, 20, 0, 0)
             val medicines = listOf(
                 MedicineWithExpiry(
@@ -100,6 +116,7 @@ class MedicineExpiryRoutesTest : FunSpec({
         }
 
         test("should return empty list when no medicines expiring") {
+            mockGetUser()
             coEvery { mockRedisService.medicineExpiry(testUsername, any()) } returns emptyList<MedicineWithExpiry>().right()
 
             testApplication {
@@ -144,6 +161,7 @@ class MedicineExpiryRoutesTest : FunSpec({
         }
 
         test("should return 500 on service error") {
+            mockGetUser()
             coEvery { mockRedisService.medicineExpiry(testUsername, any()) } returns
                 dev.gertjanassies.service.RedisError.OperationError("Database error").left()
 

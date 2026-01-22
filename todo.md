@@ -32,15 +32,47 @@
        - Uses existing password reset flow (sends email with reset link)
        - Integrated with profile dropdown menu
        - One-click experience for logged-in users
+       - Fixed to use user's email address instead of username
+       - Uses toast notifications instead of alerts
 
 ## Production Rollout
 
- - [ ] Low stock should be based on schedule (< 7 days = red, < 14 days = yellow), not stock count
- - [ ] Allow people to have the same username, but different emails
- - [ ] Activate User with email confirmation after registration
- - [ ] Allow users to delete their accounts
- - [ ] Add rate limiting to register/login to prevent brute-force attacks
- - [ ] Optional, implement Postgres StorageService for production instead of Redis
+ - [x] **Password reset now uses email address instead of username**
+       - Updated to email-based identification (required for multiple users with same username)
+       - Frontend "Forgot Password" modal now asks for email
+       - Backend `/auth/resetPassword` endpoint uses email lookup
+       - Token storage uses user ID for uniqueness
+       - Fixed token key prefix issue (medicate:environment)
+       - All tests passing (199/199)
+       - See: `ai_reports/PASSWORD_RESET_EMAIL_BASED.md`
 
+ - [x] **Low stock should be based on schedule (< 7 days = red, < 14 days = yellow), not stock count**
+       - Removed getLowStockMedicines API endpoint and method
+       - Dashboard now uses medicineExpiry calculation instead
+       - Shows medicines expiring within 7 days with warning banner
+       - Displays actual expiry dates based on consumption schedules
+       - More intelligent than arbitrary stock thresholds
+       - See: `ai_reports/LOW_STOCK_TO_EXPIRY_REFACTOR.md`
+
+ - [x] **No more window.alert()'s - use toast notifications everywhere**
+       - Verified no alert() calls exist in codebase
+       - All pages use consistent toast notification system
+       - Profile page now uses toast with auto-redirect to dashboard
+       - See: `ai_reports/UX_IMPROVEMENTS.md`
+
+ - [x] **Allow people to have the same username, but different emails**
+       - Username index now stores comma-separated list of user IDs
+       - Login checks passwords against all users with that username
+       - Email remains unique (enforced)
+       - Accepted risk: Users with same username must have different passwords
+       - See: `ai_reports/MULTIPLE_USERS_SAME_USERNAME.md`
+
+ - [ ] **Security**
+   - [ ] Don't give away information about whether username/email exists on login/register/reset password
+   - [ ] **Activate User with email confirmation after registration**
+   - [ ] **Add rate limiting to register/login to prevent brute-force attacks**
+- [ ] **Allow users to delete their accounts**
+- [ ] **Optional, implement Postgres StorageService for production instead of Redis**
+- [ ] Investigate whether we can have a database of known medicines to let users select/search it from a list
 
 ---

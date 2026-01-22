@@ -4,6 +4,7 @@ import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.DosageHistory
 import dev.gertjanassies.model.Medicine
+import dev.gertjanassies.model.User
 import dev.gertjanassies.model.request.AddStockRequest
 import dev.gertjanassies.model.request.DosageHistoryRequest
 import dev.gertjanassies.model.request.MedicineRequest
@@ -31,7 +32,8 @@ import java.util.*
 class MedicineRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
-    val jwtToken = TestJwtConfig.generateToken(testUsername)
+    val testUserId = UUID.randomUUID()
+    val jwtToken = TestJwtConfig.generateToken(testUsername, testUserId.toString())
 
     beforeEach {
         mockRedisService = mockk()
@@ -41,8 +43,22 @@ class MedicineRoutesTest : FunSpec({
         clearAllMocks()
     }
 
+    // Helper function to mock getUserById call
+    fun mockGetUser() {
+        val testUser = User(
+            id = testUserId,
+            username = testUsername,
+            email = "test@example.com",
+            firstName = "Test",
+            lastName = "User",
+            passwordHash = "hashedpassword"
+        )
+        coEvery { mockRedisService.getUserById(testUserId.toString()) } returns testUser.right()
+    }
+
     context("GET /medicine") {
         test("should return list of medicines") {
+            mockGetUser()
             val medicines = listOf(
                 Medicine(UUID.randomUUID(), "Medicine A", 100.0, "mg", 50.0),
                 Medicine(UUID.randomUUID(), "Medicine B", 200.0, "mg", 75.0)
@@ -73,6 +89,7 @@ class MedicineRoutesTest : FunSpec({
         }
 
         test("should return 500 on error") {
+            mockGetUser()
             coEvery { mockRedisService.getAllMedicines(testUsername) } returns RedisError.OperationError("Error").left()
 
             testApplication {
@@ -103,6 +120,7 @@ class MedicineRoutesTest : FunSpec({
 
     context("GET /medicine/{id}") {
         test("should return medicine by id") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             val medicine = Medicine(medicineId, "Test Medicine", 500.0, "mg", 100.0)
             coEvery { mockRedisService.getMedicine(testUsername, medicineId.toString()) } returns medicine.right()
@@ -137,6 +155,7 @@ class MedicineRoutesTest : FunSpec({
         }
 
         test("should return 404 when medicine not found") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             coEvery { mockRedisService.getMedicine(testUsername, medicineId.toString()) } returns
                 RedisError.NotFound("Medicine not found").left()
@@ -169,6 +188,7 @@ class MedicineRoutesTest : FunSpec({
 
     context("POST /medicine") {
         test("should create medicine") {
+            mockGetUser()
             val createdMedicine = Medicine(UUID.randomUUID(), "New Medicine", 250.0, "mg", 60.0)
             val request = MedicineRequest("New Medicine", 250.0, "mg", 60.0)
             coEvery { mockRedisService.createMedicine(testUsername, any()) } returns createdMedicine.right()
@@ -205,6 +225,7 @@ class MedicineRoutesTest : FunSpec({
         }
 
         test("should return 500 on create error") {
+            mockGetUser()
             val request = MedicineRequest("New Medicine", 250.0, "mg", 60.0)
             coEvery { mockRedisService.createMedicine(testUsername, any()) } returns
                 RedisError.OperationError("Failed to create").left()
@@ -240,6 +261,7 @@ class MedicineRoutesTest : FunSpec({
 
     context("PUT /medicine/{id}") {
         test("should update medicine") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             val medicine = Medicine(medicineId, "Updated Medicine", 750.0, "mg", 150.0)
             coEvery { mockRedisService.updateMedicine(testUsername, medicineId.toString(), any()) } returns medicine.right()
@@ -274,6 +296,7 @@ class MedicineRoutesTest : FunSpec({
         }
 
         test("should return 404 when medicine not found") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             val medicine = Medicine(medicineId, "Updated Medicine", 750.0, "mg", 150.0)
             coEvery { mockRedisService.updateMedicine(testUsername, medicineId.toString(), any()) } returns
@@ -310,6 +333,7 @@ class MedicineRoutesTest : FunSpec({
 
     context("DELETE /medicine/{id}") {
         test("should delete medicine") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             coEvery { mockRedisService.deleteMedicine(testUsername, medicineId.toString()) } returns Unit.right()
 
@@ -340,6 +364,7 @@ class MedicineRoutesTest : FunSpec({
         }
 
         test("should return 404 when medicine not found") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             coEvery { mockRedisService.deleteMedicine(testUsername, medicineId.toString()) } returns
                 RedisError.NotFound("Medicine not found").left()
@@ -372,6 +397,7 @@ class MedicineRoutesTest : FunSpec({
 
     context("POST /takedose") {
         test("should create dosage history and reduce stock") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             val dosageHistory = DosageHistory(
                 id = UUID.randomUUID(),
@@ -415,6 +441,7 @@ class MedicineRoutesTest : FunSpec({
         }
 
         test("should return 404 when medicine not found") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             val request = DosageHistoryRequest(medicineId, 1.0)
             coEvery { mockRedisService.createDosageHistory(testUsername, medicineId, 1.0, null, null) } returns
@@ -449,6 +476,7 @@ class MedicineRoutesTest : FunSpec({
         }
 
         test("should return 500 on error") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             val request = DosageHistoryRequest(medicineId, 1.0)
             coEvery { mockRedisService.createDosageHistory(testUsername, medicineId, 1.0, null, null) } returns
@@ -485,6 +513,7 @@ class MedicineRoutesTest : FunSpec({
 
     context("POST /addstock") {
         test("should add stock to medicine") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             val updatedMedicine = Medicine(medicineId, "Test Medicine", 500.0, "mg", 110.0)
             val request = AddStockRequest(medicineId, 10.0)
@@ -522,6 +551,7 @@ class MedicineRoutesTest : FunSpec({
         }
 
         test("should return 404 when medicine not found") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             val request = AddStockRequest(medicineId, 10.0)
             coEvery { mockRedisService.addStock(testUsername, medicineId, 10.0) } returns
@@ -556,6 +586,7 @@ class MedicineRoutesTest : FunSpec({
         }
 
         test("should return 500 on error") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             val request = AddStockRequest(medicineId, 10.0)
             coEvery { mockRedisService.addStock(testUsername, medicineId, 10.0) } returns

@@ -91,9 +91,25 @@ class RedisService private constructor(
 
     /**
      * Helper function to get userId from username
+     *
+     * WARNING: If multiple users have the same username, this returns the ID of the first one.
+     * For authenticated operations, extract userId directly from the JWT token instead.
+     *
+     * @deprecated For authenticated operations, extract userId from JWT token
      */
     private suspend fun getUserId(username: String): Either<RedisError, UUID> {
         return getUser(username).map { it.id }
+    }
+
+    /**
+     * Helper to validate a userId string and convert to UUID
+     */
+    private fun validateUserId(userIdString: String): Either<RedisError, UUID> {
+        return Either.catch {
+            UUID.fromString(userIdString)
+        }.mapLeft {
+            RedisError.OperationError("Invalid user ID format")
+        }
     }
 
     /**
@@ -817,17 +833,30 @@ class RedisService private constructor(
 
     /**
      * Get a user by username (uses username index to find user ID)
+     *
+     * WARNING: If multiple users have the same username, this returns the first one.
+     * For authenticated operations, use getUserById with the userId from the JWT token instead.
+     *
+     * @deprecated For authenticated operations, use getUserById with userId from JWT token
      */
     override suspend fun getUser(username: String): Either<RedisError, User> {
-        // First, get user ID from username index
+        // First, get user ID(s) from username index
         val usernameIndexKey = "$keyPrefix:user:username:$username"
 
         return get(usernameIndexKey).fold(
             { error -> error.left() },
-            { userId ->
-                when (userId) {
+            { userIdsString ->
+                when (userIdsString) {
                     null -> RedisError.NotFound("User not found").left()
-                    else -> getUserById(userId)
+                    else -> {
+                        // Handle comma-separated user IDs (for multiple users with same username)
+                        val firstUserId = userIdsString.split(",").firstOrNull()?.trim()
+                        if (firstUserId == null) {
+                            RedisError.NotFound("User not found").left()
+                        } else {
+                            getUserById(firstUserId)
+                        }
+                    }
                 }
             }
         )
@@ -858,17 +887,30 @@ class RedisService private constructor(
     }
 
     /**
+     * Get user by email address
+     */
+    override suspend fun getUserByEmail(email: String): Either<RedisError, User> {
+        val emailIndexKey = "$keyPrefix:user:email:${email.lowercase()}"
+
+        // Get user ID from email index
+        return get(emailIndexKey).fold(
+            { error -> error.left() },
+            { userId ->
+                when (userId) {
+                    null -> RedisError.NotFound("No user found with email: $email").left()
+                    else -> getUserById(userId)
+                }
+            }
+        )
+    }
+
+    /**
      * Register a new user with username, email and password
+     * Allows multiple users with same username but different emails
      */
     override suspend fun registerUser(username: String, email: String, password: String): Either<RedisError, User> {
         val usernameIndexKey = "$keyPrefix:user:username:$username"
         val emailIndexKey = "$keyPrefix:user:email:${email.lowercase()}"
-
-        // Check if username already exists
-        val existingUsername = get(usernameIndexKey).getOrNull()
-        if (existingUsername != null) {
-            return RedisError.OperationError("Username already exists").left()
-        }
 
         // Check if email already exists
         if (email.isNotBlank()) {
@@ -879,6 +921,11 @@ class RedisService private constructor(
         }
 
         return Either.catch {
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+
+            // Get existing username index (may be null or contain comma-separated user IDs)
+            val existingUserIds = asyncCommands.get(usernameIndexKey).await()
+
             // Generate new user ID
             val userId = UUID.randomUUID()
             val userKey = "$keyPrefix:user:id:$userId"
@@ -890,15 +937,20 @@ class RedisService private constructor(
             val user = User(id = userId, username = username, email = email, passwordHash = passwordHash)
             val jsonString = json.encodeToString(user)
 
-            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            // Calculate updated user IDs list
+            val updatedUserIds = if (existingUserIds != null) {
+                "$existingUserIds,$userId"
+            } else {
+                userId.toString()
+            }
 
             // Use transaction to ensure atomicity
             asyncCommands.multi().await()
 
             // Store user data
             asyncCommands.set(userKey, jsonString)
-            // Create username index
-            asyncCommands.set(usernameIndexKey, userId.toString())
+            // Update username index with comma-separated list of user IDs
+            asyncCommands.set(usernameIndexKey, updatedUserIds)
             // Create email index if email provided
             if (email.isNotBlank()) {
                 asyncCommands.set(emailIndexKey, userId.toString())
@@ -916,27 +968,44 @@ class RedisService private constructor(
     }
 
     /**
-     * Login user by verifying password hash
+     * Login user by verifying password hash against all users with that username
+     * Returns the user whose password matches
      */
-    override suspend fun loginUser(username: String, password: String): Either<RedisError, User> {
-        return getUser(username).fold(
-            { error -> error.left() },
-            { user ->
-                Either.catch {
-                    // Verify password against stored hash
-                    if (BCrypt.checkpw(password, user.passwordHash)) {
-                        user
-                    } else {
-                        throw IllegalArgumentException("Invalid password")
-                    }
-                }.mapLeft { e ->
-                    when (e) {
-                        is IllegalArgumentException -> RedisError.OperationError("Invalid credentials")
-                        else -> RedisError.OperationError("Failed to login: ${e.message}")
-                    }
-                }
+    override suspend fun loginUser(username: String, password: String): Either<RedisError, User> = either {
+        val usernameIndexKey = "$keyPrefix:user:username:$username"
+
+        // Get username index (may contain single ID or comma-separated list)
+        val nullableUserIdsString = get(usernameIndexKey).bind()
+        if (nullableUserIdsString == null) {
+            raise(RedisError.NotFound("User not found"))
+        }
+        val userIdsString: String = nullableUserIdsString
+
+        // Split into list of user IDs
+        val userIds = userIdsString.split(",").map { it.trim() }
+
+        // Try to authenticate with each user ID
+        for (userIdStr in userIds) {
+            val userId = try {
+                UUID.fromString(userIdStr)
+            } catch (e: IllegalArgumentException) {
+                continue // Skip invalid UUIDs
             }
-        )
+
+            // Get user data
+            val userResult = getUserById(userId.toString())
+            if (userResult.isLeft()) continue
+
+            val user = userResult.getOrNull()!!
+
+            // Check if password matches
+            if (BCrypt.checkpw(password, user.passwordHash)) {
+                return@either user
+            }
+        }
+
+        // No matching password found
+        raise(RedisError.OperationError("Invalid credentials"))
     }
 
     /**
@@ -1129,10 +1198,11 @@ class RedisService private constructor(
     /**
      * Verify password reset token and return associated username
      * Token is single-use and will be deleted after successful verification
+     * Note: Token is now stored with user ID, so we need to look up the username
      */
     override suspend fun verifyPasswordResetToken(token: String): Either<RedisError, String> = either {
         // Scan for keys matching: password_reset:*:token
-        // This will find the key password_reset:username:token
+        // This will find the key password_reset:{userId}:token
         val pattern = "$keyPrefix:password_reset:*:$token"
         logger.debug("Verifying password reset token, scanning for password_reset keys")
         val keys = mutableListOf<String>()
@@ -1181,12 +1251,16 @@ class RedisService private constructor(
 
         logger.debug("Using matching key")
 
-        // Get the username from the value
-        val username = get(matchingKey).bind() ?: raise(
+        // Get the user ID from the value (token was stored with userId as value)
+        val userId = get(matchingKey).bind() ?: raise(
             RedisError.NotFound("Invalid or expired password reset token")
         )
 
-        logger.debug("Found username: $username for token")
+        logger.debug("Found user ID: $userId for token")
+
+        // Get the user by ID to retrieve username
+        val user = getUserById(userId).bind()
+        val username = user.username
 
         // Delete the token after successful verification (one-time use)
         Either.catch {

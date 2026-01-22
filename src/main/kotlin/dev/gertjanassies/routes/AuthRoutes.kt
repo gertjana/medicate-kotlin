@@ -40,8 +40,18 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                 return@post
             }
 
-            // Generate new access token
-            val newAccessToken = jwtService.generateAccessToken(username)
+            // Get user to obtain userId for new token
+            val userResult = storageService.getUser(username)
+            if (userResult.isLeft()) {
+                logger.error("User '$username' from refresh token not found in database")
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User not found"))
+                return@post
+            }
+
+            val user = userResult.getOrNull()!!
+
+            // Generate new access token with userId
+            val newAccessToken = jwtService.generateAccessToken(user.username, user.id.toString())
 
             logger.debug("Successfully refreshed access token for user '$username'")
             call.respond(
@@ -73,24 +83,24 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
 
         /**
          * POST /api/auth/resetPassword
-         * Request a password reset for a user by username
+         * Request a password reset for a user by email address
          */
         post("/resetPassword") {
             val request = call.receive<PasswordResetRequest>()
 
-            if (request.username.isBlank()) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Username cannot be empty"))
+            if (request.email.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Email cannot be empty"))
                 return@post
             }
 
-            // Get user by username
-            val userResult = storageService.getUser(request.username)
+            // Get user by email
+            val userResult = storageService.getUserByEmail(request.email)
             val userError = userResult.leftOrNull()
             if (userError != null) {
-                logger.error("Failed to get user for password reset (username: '${request.username}'): ${userError.message}")
+                logger.error("Failed to get user for password reset (email: '${request.email}'): ${userError.message}")
                 when (userError) {
                     is RedisError.NotFound -> {
-                        call.respond(HttpStatusCode.NotFound, mapOf("error" to "User not found"))
+                        call.respond(HttpStatusCode.NotFound, mapOf("error" to "No account found with that email address"))
                     }
                     else -> {
                         call.respond(HttpStatusCode.InternalServerError, mapOf("error" to userError.message))
@@ -105,7 +115,7 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
             val emailResult = emailService.resetPassword(user)
             val emailError = emailResult.leftOrNull()
             if (emailError != null) {
-                logger.error("Failed to send password reset email (username: '${request.username}'): ${emailError.message}")
+                logger.error("Failed to send password reset email (email: '${request.email}'): ${emailError.message}")
                 when (emailError) {
                     is EmailError.InvalidEmail -> {
                         call.respond(HttpStatusCode.BadRequest, mapOf("error" to emailError.message))
@@ -121,7 +131,7 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
             }
 
             val emailId = emailResult.getOrNull()!!
-            logger.debug("Successfully sent password reset email for user '${request.username}', emailId: $emailId")
+            logger.debug("Successfully sent password reset email for email '${request.email}', emailId: $emailId")
             call.respond(HttpStatusCode.OK, mapOf("message" to "Password reset email sent", "emailId" to emailId))
         }
 

@@ -3,6 +3,7 @@ package dev.gertjanassies.routes
 import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.Schedule
+import dev.gertjanassies.model.User
 import dev.gertjanassies.model.request.ScheduleRequest
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
@@ -27,7 +28,8 @@ import java.util.*
 class ScheduleRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
-    val jwtToken = TestJwtConfig.generateToken(testUsername)
+    val testUserId = UUID.randomUUID()
+    val jwtToken = TestJwtConfig.generateToken(testUsername, testUserId.toString())
 
     beforeEach {
         mockRedisService = mockk()
@@ -37,8 +39,22 @@ class ScheduleRoutesTest : FunSpec({
         clearAllMocks()
     }
 
+    // Helper function to mock getUserById call
+    fun mockGetUser() {
+        val testUser = User(
+            id = testUserId,
+            username = testUsername,
+            email = "test@example.com",
+            firstName = "Test",
+            lastName = "User",
+            passwordHash = "hashedpassword"
+        )
+        coEvery { mockRedisService.getUserById(testUserId.toString()) } returns testUser.right()
+    }
+
     context("GET /schedule") {
         test("should return list of schedules") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             val schedules = listOf(
                 Schedule(UUID.randomUUID(), medicineId, "08:00", 1.0),
@@ -68,6 +84,7 @@ class ScheduleRoutesTest : FunSpec({
         }
 
         test("should return 500 on error") {
+            mockGetUser()
             coEvery { mockRedisService.getAllSchedules(any()) } returns RedisError.OperationError("Error").left()
 
             testApplication {
@@ -93,10 +110,11 @@ class ScheduleRoutesTest : FunSpec({
 
     context("GET /schedule/{id}") {
         test("should return schedule by id") {
+            mockGetUser()
             val scheduleId = UUID.randomUUID()
             val medicineId = UUID.randomUUID()
             val schedule = Schedule(scheduleId, medicineId, "08:00", 1.0)
-            coEvery { mockRedisService.getSchedule(any(), scheduleId.toString()) } returns schedule.right()
+            coEvery { mockRedisService.getSchedule(testUsername, scheduleId.toString()) } returns schedule.right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -123,8 +141,9 @@ class ScheduleRoutesTest : FunSpec({
         }
 
         test("should return 404 when schedule not found") {
+            mockGetUser()
             val scheduleId = UUID.randomUUID()
-            coEvery { mockRedisService.getSchedule(any(), scheduleId.toString()) } returns
+            coEvery { mockRedisService.getSchedule(testUsername, scheduleId.toString()) } returns
                 RedisError.NotFound("Schedule not found").left()
 
             testApplication {
@@ -150,10 +169,11 @@ class ScheduleRoutesTest : FunSpec({
 
     context("POST /schedule") {
         test("should create schedule") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
-            val createdSchedule = Schedule(UUID.randomUUID(), medicineId, "12:00", 1.5)
-            val request = ScheduleRequest(medicineId, "12:00", 1.5)
-            coEvery { mockRedisService.createSchedule(any(), any<ScheduleRequest>()) } returns createdSchedule.right()
+            val createdSchedule = Schedule(UUID.randomUUID(), medicineId, "08:00", 1.0)
+            val request = ScheduleRequest(medicineId, "08:00", 1.0)
+            coEvery { mockRedisService.createSchedule(testUsername, any()) } returns createdSchedule.right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -176,12 +196,13 @@ class ScheduleRoutesTest : FunSpec({
 
                 response.status shouldBe HttpStatusCode.Created
                 val body = response.body<Schedule>()
-                body.time shouldBe "12:00"
-                coVerify { mockRedisService.createSchedule(any(), any<ScheduleRequest>()) }
+                body.time shouldBe "08:00"
+                coVerify { mockRedisService.createSchedule(testUsername, any()) }
             }
         }
 
         test("should return 500 on create error") {
+            mockGetUser()
             val request = ScheduleRequest(UUID.randomUUID(), "12:00", 1.5)
             coEvery { mockRedisService.createSchedule(any(), any<ScheduleRequest>()) } returns
                 RedisError.OperationError("Failed to create").left()
@@ -212,6 +233,7 @@ class ScheduleRoutesTest : FunSpec({
 
     context("PUT /schedule/{id}") {
         test("should update schedule") {
+            mockGetUser()
             val scheduleId = UUID.randomUUID()
             val schedule = Schedule(scheduleId, UUID.randomUUID(), "14:00", 2.0)
             coEvery { mockRedisService.updateSchedule(any(), scheduleId.toString(), any<Schedule>()) } returns schedule.right()
@@ -241,6 +263,7 @@ class ScheduleRoutesTest : FunSpec({
         }
 
         test("should return 404 when schedule not found") {
+            mockGetUser()
             val scheduleId = UUID.randomUUID()
             val schedule = Schedule(scheduleId, UUID.randomUUID(), "14:00", 2.0)
             coEvery { mockRedisService.updateSchedule(any(), scheduleId.toString(), any<Schedule>()) } returns
@@ -272,6 +295,7 @@ class ScheduleRoutesTest : FunSpec({
 
     context("DELETE /schedule/{id}") {
         test("should delete schedule") {
+            mockGetUser()
             val scheduleId = UUID.randomUUID()
             coEvery { mockRedisService.deleteSchedule(any(), scheduleId.toString()) } returns Unit.right()
 
@@ -297,6 +321,7 @@ class ScheduleRoutesTest : FunSpec({
         }
 
         test("should return 404 when schedule not found") {
+            mockGetUser()
             val scheduleId = UUID.randomUUID()
             coEvery { mockRedisService.deleteSchedule(any(), scheduleId.toString()) } returns
                 RedisError.NotFound("Schedule not found").left()

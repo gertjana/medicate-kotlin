@@ -20,11 +20,12 @@ class JwtService(
     /**
      * Generate an access token for a user (short-lived)
      */
-    fun generateAccessToken(username: String): String {
+    fun generateAccessToken(username: String, userId: String): String {
         return JWT.create()
             .withAudience(audience)
             .withIssuer(issuer)
             .withClaim("username", username)
+            .withClaim("userId", userId)
             .withClaim("type", "access")
             .withExpiresAt(Date(System.currentTimeMillis() + accessTokenExpirationMs))
             .sign(algorithm)
@@ -33,24 +34,17 @@ class JwtService(
     /**
      * Generate a refresh token for a user (long-lived)
      */
-    fun generateRefreshToken(username: String): String {
+    fun generateRefreshToken(username: String, userId: String): String {
         return JWT.create()
             .withAudience(audience)
             .withIssuer(issuer)
             .withClaim("username", username)
+            .withClaim("userId", userId)
             .withClaim("type", "refresh")
             .withExpiresAt(Date(System.currentTimeMillis() + refreshTokenExpirationMs))
             .sign(algorithm)
     }
 
-    /**
-     * Generate a JWT token for a user (legacy method - generates access token)
-     * @deprecated Use generateAccessToken instead
-     */
-    @Deprecated("Use generateAccessToken instead", ReplaceWith("generateAccessToken(username)"))
-    fun generateToken(username: String): String {
-        return generateAccessToken(username)
-    }
 
     /**
      * Validate a JWT token and extract the username

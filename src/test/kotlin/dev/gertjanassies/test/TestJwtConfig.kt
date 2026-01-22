@@ -20,11 +20,12 @@ object TestJwtConfig {
     /**
      * Generate a test JWT token for a given username
      */
-    fun generateToken(username: String): String {
+    fun generateToken(username: String, userId: String = UUID.randomUUID().toString()): String {
         return JWT.create()
             .withAudience(AUDIENCE)
             .withIssuer(ISSUER)
             .withClaim("username", username)
+            .withClaim("userId", userId)
             .withExpiresAt(Date(System.currentTimeMillis() + 3600000)) // 1 hour
             .sign(Algorithm.HMAC256(SECRET))
     }

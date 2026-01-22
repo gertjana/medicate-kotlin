@@ -19,40 +19,50 @@ import java.util.*
 private val logger = LoggerFactory.getLogger("MedicineRoutes")
 
 /**
- * Helper function to extract username from JWT token
- */
-private fun ApplicationCall.getUsername(): String? {
-    val principal = principal<JWTPrincipal>()
-    return principal?.payload?.getClaim("username")?.asString()
-}
-
-/**
  * Medicine routes
  */
 fun Route.medicineRoutes(storageService: StorageService) {
     // Get all medicines
     get("/medicine") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@get
         }
 
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@get
+        }
+        val username = userResult.getOrNull()!!.username
+
         either {
             val medicines = storageService.getAllMedicines(username).bind()
-            logger.debug("Successfully retrieved ${medicines.size} medicines for user '$username'")
+            logger.debug("Successfully retrieved ${medicines.size} medicines for user '$username' (ID: $userId)")
             call.respond(HttpStatusCode.OK, medicines)
         }.onLeft { error ->
-            logger.error("Failed to get all medicines for user '$username': ${error.message}")
+            logger.error("Failed to get all medicines for user '$username' (ID: $userId): ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
 
     // Get medicine by ID
     get("/medicine/{id}") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@get
         }
+
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@get
+        }
+        val username = userResult.getOrNull()!!.username
 
         val id = call.parameters["id"] ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing id parameter"))
@@ -61,10 +71,10 @@ fun Route.medicineRoutes(storageService: StorageService) {
 
         either {
             val medicine = storageService.getMedicine(username, id).bind()
-            logger.debug("Successfully retrieved medicine '$id' (${medicine.name}) for user '$username'")
+            logger.debug("Successfully retrieved medicine '$id' (${medicine.name}) for user '$username' (ID: $userId)")
             call.respond(HttpStatusCode.OK, medicine)
         }.onLeft { error ->
-            logger.error("Failed to get medicine '$id' for user '$username': ${error.message}")
+            logger.error("Failed to get medicine '$id' for user '$username' (ID: $userId): ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -76,29 +86,47 @@ fun Route.medicineRoutes(storageService: StorageService) {
 
     // Create new medicine
     post("/medicine") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@post
         }
+
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@post
+        }
+        val username = userResult.getOrNull()!!.username
 
         val request = call.receive<MedicineRequest>()
 
         either {
             val created = storageService.createMedicine(username, request).bind()
-            logger.debug("Successfully created medicine '${created.name}' (${created.id}) for user '$username'")
+            logger.debug("Successfully created medicine '${created.name}' (${created.id}) for user '$username' (ID: $userId)")
             call.respond(HttpStatusCode.Created, created)
         }.onLeft { error ->
-            logger.error("Failed to create medicine for user '$username': ${error.message}")
+            logger.error("Failed to create medicine for user '$username' (ID: $userId): ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
 
     // Update existing medicine
     put("/medicine/{id}") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@put
         }
+
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@put
+        }
+        val username = userResult.getOrNull()!!.username
 
         val id = call.parameters["id"] ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing id parameter"))
@@ -109,10 +137,10 @@ fun Route.medicineRoutes(storageService: StorageService) {
 
         either {
             val updated = storageService.updateMedicine(username, id, medicine).bind()
-            logger.debug("Successfully updated medicine '$id' (${updated.name}) for user '$username'")
+            logger.debug("Successfully updated medicine '$id' (${updated.name}) for user '$username' (ID: $userId)")
             call.respond(HttpStatusCode.OK, updated)
         }.onLeft { error ->
-            logger.error("Failed to update medicine '$id' for user '$username': ${error.message}")
+            logger.error("Failed to update medicine '$id' for user '$username' (ID: $userId): ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -124,10 +152,19 @@ fun Route.medicineRoutes(storageService: StorageService) {
 
     // Delete medicine
     delete("/medicine/{id}") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@delete
         }
+
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@delete
+        }
+        val username = userResult.getOrNull()!!.username
 
         val id = call.parameters["id"] ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing id parameter"))
@@ -136,10 +173,10 @@ fun Route.medicineRoutes(storageService: StorageService) {
 
         either {
             storageService.deleteMedicine(username, id).bind()
-            logger.debug("Successfully deleted medicine '$id' for user '$username'")
+            logger.debug("Successfully deleted medicine '$id' for user '$username' (ID: $userId)")
             call.respond(HttpStatusCode.NoContent)
         }.onLeft { error ->
-            logger.error("Failed to delete medicine '$id' for user '$username': ${error.message}")
+            logger.error("Failed to delete medicine '$id' for user '$username' (ID: $userId): ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -151,19 +188,28 @@ fun Route.medicineRoutes(storageService: StorageService) {
 
     // Record a dose taken
     post("/takedose") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@post
         }
+
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@post
+        }
+        val username = userResult.getOrNull()!!.username
 
         val request = call.receive<DosageHistoryRequest>()
 
         either {
             val dosageHistory = storageService.createDosageHistory(username, request.medicineId, request.amount, request.scheduledTime, request.datetime).bind()
-            logger.debug("Successfully recorded dose for medicine '${request.medicineId}' (amount: ${request.amount}) for user '$username'")
+            logger.debug("Successfully recorded dose for medicine '${request.medicineId}' (amount: ${request.amount}) for user '$username' (ID: $userId)")
             call.respond(HttpStatusCode.Created, dosageHistory)
         }.onLeft { error ->
-            logger.error("Failed to record dose for medicine '${request.medicineId}' for user '$username': ${error.message}")
+            logger.error("Failed to record dose for medicine '${request.medicineId}' for user '$username' (ID: $userId): ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -175,19 +221,28 @@ fun Route.medicineRoutes(storageService: StorageService) {
 
     // Add stock to medicine
     post("/addstock") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@post
         }
+
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@post
+        }
+        val username = userResult.getOrNull()!!.username
 
         val request = call.receive<AddStockRequest>()
 
         either {
             val updatedMedicine = storageService.addStock(username, request.medicineId, request.amount).bind()
-            logger.debug("Successfully added ${request.amount} stock to medicine '${request.medicineId}' for user '$username' (new stock: ${updatedMedicine.stock})")
+            logger.debug("Successfully added ${request.amount} stock to medicine '${request.medicineId}' for user '$username' (ID: $userId, new stock: ${updatedMedicine.stock})")
             call.respond(HttpStatusCode.OK, updatedMedicine)
         }.onLeft { error ->
-            logger.error("Failed to add stock to medicine '${request.medicineId}' for user '$username': ${error.message}")
+            logger.error("Failed to add stock to medicine '${request.medicineId}' for user '$username' (ID: $userId): ${error.message}")
             when (error) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
@@ -198,14 +253,23 @@ fun Route.medicineRoutes(storageService: StorageService) {
     }
 
     get("/medicineExpiry") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@get
         }
 
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@get
+        }
+        val username = userResult.getOrNull()!!.username
+
         either {
             val expiringMedicines = storageService.medicineExpiry(username).bind()
-            logger.debug("Successfully retrieved ${expiringMedicines.size} medicine expiry records for user '$username'")
+            logger.debug("Successfully retrieved ${expiringMedicines.size} medicine expiry records for user '$username' (ID: $userId)")
             call.respond(HttpStatusCode.OK, expiringMedicines)
         }.onLeft { error ->
             logger.error("Failed to get medicine expiry for user '$username': ${error.message}")

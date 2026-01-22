@@ -59,18 +59,19 @@ class EmailService(
     /**
      * Store password reset token in Redis with TTL expiry
      * Redis will automatically delete the key after the specified time
-     * Key format: {environment}:password_reset:{username}:{token}
+     * Key format: medicate:{environment}:password_reset:{userId}:{token}
      */
     private suspend fun storePasswordResetToken(
-        username: String,
+        userId: String,
         token: String,
         ttlSeconds: Long = 3600 // 1 hour default
     ): Either<RedisError, Unit> {
-        // Get environment from RedisService to ensure consistency
+        // Use the same key format as RedisService uses for all other keys
+        // This ensures verifyPasswordResetToken can find the token via SCAN
         val environment = redisService.getEnvironment()
-        val key = "$environment:password_reset:$username:$token"
-        logger.debug("Storing password reset token for user: $username in environment: $environment with TTL: $ttlSeconds seconds")
-        return redisService.setex(key, ttlSeconds, username)
+        val key = "medicate:$environment:password_reset:$userId:$token"
+        logger.debug("Storing password reset token for user ID: $userId in environment: $environment with TTL: $ttlSeconds seconds")
+        return redisService.setex(key, ttlSeconds, userId)
             .map { } // Convert Either<RedisError, String> to Either<RedisError, Unit>
     }
 
@@ -196,7 +197,8 @@ class EmailService(
 
         // Store token in Redis with 1 hour TTL (3600 seconds)
         // Redis will automatically delete the key after 1 hour
-        storePasswordResetToken(user.username, token, ttlSeconds = 3600).mapLeft { redisError ->
+        // Use user ID instead of username since multiple users can have same username
+        storePasswordResetToken(user.id.toString(), token, ttlSeconds = 3600).mapLeft { redisError ->
             EmailError.SendFailed("Failed to store reset token: ${redisError.message}")
         }.bind()
 

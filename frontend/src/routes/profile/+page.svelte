@@ -11,15 +11,21 @@
 	let loading = true;
 	let saving = false;
 	let error = '';
-	let toastMessage = '';
-	let showToast = false;
+
+	// Toast notification state - support multiple stacked toasts
+	interface Toast {
+		id: number;
+		message: string;
+	}
+	let toasts: Toast[] = [];
+	let toastIdCounter = 0;
 
 	function showToastNotification(message: string) {
-		toastMessage = message;
-		showToast = true;
+		const id = toastIdCounter++;
+		toasts = [...toasts, { id, message }];
 		setTimeout(() => {
-			showToast = false;
-		}, 3000);
+			toasts = toasts.filter(t => t.id !== id);
+		}, 6000);
 	}
 
 	onMount(async () => {
@@ -188,8 +194,13 @@
 	{/if}
 </div>
 
-{#if showToast}
-	<div class="fixed top-4 right-4 bg-[steelblue] text-white px-6 py-3 rounded-tr-lg rounded-bl-lg shadow-lg transition-opacity z-50">
-		{toastMessage}
-	</div>
-{/if}
+<!-- Toast Notifications - stacked -->
+<div class="fixed top-[5.4rem] right-4 z-50 flex flex-col gap-2">
+	{#each toasts as toast (toast.id)}
+		<div class="animate-slide-up">
+			<div class="p-4 rounded-lg shadow-lg border-2 bg-green-50 border-green-500 text-green-800">
+				{toast.message}
+			</div>
+		</div>
+	{/each}
+</div>

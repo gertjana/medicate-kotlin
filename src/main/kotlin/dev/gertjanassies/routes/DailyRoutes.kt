@@ -12,13 +12,6 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("DailyRoutes")
 
-/**
- * Helper function to extract username from JWT token
- */
-private fun ApplicationCall.getUsername(): String? {
-    val principal = principal<JWTPrincipal>()
-    return principal?.payload?.getClaim("username")?.asString()
-}
 
 /**
  * Daily schedule routes
@@ -26,18 +19,27 @@ private fun ApplicationCall.getUsername(): String? {
 fun Route.dailyRoutes(storageService: StorageService) {
     // Get daily schedule
     get("/daily") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@get
         }
+
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@get
+        }
+        val username = userResult.getOrNull()!!.username
 
         either {
             val dailySchedule = storageService.getDailySchedule(username).bind()
 
-            logger.debug("Successfully retrieved daily schedule for user '$username' with ${dailySchedule.schedule.size} time slots")
+            logger.debug("Successfully retrieved daily schedule for user '$username' (ID: $userId) with ${dailySchedule.schedule.size} time slots")
             call.respond(HttpStatusCode.OK, dailySchedule)
         }.onLeft { error ->
-            logger.error("Failed to get daily schedule for user '$username': ${error.message}")
+            logger.error("Failed to get daily schedule for user '$username' (ID: $userId): ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }

@@ -14,13 +14,6 @@ import java.util.*
 
 private val logger = LoggerFactory.getLogger("DosageHistoryRoutes")
 
-/**
- * Helper function to extract username from JWT token
- */
-private fun ApplicationCall.getUsername(): String? {
-    val principal = principal<JWTPrincipal>()
-    return principal?.payload?.getClaim("username")?.asString()
-}
 
 /**
  * Dosage history routes
@@ -28,27 +21,45 @@ private fun ApplicationCall.getUsername(): String? {
 fun Route.dosageHistoryRoutes(storageService: StorageService) {
     // Get all dosage histories
     get("/history") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@get
         }
 
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@get
+        }
+        val username = userResult.getOrNull()!!.username
+
         either {
             val histories = storageService.getAllDosageHistories(username).bind()
-            logger.debug("Successfully retrieved ${histories.size} dosage histories for user '$username'")
+            logger.debug("Successfully retrieved ${histories.size} dosage histories for user '$username' (ID: $userId)")
             call.respond(HttpStatusCode.OK, histories)
         }.onLeft { error ->
-            logger.error("Failed to get dosage histories for user '$username': ${error.message}")
+            logger.error("Failed to get dosage histories for user '$username' (ID: $userId): ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
 
     // Delete a dosage history (undo dose)
     delete("/history/{id}") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@delete
         }
+
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@delete
+        }
+        val username = userResult.getOrNull()!!.username
 
         val id = call.parameters["id"] ?: run {
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Missing id parameter"))

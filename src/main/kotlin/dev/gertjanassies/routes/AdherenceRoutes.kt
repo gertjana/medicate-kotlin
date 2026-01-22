@@ -13,30 +13,31 @@ import org.slf4j.LoggerFactory
 private val logger = LoggerFactory.getLogger("AdherenceRoutes")
 
 /**
- * Helper function to extract username from JWT token
- */
-private fun ApplicationCall.getUsername(): String? {
-    val principal = principal<JWTPrincipal>()
-    return principal?.payload?.getClaim("username")?.asString()
-}
-
-/**
- * Adherence and analytics routes
+ * Adherence tracking routes
  */
 fun Route.adherenceRoutes(storageService: StorageService) {
     // Get weekly adherence
     get("/adherence") {
-        val username = call.getUsername() ?: run {
-            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Username required"))
+        val userId = call.getUserId() ?: run {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "User ID required"))
             return@get
         }
 
+        // Get user to obtain username
+        val userResult = storageService.getUserById(userId)
+        if (userResult.isLeft()) {
+            logger.error("User with ID '$userId' not found")
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid user"))
+            return@get
+        }
+        val username = userResult.getOrNull()!!.username
+
         either {
             val weeklyAdherence = storageService.getWeeklyAdherence(username).bind()
-            logger.debug("Successfully retrieved weekly adherence for user '$username'")
+            logger.debug("Successfully retrieved weekly adherence for user '$username' (ID: $userId)")
             call.respond(HttpStatusCode.OK, weeklyAdherence)
         }.onLeft { error ->
-            logger.error("Failed to get weekly adherence for user '$username': ${error.message}")
+            logger.error("Failed to get weekly adherence for user '$username' (ID: $userId): ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }

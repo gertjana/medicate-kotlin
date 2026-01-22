@@ -3,6 +3,7 @@ package dev.gertjanassies.routes
 import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.DosageHistory
+import dev.gertjanassies.model.User
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
 import dev.gertjanassies.test.TestJwtConfig
@@ -27,7 +28,8 @@ import java.util.*
 class DosageHistoryRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
-    val jwtToken = TestJwtConfig.generateToken(testUsername)
+    val testUserId = UUID.randomUUID()
+    val jwtToken = TestJwtConfig.generateToken(testUsername, testUserId.toString())
 
     beforeEach {
         mockRedisService = mockk()
@@ -37,8 +39,22 @@ class DosageHistoryRoutesTest : FunSpec({
         clearAllMocks()
     }
 
+    // Helper function to mock getUserById call
+    fun mockGetUser() {
+        val testUser = User(
+            id = testUserId,
+            username = testUsername,
+            email = "test@example.com",
+            firstName = "Test",
+            lastName = "User",
+            passwordHash = "hashedpassword"
+        )
+        coEvery { mockRedisService.getUserById(testUserId.toString()) } returns testUser.right()
+    }
+
     context("GET /history") {
         test("should return empty list when no histories exist") {
+            mockGetUser()
             coEvery { mockRedisService.getAllDosageHistories(testUsername) } returns emptyList<DosageHistory>().right()
 
             testApplication {
@@ -67,6 +83,7 @@ class DosageHistoryRoutesTest : FunSpec({
         }
 
         test("should return all dosage histories sorted by datetime descending") {
+            mockGetUser()
             val medicineId = UUID.randomUUID()
             val histories = listOf(
                 DosageHistory(
@@ -124,6 +141,7 @@ class DosageHistoryRoutesTest : FunSpec({
         }
 
         test("should handle multiple medicines") {
+            mockGetUser()
             val medicineId1 = UUID.randomUUID()
             val medicineId2 = UUID.randomUUID()
 
@@ -176,6 +194,7 @@ class DosageHistoryRoutesTest : FunSpec({
         }
 
         test("should return 500 on error") {
+            mockGetUser()
             coEvery { mockRedisService.getAllDosageHistories(testUsername) } returns RedisError.OperationError("Database error").left()
 
             testApplication {
@@ -203,6 +222,7 @@ class DosageHistoryRoutesTest : FunSpec({
 
     context("DELETE /history/{id}") {
         test("should delete dosage history successfully") {
+            mockGetUser()
             val dosageHistoryId = UUID.randomUUID()
             coEvery { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) } returns Unit.right()
 
@@ -251,6 +271,7 @@ class DosageHistoryRoutesTest : FunSpec({
         }
 
         test("should return 400 when id is invalid") {
+            mockGetUser()
             testApplication {
                 environment { config = MapApplicationConfig() }
                 application {
@@ -273,6 +294,7 @@ class DosageHistoryRoutesTest : FunSpec({
         }
 
         test("should return 404 when dosage history not found") {
+            mockGetUser()
             val dosageHistoryId = UUID.randomUUID()
             coEvery { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) } returns RedisError.NotFound("Not found").left()
 
@@ -299,6 +321,7 @@ class DosageHistoryRoutesTest : FunSpec({
         }
 
         test("should return 500 on operation error") {
+            mockGetUser()
             val dosageHistoryId = UUID.randomUUID()
             coEvery { mockRedisService.deleteDosageHistory(testUsername, dosageHistoryId) } returns RedisError.OperationError("Database error").left()
 

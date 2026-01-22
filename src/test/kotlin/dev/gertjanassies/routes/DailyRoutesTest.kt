@@ -26,7 +26,8 @@ import java.util.*
 class DailyRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
-    val jwtToken = TestJwtConfig.generateToken(testUsername)
+    val testUserId = UUID.randomUUID()
+    val jwtToken = TestJwtConfig.generateToken(testUsername, testUserId.toString())
 
     beforeEach {
         mockRedisService = mockk()
@@ -34,6 +35,19 @@ class DailyRoutesTest : FunSpec({
 
     afterEach {
         clearAllMocks()
+    }
+
+    // Helper function to mock getUserById call
+    fun mockGetUser() {
+        val testUser = User(
+            id = testUserId,
+            username = testUsername,
+            email = "test@example.com",
+            firstName = "Test",
+            lastName = "User",
+            passwordHash = "hashedpassword"
+        )
+        coEvery { mockRedisService.getUserById(testUserId.toString()) } returns testUser.right()
     }
 
     context("GET /daily") {
@@ -61,6 +75,7 @@ class DailyRoutesTest : FunSpec({
                 )
             )
 
+            mockGetUser()
             coEvery { mockRedisService.getDailySchedule(testUsername) } returns dailySchedule.right()
 
             testApplication {
@@ -92,6 +107,7 @@ class DailyRoutesTest : FunSpec({
         }
 
         test("should return 500 on error") {
+            mockGetUser()
             coEvery { mockRedisService.getDailySchedule(testUsername) } returns
                 RedisError.OperationError("Failed to retrieve schedule").left()
 

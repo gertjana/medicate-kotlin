@@ -4,6 +4,7 @@ import arrow.core.left
 import arrow.core.right
 import dev.gertjanassies.model.AdherenceStatus
 import dev.gertjanassies.model.DayAdherence
+import dev.gertjanassies.model.User
 import dev.gertjanassies.model.WeeklyAdherence
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
@@ -22,11 +23,13 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import io.mockk.*
+import java.util.UUID
 
 class AdherenceRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     val testUsername = "testuser"
-    val jwtToken = TestJwtConfig.generateToken(testUsername)
+    val testUserId = UUID.randomUUID()
+    val jwtToken = TestJwtConfig.generateToken(testUsername, testUserId.toString())
 
     beforeEach {
         mockRedisService = mockk()
@@ -34,6 +37,19 @@ class AdherenceRoutesTest : FunSpec({
 
     afterEach {
         clearAllMocks()
+    }
+
+    // Helper function to mock getUserById call
+    fun mockGetUser() {
+        val testUser = User(
+            id = testUserId,
+            username = testUsername,
+            email = "test@example.com",
+            firstName = "Test",
+            lastName = "User",
+            passwordHash = "hashedpassword"
+        )
+        coEvery { mockRedisService.getUserById(testUserId.toString()) } returns testUser.right()
     }
 
     context("GET /adherence") {
@@ -60,6 +76,7 @@ class AdherenceRoutesTest : FunSpec({
                     )
                 )
             )
+            mockGetUser()
             coEvery { mockRedisService.getWeeklyAdherence(testUsername) } returns weeklyAdherence.right()
 
             testApplication {
@@ -106,6 +123,7 @@ class AdherenceRoutesTest : FunSpec({
         }
 
         test("should return 500 on service error") {
+            mockGetUser()
             coEvery { mockRedisService.getWeeklyAdherence(testUsername) } returns
                 RedisError.OperationError("Database error").left()
 
