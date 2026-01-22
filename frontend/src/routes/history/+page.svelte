@@ -13,7 +13,6 @@
 	let histories: DosageHistory[] = [];
 	let medicines: Medicine[] = [];
 	let schedules: Schedule[] = [];
-	let dosageHistories: DosageHistory[] = [];
 	let error = '';
 
 	// Toast notification state - support multiple stacked toasts
