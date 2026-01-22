@@ -1,4 +1,4 @@
-to # Session Summary: Multiple Users & Email-Based Password Reset
+# Session Summary: Multiple Users & Email-Based Password Reset
 
 ## Date
 January 21-22, 2026
