@@ -63,14 +63,7 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
             val emailError = emailResult.leftOrNull()
             if (emailError != null) {
                 logger.error("Failed to send verification email to ${user.email}: ${emailError.message}")
-                // Email failed after user creation - attempt to clean up the created user
-                try {
-                    // Best-effort cleanup to avoid leaving an inactive, unrecoverable account
-                    storageService.deleteUser(user.id)
-                } catch (cleanupError: Throwable) {
-                    logger.error("Failed to clean up user '${user.username}' after email failure", cleanupError)
-                }
-
+                // TODO: Add deleteUser method to clean up user if email fails
                 call.respond(
                     HttpStatusCode.InternalServerError,
                     mapOf("error" to "Registration failed due to an internal error while sending the verification email. Please try again later.")

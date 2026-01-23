@@ -1282,53 +1282,24 @@ class RedisService private constructor(
     /**
      * Verify email activation token
      * Token is single-use and will be deleted after successful verification
+     * Uses O(1) GET operation instead of O(N) SCAN for better performance
      */
     override suspend fun verifyActivationToken(token: String): Either<RedisError, String> = either {
-        // Scan for keys matching: verification:*:token
-        val pattern = "$keyPrefix:verification:*:$token"
-        logger.debug("Verifying activation token, scanning for verification keys")
-        val keys = mutableListOf<String>()
+        // Use direct token lookup: verification:token:{token}
+        val key = "$keyPrefix:verification:token:$token"
+        logger.debug("Verifying activation token with direct lookup")
 
-        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-        var scanCursor = Either.catch {
-            asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
-        }.mapLeft { e ->
-            RedisError.OperationError("Failed to scan for verification tokens: ${e.message}")
-        }.bind()
-
-        // Iterate through all cursor pages
-        while (true) {
-            keys.addAll(scanCursor.keys)
-            if (scanCursor.isFinished) break
-            scanCursor = Either.catch {
-                asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
-            }.mapLeft { e ->
-                RedisError.OperationError("Failed to scan for verification tokens: ${e.message}")
-            }.bind()
-        }
-
-        logger.debug("Found ${keys.size} matching verification keys")
-
-        // Should find exactly one matching key
-        val matchingKey = when (keys.size) {
-            0 -> raise(RedisError.NotFound("Invalid or expired verification token"))
-            1 -> keys[0]
-            else -> {
-                logger.warn("Multiple matching verification keys found for token pattern {}: count={}", pattern, keys.size)
-                raise(RedisError.OperationError("Multiple verification tokens found"))
-            }
-        }
-
-        // Get the user ID from the value
-        val userId = get(matchingKey).bind() ?: raise(
+        // Get the user ID directly with O(1) GET operation
+        val userId = get(key).bind() ?: raise(
             RedisError.NotFound("Invalid or expired verification token")
         )
 
         logger.debug("Found user ID: $userId for verification token")
 
         // Delete the token after successful verification (one-time use)
+        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
         Either.catch {
-            asyncCommands.del(matchingKey).await()
+            asyncCommands.del(key).await()
         }.mapLeft { e ->
             RedisError.OperationError("Failed to delete verification token: ${e.message}")
         }.bind()
