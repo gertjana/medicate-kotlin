@@ -13,5 +13,5 @@ data class User(
     val firstName: String = "",
     val lastName: String = "",
     val passwordHash: String = "",
-    val isActive: Boolean = false
+    val isActive: Boolean = true
 )
