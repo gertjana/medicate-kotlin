@@ -358,7 +358,7 @@ class EmailServiceTest : FunSpec({
             capturedEmailBody shouldContain "test@example.com"
             capturedEmailBody shouldContain "Verify Your Medicate Account"
             capturedEmailBody shouldContain "John Doe"
-            capturedEmailBody shouldContain "verify-email?token="
+            capturedEmailBody shouldContain "activate-account?token="
         }
 
         test("should return InvalidEmail error for blank email") {
