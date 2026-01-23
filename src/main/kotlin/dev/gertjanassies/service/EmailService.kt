@@ -214,4 +214,120 @@ class EmailService(
 
         emailId
     }
+
+    /**
+     * Validate email format
+     */
+    private fun isValidEmail(email: String): Boolean {
+        return email.contains("@") && email.contains(".") && email.length > 3
+    }
+
+    /**
+     * Send email verification email to newly registered user
+     */
+    suspend fun sendVerificationEmail(user: User): Either<EmailError, String> = either {
+        logger.debug("Sending verification email to ${user.email} for user ID: ${user.id}")
+
+        // Validate email format
+        if (!isValidEmail(user.email)) {
+            raise(EmailError.InvalidEmail(user.email))
+        }
+
+        // Generate verification token
+        val token = generateToken()
+
+        // Store verification token in Redis with 24 hour expiry
+        storeVerificationToken(user.id.toString(), token, ttlSeconds = 86400).mapLeft { redisError ->
+            EmailError.SendFailed("Failed to store verification token: ${redisError.message}")
+        }.bind()
+
+        // Generate email HTML
+        val emailHtml = generateVerificationEmailHtml(user, token)
+
+        // Send email
+        val emailId = sendEmail(
+            to = user.email,
+            subject = "Verify Your Medicate Account",
+            htmlContent = emailHtml
+        ).bind()
+
+        emailId
+    }
+
+    /**
+     * Store verification token in Redis with TTL expiry
+     * Key format: medicate:{environment}:verification:{userId}:{token}
+     */
+    private suspend fun storeVerificationToken(
+        userId: String,
+        token: String,
+        ttlSeconds: Long = 86400 // 24 hours default
+    ): Either<RedisError, Unit> {
+        val environment = redisService.getEnvironment()
+        val key = "medicate:$environment:verification:$userId:$token"
+        logger.debug("Storing verification token for user ID: $userId in environment: $environment with TTL: $ttlSeconds seconds")
+        return redisService.setex(key, ttlSeconds, userId)
+            .map { } // Convert Either<RedisError, String> to Either<RedisError, Unit>
+    }
+
+    /**
+     * Generate HTML content for verification email
+     */
+    private fun generateVerificationEmailHtml(user: User, token: String): String {
+        val verificationLink = "$appUrl/verify-email?token=$token"
+        val displayName = if (user.firstName.isNotBlank() && user.lastName.isNotBlank()) {
+            "${user.firstName} ${user.lastName}"
+        } else if (user.firstName.isNotBlank()) {
+            user.firstName
+        } else {
+            user.username
+        }
+
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background-color: #4F46E5; color: white; padding: 20px; text-align: center; }
+                .content { background-color: #f9fafb; padding: 30px; }
+                .button {
+                    display: inline-block;
+                    background-color: #4F46E5;
+                    color: white;
+                    padding: 12px 30px;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    margin: 20px 0;
+                    font-weight: bold;
+                    border: 2px solid #4338CA;
+                }
+                .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #6b7280; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Welcome to Medicate</h1>
+                </div>
+                <div class="content">
+                    <p>Hello $displayName,</p>
+                    <p>Thank you for registering with Medicate. To complete your registration and activate your account, please verify your email address by clicking the button below:</p>
+                    <div style="text-align: center;">
+                        <a href="$verificationLink" class="button">Verify Email Address</a>
+                    </div>
+                    <p>This verification link will expire in 24 hours.</p>
+                    <p>If you did not create an account with Medicate, please ignore this email.</p>
+                    <p>If you have any questions, please contact our support team.</p>
+                </div>
+                <div class="footer">
+                    <p>Medicate - Medication Management</p>
+                    <p>This is an automated email. Please do not reply.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """.trimIndent()
+    }
 }

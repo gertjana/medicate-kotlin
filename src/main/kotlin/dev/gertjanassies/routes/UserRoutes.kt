@@ -3,6 +3,7 @@ package dev.gertjanassies.routes
 import dev.gertjanassies.model.request.UserRequest
 import dev.gertjanassies.model.response.AuthResponse
 import dev.gertjanassies.model.response.toResponse
+import dev.gertjanassies.service.EmailService
 import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.StorageService
 import io.ktor.http.*
@@ -16,7 +17,7 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("UserRoutes")
 
-fun Route.userRoutes(storageService: StorageService, jwtService: JwtService) {
+fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, emailService: EmailService) {
     route("/user") {
         /**
          * POST /api/user/register
@@ -57,27 +58,27 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService) {
 
             val user = result.getOrNull()!!
 
-            // Generate JWT tokens for newly registered user
-            val accessToken = jwtService.generateAccessToken(user.username, user.id.toString())
-            val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString())
-
-            // Set refresh token as HttpOnly cookie
-            call.response.cookies.append(
-                io.ktor.http.Cookie(
-                    name = "refresh_token",
-                    value = refreshToken,
-                    maxAge = 30 * 24 * 60 * 60, // 30 days in seconds
-                    httpOnly = true,
-                    secure = false, // Set to true in production with HTTPS
-                    path = "/",
-                    extensions = mapOf("SameSite" to "Strict")
+            // Send verification email (user is created but inactive)
+            val emailResult = emailService.sendVerificationEmail(user)
+            val emailError = emailResult.leftOrNull()
+            if (emailError != null) {
+                logger.error("Failed to send verification email to ${user.email}: ${emailError.message}")
+                // User is already created but email failed - log them in anyway for now
+                // TODO: Consider if we should delete the user or mark for cleanup
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to "Registration successful but failed to send verification email. Please contact support.")
                 )
-            )
+                return@post
+            }
 
-            logger.debug("Successfully registered user '${request.username}' and generated JWT tokens")
+            logger.debug("Successfully registered user '${request.username}' and sent verification email")
             call.respond(
                 HttpStatusCode.Created,
-                AuthResponse(user = user.toResponse(), token = accessToken, refreshToken = "") // Don't send refresh token in response
+                mapOf(
+                    "message" to "Registration successful! Please check your email to verify your account.",
+                    "email" to user.email
+                )
             )
         }
 
@@ -109,6 +110,16 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService) {
 
             val user = loginResult.getOrNull()!!
 
+            // Check if user account is active (email verified)
+            if (!user.isActive) {
+                logger.warn("Login attempt for inactive account: ${request.username}")
+                call.respond(
+                    HttpStatusCode.Forbidden,
+                    mapOf("error" to "Account not verified. Please check your email for the verification link.")
+                )
+                return@post
+            }
+
             // Generate JWT tokens for logged in user
             val accessToken = jwtService.generateAccessToken(user.username, user.id.toString())
             val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString())
@@ -130,6 +141,70 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService) {
             call.respond(
                 HttpStatusCode.OK,
                 AuthResponse(user = user.toResponse(), token = accessToken, refreshToken = "") // Don't send refresh token in response
+            )
+        }
+
+        /**
+         * GET /api/user/verify-email?token=xxx
+         * Verify email address and activate user account
+         */
+        get("/verify-email") {
+            val token = call.request.queryParameters["token"]
+
+            if (token.isNullOrBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Verification token is required"))
+                return@get
+            }
+
+            // Verify the token and get user ID
+            val verifyResult = storageService.verifyActivationToken(token)
+            val verifyError = verifyResult.leftOrNull()
+            if (verifyError != null) {
+                logger.error("Failed to verify activation token: ${verifyError.message}")
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Invalid or expired verification token")
+                )
+                return@get
+            }
+
+            val userId = verifyResult.getOrNull()!!
+
+            // Activate the user account
+            val activateResult = storageService.activateUser(userId)
+            val activateError = activateResult.leftOrNull()
+            if (activateError != null) {
+                logger.error("Failed to activate user ID '$userId': ${activateError.message}")
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to "Failed to activate account. Please try again or contact support.")
+                )
+                return@get
+            }
+
+            val user = activateResult.getOrNull()!!
+
+            // Generate JWT tokens for the newly activated user
+            val accessToken = jwtService.generateAccessToken(user.username, user.id.toString())
+            val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString())
+
+            // Set refresh token as HttpOnly cookie
+            call.response.cookies.append(
+                io.ktor.http.Cookie(
+                    name = "refresh_token",
+                    value = refreshToken,
+                    maxAge = 30 * 24 * 60 * 60, // 30 days in seconds
+                    httpOnly = true,
+                    secure = false, // Set to true in production with HTTPS
+                    path = "/",
+                    extensions = mapOf("SameSite" to "Strict")
+                )
+            )
+
+            logger.debug("Successfully verified and activated user '${user.username}'")
+            call.respond(
+                HttpStatusCode.OK,
+                AuthResponse(user = user.toResponse(), token = accessToken, refreshToken = "")
             )
         }
 

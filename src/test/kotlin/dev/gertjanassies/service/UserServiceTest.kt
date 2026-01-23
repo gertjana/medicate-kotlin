@@ -163,7 +163,7 @@ class UserServiceTest : FunSpec({
 
             // Hash the password using BCrypt to simulate stored user
             val passwordHash = org.mindrot.jbcrypt.BCrypt.hashpw(password, org.mindrot.jbcrypt.BCrypt.gensalt())
-            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = passwordHash)
+            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = passwordHash, isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -192,7 +192,7 @@ class UserServiceTest : FunSpec({
             val userKey = "medicate:$environment:user:id:$userId"
 
             val passwordHash = org.mindrot.jbcrypt.BCrypt.hashpw(correctPassword, org.mindrot.jbcrypt.BCrypt.gensalt())
-            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = passwordHash)
+            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = passwordHash, isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -279,7 +279,7 @@ class UserServiceTest : FunSpec({
             val userKey = "medicate:$environment:user:id:$userId"
             val newEmailIndexKey = "medicate:$environment:user:email:${email.lowercase()}"
 
-            val user = User(id = userId, username = username, email = "old@example.com", firstName = "OldFirst", lastName = "OldLast", passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = "old@example.com", firstName = "OldFirst", lastName = "OldLast", passwordHash = "hashedpassword", isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -322,7 +322,7 @@ class UserServiceTest : FunSpec({
             val userKey = "medicate:$environment:user:id:$userId"
             val emailIndexKey = "medicate:$environment:user:email:${email.lowercase()}"
 
-            val user = User(id = userId, username = username, email = "old@example.com", passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = "old@example.com", passwordHash = "hashedpassword", isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -354,7 +354,7 @@ class UserServiceTest : FunSpec({
             val userKey = "medicate:$environment:user:id:$userId"
             val emailIndexKey = "medicate:$environment:user:email:${email.lowercase()}"
 
-            val user = User(id = userId, username = username, email = email, firstName = "OldFirst", lastName = "OldLast", passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = email, firstName = "OldFirst", lastName = "OldLast", passwordHash = "hashedpassword", isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -418,7 +418,7 @@ class UserServiceTest : FunSpec({
             val userKey = "medicate:$environment:user:id:$userId"
             val emailIndexKey = "medicate:$environment:user:email:existing@example.com"  // lowercase in index
 
-            val user = User(id = userId, username = username, email = "old@example.com", passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = "old@example.com", passwordHash = "hashedpassword", isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands

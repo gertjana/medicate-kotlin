@@ -165,6 +165,80 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
         }
 
         /**
+         * POST /api/auth/activateAccount
+         * Verify activation token and activate user account
+         * Body: { "token": "verification-token" }
+         */
+        post("/activateAccount") {
+            val request = call.receive<VerifyResetTokenRequest>() // Reuse same request model
+
+            if (request.token.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Token cannot be empty"))
+                return@post
+            }
+
+            // Verify activation token and get user ID
+            val tokenResult = storageService.verifyActivationToken(request.token)
+            val tokenError = tokenResult.leftOrNull()
+            if (tokenError != null) {
+                logger.error("Failed to verify activation token: ${tokenError.message}")
+                when (tokenError) {
+                    is RedisError.NotFound -> {
+                        call.respond(HttpStatusCode.NotFound, mapOf("error" to "Invalid or expired activation token"))
+                    }
+                    else -> {
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to tokenError.message))
+                    }
+                }
+                return@post
+            }
+
+            val userId = tokenResult.getOrNull()!!
+
+            // Activate the user account
+            val activationResult = storageService.activateUser(userId)
+            val activationError = activationResult.leftOrNull()
+            if (activationError != null) {
+                logger.error("Failed to activate user account for user ID '$userId': ${activationError.message}")
+                call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Failed to activate account"))
+                return@post
+            }
+
+            val user = activationResult.getOrNull()!!
+
+            // Generate access and refresh tokens for the newly activated user
+            val accessToken = jwtService.generateAccessToken(user.username, user.id.toString())
+            val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString())
+
+            // Set refresh token as HttpOnly cookie
+            call.response.cookies.append(
+                io.ktor.http.Cookie(
+                    name = "refresh_token",
+                    value = refreshToken,
+                    maxAge = 30 * 24 * 3600, // 30 days
+                    httpOnly = true,
+                    secure = false,
+                    path = "/"
+                )
+            )
+
+            logger.debug("Successfully activated account for user '${user.username}' (ID: $userId)")
+            call.respond(
+                HttpStatusCode.OK,
+                mapOf(
+                    "message" to "Account activated successfully",
+                    "user" to mapOf(
+                        "username" to user.username,
+                        "email" to user.email,
+                        "firstName" to user.firstName,
+                        "lastName" to user.lastName
+                    ),
+                    "token" to accessToken
+                )
+            )
+        }
+
+        /**
          * PUT /api/auth/updatePassword
          * Update user password (public endpoint for password reset flow)
          */
