@@ -76,8 +76,9 @@
          - General API: 60 requests per minute per IP (+ 10 burst)
          - Returns 429 status when limit exceeded
          - See: `ai_reports/RATE_LIMITING.md`
-   - [ ] **Activate User with email confirmation after registration**
-- [ ] **Allow users to delete their accounts**
+   - [x] **Activate User with email confirmation after registration**
+- [ ] Create an admin page that only shows up for admin users, (an admin is a user with isAdmin = true in their user record).
+      This page should allow the admin to see a list of all users, and delete any user.
 - [ ] **Optional, implement Postgres StorageService for production instead of Redis**
 - [ ] Investigate whether we can have a database of known medicines to let users select/search it from a list
 

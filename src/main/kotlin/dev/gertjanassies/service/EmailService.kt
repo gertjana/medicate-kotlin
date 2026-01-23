@@ -291,42 +291,51 @@ class EmailService(
         <!DOCTYPE html>
         <html>
         <head>
+            <meta charset="UTF-8">
             <style>
                 body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
                 .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .header { background-color: #4F46E5; color: white; padding: 20px; text-align: center; }
-                .content { background-color: #f9fafb; padding: 30px; }
+                .header { background-color: #4682b4; color: white; padding: 20px; text-align: center; }
+                .content { background-color: #f9f9f9; padding: 30px; }
                 .button {
                     display: inline-block;
-                    background-color: #4F46E5;
-                    color: white;
-                    padding: 12px 30px;
+                    padding: 12px 24px;
+                    background-color: #4682b4;
+                    color: white !important;
                     text-decoration: none;
-                    border-radius: 5px;
+                    border-radius: 4px;
                     margin: 20px 0;
                     font-weight: bold;
-                    border: 2px solid #4338CA;
                 }
-                .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #6b7280; }
+                .button:visited {
+                    color: white !important;
+                    text-decoration: none;
+                }
+                .button:hover {
+                    color: white !important;
+                    text-decoration: none;
+                }
+                .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
             </style>
         </head>
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>Welcome to Medicate</h1>
+                    <h1>Medicate - Activate Your Account</h1>
                 </div>
                 <div class="content">
-                    <p>Hello $displayName,</p>
+                    <h2>Hello $displayName,</h2>
                     <p>Thank you for registering with Medicate. To complete your registration and activate your account, please verify your email address by clicking the button below:</p>
-                    <div style="text-align: center;">
-                        <a href="$verificationLink" class="button">Verify Email Address</a>
-                    </div>
-                    <p>This verification link will expire in 24 hours.</p>
-                    <p>If you did not create an account with Medicate, please ignore this email.</p>
-                    <p>If you have any questions, please contact our support team.</p>
+                    <p style="text-align: center;">
+                        <a href="$verificationLink" class="button">Activate Account</a>
+                    </p>
+                    <p>Or copy and paste this link into your browser:</p>
+                    <p style="word-break: break-all; color: #4682b4;">$verificationLink</p>
+                    <p><strong>This link will expire in 24 hours.</strong></p>
+                    <p>If you didn't create an account with Medicate, you can safely ignore this email.</p>
                 </div>
                 <div class="footer">
-                    <p>Medicate - Medication Management</p>
+                    <p>&copy; 2026 Medicate. All rights reserved.</p>
                     <p>This is an automated email. Please do not reply.</p>
                 </div>
             </div>

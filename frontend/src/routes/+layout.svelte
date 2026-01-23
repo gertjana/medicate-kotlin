@@ -84,15 +84,30 @@
 		}
 
 		try {
-			const user = authMode === 'register'
-				? await registerUser(username.trim(), password, email.trim())
-				: await loginUser(username.trim(), password);
+			if (authMode === 'register') {
+				// Registration: show success message, do NOT log user in
+				const registrationResponse = await registerUser(username.trim(), password, email.trim());
 
-			userStore.login(user);
-			showAuthModal = false;
-			username = '';
-			password = '';
-			email = '';
+				// Close modal and show success notification
+				showAuthModal = false;
+				username = '';
+				password = '';
+				email = '';
+
+				// Show success notification with the email address
+				showToastNotification(
+					`Registration successful! Please check your email (${registrationResponse.email}) to activate your account.`,
+					'success'
+				);
+			} else {
+				// Login: log the user in as before
+				const user = await loginUser(username.trim(), password);
+				userStore.login(user);
+				showAuthModal = false;
+				username = '';
+				password = '';
+				email = '';
+			}
 		} catch (e) {
 			authError = e instanceof Error ? e.message : 'Authentication failed';
 		}

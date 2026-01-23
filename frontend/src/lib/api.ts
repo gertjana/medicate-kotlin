@@ -315,8 +315,14 @@ export async function getWeeklyAdherence(): Promise<WeeklyAdherence> {
 }
 
 
+// Registration response (when account activation is required)
+export interface RegistrationResponse {
+	message: string;
+	email: string;
+}
+
 // User authentication API
-export async function registerUser(username: string, password: string, email?: string): Promise<User> {
+export async function registerUser(username: string, password: string, email?: string): Promise<RegistrationResponse> {
     const body: any = { username, password };
     if (email) body.email = email;
 
@@ -329,20 +335,14 @@ export async function registerUser(username: string, password: string, email?: s
     });
 
     if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to register user: ${response.status} ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to register user: ${response.status} ${response.statusText}`);
     }
 
-    const authResponse: AuthResponse = await response.json();
+    const registrationResponse: RegistrationResponse = await response.json();
 
-    // Store user in localStorage and access token in memory
-    // Refresh token is in HttpOnly cookie (set by server)
-    if (browser) {
-        localStorage.setItem('medicate_user', JSON.stringify(authResponse.user));
-        setAccessToken(authResponse.token);
-    }
-
-    return authResponse.user;
+    // User account is created but NOT logged in (account needs activation via email)
+    return registrationResponse;
 }
 
 export async function loginUser(username: string, password: string): Promise<User> {

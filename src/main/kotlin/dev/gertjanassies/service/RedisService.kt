@@ -122,11 +122,10 @@ class RedisService private constructor(
 
     /**
      * Get a Medicine object from Redis by ID asynchronously for a specific user
-     * @param username Actually receives userId from routes (for backward compatibility, parameter name not changed)
+     * @param userId User ID
      */
-    override suspend fun getMedicine(username: String, id: String): Either<RedisError, Medicine> {
-        // Treat username parameter as userId directly (routes now pass userId)
-        return validateUserId(username).fold(
+    override suspend fun getMedicine(userId: String, id: String): Either<RedisError, Medicine> {
+        return validateUserId(userId).fold(
             { error -> error.left() },
             { userId ->
                 val key = "$keyPrefix:user:$userId:medicine:$id"
@@ -151,9 +150,9 @@ class RedisService private constructor(
      * Create a new Medicine in Redis asynchronously
      * @param username Actually receives userId from routes (for backward compatibility, parameter name not changed)
      */
-    override suspend fun createMedicine(username: String, request: MedicineRequest): Either<RedisError, Medicine> {
+    override suspend fun createMedicine(userId: String, request: MedicineRequest): Either<RedisError, Medicine> {
         // Treat username parameter as userId directly (routes now pass userId)
-        return validateUserId(username).fold(
+        return validateUserId(userId).fold(
             { error -> error.left() },
             { userId ->
                 val medicine = Medicine(
@@ -183,8 +182,8 @@ class RedisService private constructor(
     /**
      * Update an existing Medicine in Redis asynchronously
      */
-    override suspend fun updateMedicine(username: String, id: String, medicine: Medicine): Either<RedisError, Medicine> {
-        return validateUserId(username).fold(
+    override suspend fun updateMedicine(userId: String, id: String, medicine: Medicine): Either<RedisError, Medicine> {
+        return validateUserId(userId).fold(
             { error -> error.left() },
             { userId ->
                 val key = "$keyPrefix:user:$userId:medicine:$id"
@@ -215,8 +214,8 @@ class RedisService private constructor(
     /**
      * Delete a Medicine from Redis asynchronously
      */
-    override suspend fun deleteMedicine(username: String, id: String): Either<RedisError, Unit> {
-        return validateUserId(username).fold(
+    override suspend fun deleteMedicine(userId: String, id: String): Either<RedisError, Unit> {
+        return validateUserId(userId).fold(
             { error -> error.left() },
             { userId ->
                 val key = "$keyPrefix:user:$userId:medicine:$id"
@@ -240,9 +239,8 @@ class RedisService private constructor(
      * Get all Medicines from Redis asynchronously for a specific user
      * @param username Actually receives userId from routes (for backward compatibility, parameter name not changed)
      */
-    override suspend fun getAllMedicines(username: String): Either<RedisError, List<Medicine>> {
-        // Treat username parameter as userId directly (routes now pass userId)
-        val userId = username
+    override suspend fun getAllMedicines(userId: String): Either<RedisError, List<Medicine>> {
+        // userId parameter is already the userId (routes now pass userId)
         return Either.catch {
             val pattern = "$keyPrefix:user:$userId:medicine:*"
             val keys = mutableListOf<String>()
@@ -278,8 +276,8 @@ class RedisService private constructor(
     /**
      * Get a Schedule object from Redis by ID asynchronously for a specific user
      */
-    override suspend fun getSchedule(username: String, id: String): Either<RedisError, Schedule> {
-        return validateUserId(username).fold(
+    override suspend fun getSchedule(userId: String, id: String): Either<RedisError, Schedule> {
+        return validateUserId(userId).fold(
             { error -> error.left() },
             { userId ->
                 val key = "$keyPrefix:user:$userId:schedule:$id"
@@ -303,10 +301,10 @@ class RedisService private constructor(
     /**
      * Create a new Schedule in Redis asynchronously
      */
-    override suspend fun createSchedule(username: String, request: ScheduleRequest): Either<RedisError, Schedule> {
-        return validateUserId(username).fold(
+    override suspend fun createSchedule(userId: String, request: ScheduleRequest): Either<RedisError, Schedule> {
+        return validateUserId(userId).fold(
             { error -> error.left() },
-            { userId ->
+            { validatedUserId ->
                 val schedule = Schedule(
                     id = UUID.randomUUID(),
                     medicineId = request.medicineId,
@@ -314,7 +312,7 @@ class RedisService private constructor(
                     amount = request.amount,
                     daysOfWeek = request.daysOfWeek
                 )
-                val key = "$keyPrefix:user:$userId:schedule:${schedule.id}"
+                val key = "$keyPrefix:user:$validatedUserId:schedule:${schedule.id}"
 
                 Either.catch {
                     val jsonString = json.encodeToString(schedule)
@@ -333,11 +331,11 @@ class RedisService private constructor(
     /**
      * Update an existing Schedule in Redis asynchronously
      */
-    override suspend fun updateSchedule(username: String, id: String, schedule: Schedule): Either<RedisError, Schedule> {
-        return validateUserId(username).fold(
+    override suspend fun updateSchedule(userId: String, id: String, schedule: Schedule): Either<RedisError, Schedule> {
+        return validateUserId(userId).fold(
             { error -> error.left() },
-            { userId ->
-                val key = "$keyPrefix:user:$userId:schedule:$id"
+            { validatedUserId ->
+                val key = "$keyPrefix:user:$validatedUserId:schedule:$id"
 
                 // Check if schedule exists
                 val existing = get(key).getOrNull()
@@ -365,11 +363,11 @@ class RedisService private constructor(
     /**
      * Delete a Schedule from Redis asynchronously
      */
-    override suspend fun deleteSchedule(username: String, id: String): Either<RedisError, Unit> {
-        return validateUserId(username).fold(
+    override suspend fun deleteSchedule(userId: String, id: String): Either<RedisError, Unit> {
+        return validateUserId(userId).fold(
             { error -> error.left() },
-            { userId ->
-                val key = "$keyPrefix:user:$userId:schedule:$id"
+            { validatedUserId ->
+                val key = "$keyPrefix:user:$validatedUserId:schedule:$id"
 
                 Either.catch {
                     val deleted = connection?.async()?.del(key)?.await() ?: throw IllegalStateException("Not connected")
@@ -475,13 +473,13 @@ class RedisService private constructor(
      *       - [RedisError.OperationError] if persisting the dosage history or updating the medicine fails
      *         (e.g. connection issues or an invalid Redis state).
      */
-    override suspend fun createDosageHistory(username: String, medicineId: UUID, amount: Double, scheduledTime: String?, datetime: java.time.LocalDateTime?): Either<RedisError, DosageHistory> {
-        return validateUserId(username).fold(
+    override suspend fun createDosageHistory(userId: String, medicineId: UUID, amount: Double, scheduledTime: String?, datetime: java.time.LocalDateTime?): Either<RedisError, DosageHistory> {
+        return validateUserId(userId).fold(
             { error -> error.left() },
-            { userId ->
+            { validatedUserId ->
                 either {
                     val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-                    val medicineKey = "$keyPrefix:user:$userId:medicine:$medicineId"
+                    val medicineKey = "$keyPrefix:user:$validatedUserId:medicine:$medicineId"
 
                     // Retry loop for optimistic locking with WATCH
                     var retryCount = 0
@@ -507,7 +505,7 @@ class RedisService private constructor(
                                 scheduledTime = scheduledTime
                             )
 
-                            val dosageKey = "$keyPrefix:user:$userId:dosagehistory:${dosageHistory.id}"
+                            val dosageKey = "$keyPrefix:user:$validatedUserId:dosagehistory:${dosageHistory.id}"
                             val updatedMedicine = medicine.copy(stock = medicine.stock - amount)
 
                             // Start transaction
@@ -551,13 +549,13 @@ class RedisService private constructor(
     /**
      * Add stock to a medicine using Redis WATCH for optimistic locking asynchronously
      */
-    override suspend fun addStock(username: String, medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
-        return validateUserId(username).fold(
+    override suspend fun addStock(userId: String, medicineId: UUID, amount: Double): Either<RedisError, Medicine> {
+        return validateUserId(userId).fold(
             { error -> error.left() },
-            { userId ->
+            { validatedUserId ->
                 either {
                     val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-                    val medicineKey = "$keyPrefix:user:$userId:medicine:$medicineId"
+                    val medicineKey = "$keyPrefix:user:$validatedUserId:medicine:$medicineId"
 
                     // Retry loop for optimistic locking with WATCH
                     var retryCount = 0
@@ -653,13 +651,13 @@ class RedisService private constructor(
     /**
      * Delete a DosageHistory entry and restore the stock to the medicine
      */
-    override suspend fun deleteDosageHistory(username: String, dosageHistoryId: UUID): Either<RedisError, Unit> {
-        return validateUserId(username).fold(
+    override suspend fun deleteDosageHistory(userId: String, dosageHistoryId: UUID): Either<RedisError, Unit> {
+        return validateUserId(userId).fold(
             { error -> error.left() },
-            { userId ->
+            { validatedUserId ->
                 either {
                     val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-                    val dosageKey = "$keyPrefix:user:$userId:dosagehistory:$dosageHistoryId"
+                    val dosageKey = "$keyPrefix:user:$validatedUserId:dosagehistory:$dosageHistoryId"
 
                     // Retry loop for optimistic locking with WATCH
                     var retryCount = 0
@@ -672,7 +670,7 @@ class RedisService private constructor(
                                 ?: throw NoSuchElementException("Dosage history with id $dosageHistoryId not found")
 
                             val dosageHistory = json.decodeFromString<DosageHistory>(dosageJson)
-                            val medicineKey = "$keyPrefix:user:$userId:medicine:${dosageHistory.medicineId}"
+                            val medicineKey = "$keyPrefix:user:$validatedUserId:medicine:${dosageHistory.medicineId}"
 
                             // Watch both keys for changes
                             asyncCommands.watch(medicineKey, dosageKey).await()
@@ -781,14 +779,14 @@ class RedisService private constructor(
     /**
      * Get weekly adherence (last 7 days, excluding today) for a specific user
      */
-    override suspend fun getWeeklyAdherence(username: String): Either<RedisError, WeeklyAdherence> {
+    override suspend fun getWeeklyAdherence(userId: String): Either<RedisError, WeeklyAdherence> {
         return either {
-            val allSchedules = getAllSchedules(username).bind()
+            val allSchedules = getAllSchedules(userId).bind()
 
             // Only load dosage histories from the last 7 days (excluding today) for efficiency
             val endDate = java.time.LocalDate.now().minusDays(1)
             val startDate = endDate.minusDays(6)
-            val dosageHistories = getDosageHistoriesInDateRange(username, startDate, endDate).bind()
+            val dosageHistories = getDosageHistoriesInDateRange(userId, startDate, endDate).bind()
 
             val days = (6 downTo 0).map { daysAgo ->
                 val date = endDate.minusDays(daysAgo.toLong())
