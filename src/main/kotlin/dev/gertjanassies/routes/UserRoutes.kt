@@ -110,16 +110,6 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
 
             val user = loginResult.getOrNull()!!
 
-            // Check if user account is active (email verified)
-            if (!user.isActive) {
-                logger.warn("Login attempt for inactive account: ${request.username}")
-                call.respond(
-                    HttpStatusCode.Forbidden,
-                    mapOf("error" to "Account not verified. Please check your email for the verification link.")
-                )
-                return@post
-            }
-
             // Generate JWT tokens for logged in user
             val accessToken = jwtService.generateAccessToken(user.username, user.id.toString())
             val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString())
