@@ -84,6 +84,7 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
         /**
          * POST /api/auth/resetPassword
          * Request a password reset for a user by email address
+         * Note: Always returns success to prevent email enumeration attacks
          */
         post("/resetPassword") {
             val request = call.receive<PasswordResetRequest>()
@@ -96,16 +97,15 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
             // Get user by email
             val userResult = storageService.getUserByEmail(request.email)
             val userError = userResult.leftOrNull()
+
             if (userError != null) {
-                logger.error("Failed to get user for password reset (email: '${request.email}'): ${userError.message}")
-                when (userError) {
-                    is RedisError.NotFound -> {
-                        call.respond(HttpStatusCode.NotFound, mapOf("error" to "No account found with that email address"))
-                    }
-                    else -> {
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to userError.message))
-                    }
-                }
+                // Don't reveal whether the email exists or not - still log for debugging
+                logger.info("Password reset requested for non-existent email: '${request.email}'")
+                // Return success message anyway to prevent email enumeration
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "message" to "If an account exists with that email, you will receive a password reset link.",
+                    "emailId" to "no-email-sent"
+                ))
                 return@post
             }
 
@@ -116,23 +116,20 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
             val emailError = emailResult.leftOrNull()
             if (emailError != null) {
                 logger.error("Failed to send password reset email (email: '${request.email}'): ${emailError.message}")
-                when (emailError) {
-                    is EmailError.InvalidEmail -> {
-                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to emailError.message))
-                    }
-                    is EmailError.SendFailed -> {
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to emailError.message))
-                    }
-                    is EmailError.TokenGenerationFailed -> {
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to emailError.message))
-                    }
-                }
+                // Even if email sending fails, return success message to prevent enumeration
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "message" to "If an account exists with that email, you will receive a password reset link.",
+                    "emailId" to "email-send-failed"
+                ))
                 return@post
             }
 
             val emailId = emailResult.getOrNull()!!
             logger.debug("Successfully sent password reset email for email '${request.email}', emailId: $emailId")
-            call.respond(HttpStatusCode.OK, mapOf("message" to "Password reset email sent", "emailId" to emailId))
+            call.respond(HttpStatusCode.OK, mapOf(
+                "message" to "If an account exists with that email, you will receive a password reset link.",
+                "emailId" to emailId
+            ))
         }
 
         /**

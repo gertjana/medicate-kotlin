@@ -68,7 +68,7 @@ class AuthRoutesTest : FunSpec({
                 body shouldContainKey "message"
                 body shouldContainKey "emailId"
                 body["emailId"] shouldBe emailId
-                body["message"] shouldContain "Password reset email sent"
+                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
 
                 coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify { mockEmailService.resetPassword(user) }
@@ -100,7 +100,7 @@ class AuthRoutesTest : FunSpec({
             }
         }
 
-        test("should return 404 when user not found by email") {
+        test("should return OK with generic message when user not found by email") {
             val email = "nonexistent@example.com"
             val request = PasswordResetRequest(email)
 
@@ -119,16 +119,18 @@ class AuthRoutesTest : FunSpec({
                     setBody(request)
                 }
 
-                response.status shouldBe HttpStatusCode.NotFound
+                // Should return OK to avoid leaking information about user existence
+                response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "No account found"
+                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
+                body["emailId"] shouldBe "no-email-sent"
 
                 coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify(exactly = 0) { mockEmailService.resetPassword(any()) }
             }
         }
 
-        test("should return 500 when Redis operation fails") {
+        test("should return OK with generic message when Redis operation fails") {
             val email = "testuser@example.com"
             val request = PasswordResetRequest(email)
 
@@ -147,9 +149,11 @@ class AuthRoutesTest : FunSpec({
                     setBody(request)
                 }
 
-                response.status shouldBe HttpStatusCode.InternalServerError
+                // Should return OK to avoid leaking internal errors
+                response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Redis connection failed"
+                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
+                body["emailId"] shouldBe "no-email-sent"
 
                 coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify(exactly = 0) { mockEmailService.resetPassword(any()) }
@@ -178,9 +182,10 @@ class AuthRoutesTest : FunSpec({
                     setBody(request)
                 }
 
-                response.status shouldBe HttpStatusCode.BadRequest
+                response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Invalid email address"
+                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
+                body["emailId"] shouldBe "email-send-failed"
 
                 coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify { mockEmailService.resetPassword(user) }
@@ -209,9 +214,10 @@ class AuthRoutesTest : FunSpec({
                     setBody(request)
                 }
 
-                response.status shouldBe HttpStatusCode.InternalServerError
+                response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Failed to send email"
+                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
+                body["emailId"] shouldBe "email-send-failed"
 
                 coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify { mockEmailService.resetPassword(user) }
@@ -240,9 +246,10 @@ class AuthRoutesTest : FunSpec({
                     setBody(request)
                 }
 
-                response.status shouldBe HttpStatusCode.InternalServerError
+                response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Failed to generate token"
+                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
+                body["emailId"] shouldBe "email-send-failed"
 
                 coVerify { mockRedisService.getUserByEmail(email) }
                 coVerify { mockEmailService.resetPassword(user) }

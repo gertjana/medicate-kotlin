@@ -382,7 +382,7 @@ class UserRoutesTest : FunSpec({
             }
         }
 
-        test("should return 404 when user not found") {
+        test("should return OK with generic message when user not found") {
             val username = "nonexistent"
             val newPassword = "newpassword123"
             val request = UserRequest(username, "", newPassword)
@@ -403,12 +403,16 @@ class UserRoutesTest : FunSpec({
                     setBody(request)
                 }
 
-                response.status shouldBe HttpStatusCode.NotFound
+                // Should return OK to avoid revealing user existence
+                response.status shouldBe HttpStatusCode.OK
+                val body = response.body<Map<String, String>>()
+                body["message"] shouldBe "Password updated successfully"
+
                 coVerify { mockRedisService.updatePassword(username, newPassword) }
             }
         }
 
-        test("should return 500 on update error") {
+        test("should return OK with generic message on update error") {
             val username = "testuser"
             val newPassword = "newpassword123"
             val request = UserRequest(username, "", newPassword)
@@ -429,7 +433,11 @@ class UserRoutesTest : FunSpec({
                     setBody(request)
                 }
 
-                response.status shouldBe HttpStatusCode.InternalServerError
+                // Should return OK to avoid revealing internal errors
+                response.status shouldBe HttpStatusCode.OK
+                val body = response.body<Map<String, String>>()
+                body["message"] shouldBe "Password updated successfully"
+
                 coVerify { mockRedisService.updatePassword(username, newPassword) }
             }
         }
@@ -556,7 +564,7 @@ class UserRoutesTest : FunSpec({
             }
         }
 
-        test("should return 404 when user not found") {
+        test("should return InternalServerError with generic message when user not found") {
             val username = "nonexistent"
             val userId = java.util.UUID.randomUUID()
 
@@ -582,7 +590,11 @@ class UserRoutesTest : FunSpec({
                     header(HttpHeaders.Authorization, "Bearer $token")
                 }
 
-                response.status shouldBe HttpStatusCode.NotFound
+                // Return generic error message without revealing user existence
+                response.status shouldBe HttpStatusCode.InternalServerError
+                val body = response.body<Map<String, String>>()
+                body["error"] shouldBe "Failed to retrieve profile"
+
                 coVerify { mockRedisService.getUserById(userId.toString()) }
             }
         }
@@ -787,7 +799,7 @@ class UserRoutesTest : FunSpec({
             }
         }
 
-        test("should return 404 when user not found") {
+        test("should return InternalServerError with generic message when user not found") {
             val username = "nonexistent"
             val userId = java.util.UUID.randomUUID()
             val updateRequest = UpdateProfileRequest(
@@ -821,14 +833,18 @@ class UserRoutesTest : FunSpec({
                     setBody(updateRequest)
                 }
 
-                response.status shouldBe HttpStatusCode.NotFound
+                // Return generic error message
+                response.status shouldBe HttpStatusCode.InternalServerError
+                val body = response.body<Map<String, String>>()
+                body["error"] shouldBe "Failed to update profile"
+
                 coVerify { mockRedisService.getUserById(userId.toString()) }
                 // updateProfile should not be called since getUserById failed
                 coVerify(exactly = 0) { mockRedisService.updateProfile(any(), any(), any(), any()) }
             }
         }
 
-        test("should return 500 on Redis error") {
+        test("should return BadRequest with generic message on Redis error") {
             val username = "testuser"
             val userId = java.util.UUID.randomUUID()
             val updateRequest = UpdateProfileRequest(
@@ -873,7 +889,11 @@ class UserRoutesTest : FunSpec({
                     setBody(updateRequest)
                 }
 
-                response.status shouldBe HttpStatusCode.InternalServerError
+                // Return generic error message
+                response.status shouldBe HttpStatusCode.BadRequest
+                val body = response.body<Map<String, String>>()
+                body["error"] shouldBe "Failed to update profile. Email may already be in use."
+
                 coVerify { mockRedisService.getUserById(userId.toString()) }
                 coVerify { mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) }
             }
