@@ -345,10 +345,10 @@ class EmailServiceTest : FunSpec({
 
             // Verify token was stored with correct format and TTL
             val storedKey = capturedKey.captured
-            storedKey shouldContain "medicate:test:verification:${user.id}:"
+            storedKey shouldContain "medicate:test:verification:token:"
             verify(exactly = 1) {
                 mockAsyncCommands.setex(
-                    match { it.startsWith("medicate:test:verification:${user.id}:") },
+                    match { it.startsWith("medicate:test:verification:token:") },
                     86400L,
                     user.id.toString()
                 )

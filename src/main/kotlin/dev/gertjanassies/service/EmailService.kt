@@ -259,7 +259,8 @@ class EmailService(
 
     /**
      * Store verification token in Redis with TTL expiry
-     * Key format: medicate:{environment}:verification:{userId}:{token}
+     * Key format: medicate:{environment}:verification:token:{token}
+     * This allows O(1) lookup with GET instead of O(N) SCAN operation
      */
     private suspend fun storeVerificationToken(
         userId: String,
@@ -267,7 +268,7 @@ class EmailService(
         ttlSeconds: Long = 86400 // 24 hours default
     ): Either<RedisError, Unit> {
         val environment = redisService.getEnvironment()
-        val key = "medicate:$environment:verification:$userId:$token"
+        val key = "medicate:$environment:verification:token:$token"
         logger.debug("Storing verification token for user ID: $userId in environment: $environment with TTL: $ttlSeconds seconds")
         return redisService.setex(key, ttlSeconds, userId)
             .map { } // Convert Either<RedisError, String> to Either<RedisError, Unit>
