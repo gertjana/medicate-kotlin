@@ -277,7 +277,7 @@ class EmailService(
      * Generate HTML content for verification email
      */
     private fun generateVerificationEmailHtml(user: User, token: String): String {
-        val verificationLink = "$appUrl/verify-email?token=$token"
+        val verificationLink = "$appUrl/activate-account?token=$token"
         val displayName = if (user.firstName.isNotBlank() && user.lastName.isNotBlank()) {
             "${user.firstName} ${user.lastName}"
         } else if (user.firstName.isNotBlank()) {
