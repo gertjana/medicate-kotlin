@@ -5,6 +5,7 @@ import dev.gertjanassies.util.createFailedRedisFutureMock
 import dev.gertjanassies.util.createRedisFutureMock
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.lettuce.core.TransactionResult
 import io.lettuce.core.api.StatefulRedisConnection
@@ -163,7 +164,7 @@ class UserServiceTest : FunSpec({
 
             // Hash the password using BCrypt to simulate stored user
             val passwordHash = org.mindrot.jbcrypt.BCrypt.hashpw(password, org.mindrot.jbcrypt.BCrypt.gensalt())
-            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = passwordHash)
+            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = passwordHash, isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -192,7 +193,7 @@ class UserServiceTest : FunSpec({
             val userKey = "medicate:$environment:user:id:$userId"
 
             val passwordHash = org.mindrot.jbcrypt.BCrypt.hashpw(correctPassword, org.mindrot.jbcrypt.BCrypt.gensalt())
-            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = passwordHash)
+            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = passwordHash, isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -279,7 +280,7 @@ class UserServiceTest : FunSpec({
             val userKey = "medicate:$environment:user:id:$userId"
             val newEmailIndexKey = "medicate:$environment:user:email:${email.lowercase()}"
 
-            val user = User(id = userId, username = username, email = "old@example.com", firstName = "OldFirst", lastName = "OldLast", passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = "old@example.com", firstName = "OldFirst", lastName = "OldLast", passwordHash = "hashedpassword", isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -322,7 +323,7 @@ class UserServiceTest : FunSpec({
             val userKey = "medicate:$environment:user:id:$userId"
             val emailIndexKey = "medicate:$environment:user:email:${email.lowercase()}"
 
-            val user = User(id = userId, username = username, email = "old@example.com", passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = "old@example.com", passwordHash = "hashedpassword", isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -354,7 +355,7 @@ class UserServiceTest : FunSpec({
             val userKey = "medicate:$environment:user:id:$userId"
             val emailIndexKey = "medicate:$environment:user:email:${email.lowercase()}"
 
-            val user = User(id = userId, username = username, email = email, firstName = "OldFirst", lastName = "OldLast", passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = email, firstName = "OldFirst", lastName = "OldLast", passwordHash = "hashedpassword", isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -418,7 +419,7 @@ class UserServiceTest : FunSpec({
             val userKey = "medicate:$environment:user:id:$userId"
             val emailIndexKey = "medicate:$environment:user:email:existing@example.com"  // lowercase in index
 
-            val user = User(id = userId, username = username, email = "old@example.com", passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = "old@example.com", passwordHash = "hashedpassword", isActive = true)
             val userJson = json.encodeToString(user)
 
             every { mockConnection.async() } returns mockAsyncCommands
@@ -487,6 +488,219 @@ class UserServiceTest : FunSpec({
                     match { it.startsWith(existingUserId) && it.contains(",") }
                 )
             }
+        }
+    }
+
+    context("activateUser") {
+        test("should successfully activate an inactive user") {
+            val userId = java.util.UUID.randomUUID()
+            val username = "testuser"
+            val email = "test@example.com"
+            val userKey = "medicate:$environment:user:id:$userId"
+
+            val inactiveUser = User(
+                id = userId,
+                username = username,
+                email = email,
+                passwordHash = "hash123",
+                isActive = false
+            )
+            val inactiveUserJson = json.encodeToString(inactiveUser)
+
+            val activatedUser = inactiveUser.copy(isActive = true)
+            val activatedUserJson = json.encodeToString(activatedUser)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(inactiveUserJson)
+            every { mockAsyncCommands.set(userKey, activatedUserJson) } returns createRedisFutureMock("OK")
+
+            val result = redisService.activateUser(userId.toString())
+
+            result.isRight() shouldBe true
+            val user = result.getOrNull()
+            user?.isActive shouldBe true
+            user?.id shouldBe userId
+            user?.username shouldBe username
+            user?.email shouldBe email
+
+            verify(exactly = 1) { mockAsyncCommands.get(userKey) }
+            verify(exactly = 1) { mockAsyncCommands.set(userKey, activatedUserJson) }
+        }
+
+        test("should return NotFound when user doesn't exist") {
+            val userId = java.util.UUID.randomUUID()
+            val userKey = "medicate:$environment:user:id:$userId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(null as String?)
+
+            val result = redisService.activateUser(userId.toString())
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.NotFound>()
+            error.message shouldBe "User not found"
+
+            verify(exactly = 1) { mockAsyncCommands.get(userKey) }
+            verify(exactly = 0) { mockAsyncCommands.set(any(), any()) }
+        }
+
+        test("should return OperationError when Redis set fails") {
+            val userId = java.util.UUID.randomUUID()
+            val username = "testuser"
+            val email = "test@example.com"
+            val userKey = "medicate:$environment:user:id:$userId"
+
+            val inactiveUser = User(
+                id = userId,
+                username = username,
+                email = email,
+                passwordHash = "hash123",
+                isActive = false
+            )
+            val inactiveUserJson = json.encodeToString(inactiveUser)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(inactiveUserJson)
+            every {
+                mockAsyncCommands.set(any(), any())
+            } returns createFailedRedisFutureMock(RuntimeException("Redis write failed"))
+
+            val result = redisService.activateUser(userId.toString())
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.OperationError>()
+            error.message shouldContain "Failed to activate user"
+        }
+
+        test("should return SerializationError when user JSON is malformed") {
+            val userId = java.util.UUID.randomUUID()
+            val userKey = "medicate:$environment:user:id:$userId"
+            val malformedJson = "{invalid json"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(malformedJson)
+
+            val result = redisService.activateUser(userId.toString())
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.SerializationError>()
+        }
+
+        test("should handle activating an already active user") {
+            val userId = java.util.UUID.randomUUID()
+            val username = "testuser"
+            val email = "test@example.com"
+            val userKey = "medicate:$environment:user:id:$userId"
+
+            val alreadyActiveUser = User(
+                id = userId,
+                username = username,
+                email = email,
+                passwordHash = "hash123",
+                isActive = true
+            )
+            val userJson = json.encodeToString(alreadyActiveUser)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+            every { mockAsyncCommands.set(userKey, userJson) } returns createRedisFutureMock("OK")
+
+            val result = redisService.activateUser(userId.toString())
+
+            result.isRight() shouldBe true
+            val user = result.getOrNull()
+            user?.isActive shouldBe true
+
+            // Should still update the user (idempotent operation)
+            verify(exactly = 1) { mockAsyncCommands.set(userKey, userJson) }
+        }
+    }
+
+    context("verifyActivationToken") {
+        test("should successfully verify valid token and delete it") {
+            val userId = java.util.UUID.randomUUID()
+            val token = "valid-activation-token"
+            val verificationKey = "medicate:$environment:verification:token:$token"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            // Mock get to return userId (direct O(1) lookup)
+            every { mockAsyncCommands.get(verificationKey) } returns createRedisFutureMock(userId.toString())
+
+            // Mock delete
+            every { mockAsyncCommands.del(verificationKey) } returns createRedisFutureMock(1L)
+
+            val result = redisService.verifyActivationToken(token)
+
+            result.isRight() shouldBe true
+            result.getOrNull() shouldBe userId.toString()
+
+            verify(exactly = 1) { mockAsyncCommands.get(verificationKey) }
+            verify(exactly = 1) { mockAsyncCommands.del(verificationKey) }
+        }
+
+        test("should return NotFound when token doesn't exist") {
+            val token = "invalid-token"
+            val verificationKey = "medicate:$environment:verification:token:$token"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            // Mock get to return null (token not found)
+            every { mockAsyncCommands.get(verificationKey) } returns createRedisFutureMock(null as String?)
+
+            val result = redisService.verifyActivationToken(token)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.NotFound>()
+            error.message shouldContain "Invalid or expired verification token"
+
+            verify(exactly = 1) { mockAsyncCommands.get(verificationKey) }
+            verify(exactly = 0) { mockAsyncCommands.del(any()) }
+        }
+
+        test("should return NotFound when token value is null") {
+            val token = "expired-token"
+            val verificationKey = "medicate:$environment:verification:token:$token"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            every { mockAsyncCommands.get(verificationKey) } returns createRedisFutureMock(null as String?)
+
+            val result = redisService.verifyActivationToken(token)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.NotFound>()
+            error.message shouldContain "Invalid or expired verification token"
+
+            verify(exactly = 1) { mockAsyncCommands.get(verificationKey) }
+            verify(exactly = 0) { mockAsyncCommands.del(any()) }
+        }
+
+        test("should return OperationError when delete fails") {
+            val userId = java.util.UUID.randomUUID()
+            val token = "valid-token"
+            val verificationKey = "medicate:$environment:verification:token:$token"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            every { mockAsyncCommands.get(verificationKey) } returns createRedisFutureMock(userId.toString())
+            every {
+                mockAsyncCommands.del(verificationKey)
+            } returns createFailedRedisFutureMock(RuntimeException("Delete failed"))
+
+            val result = redisService.verifyActivationToken(token)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.OperationError>()
+            error.message shouldContain "Failed to delete verification token"
+
+            verify(exactly = 1) { mockAsyncCommands.get(verificationKey) }
         }
     }
 })

@@ -1,9 +1,12 @@
 package dev.gertjanassies.service
 
 import dev.gertjanassies.model.User
+import dev.gertjanassies.util.createFailedRedisFutureMock
+import dev.gertjanassies.util.createRedisFutureMock
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
@@ -28,14 +31,6 @@ class EmailServiceTest : FunSpec({
     val environment = "test"
     val json = Json { ignoreUnknownKeys = true }
 
-    // Helper to create RedisFuture mocks
-    fun <T> createRedisFutureMock(value: T): RedisFuture<T> {
-        val future = CompletableFuture<T>()
-        future.complete(value)
-        return mockk<RedisFuture<T>> {
-            every { toCompletableFuture() } returns future
-        }
-    }
 
     beforeEach {
         mockConnection = mockk()
@@ -303,6 +298,326 @@ class EmailServiceTest : FunSpec({
             capturedEmailBody shouldContain "johndoe"
             capturedEmailBody shouldContain "john@example.com"
             capturedEmailBody shouldContain "Reset Password"
+        }
+    }
+
+    context("sendVerificationEmail") {
+        test("should send verification email successfully and store token") {
+            // Mock Redis connection
+            every { mockConnection.async() } returns mockAsyncCommands
+            val capturedToken = slot<String>()
+            val capturedKey = slot<String>()
+            every {
+                mockAsyncCommands.setex(capture(capturedKey), 86400L, capture(capturedToken))
+            } returns createRedisFutureMock("OK")
+
+            var capturedEmailBody = ""
+            val mockEngine = MockEngine { request ->
+                capturedEmailBody = request.body.toByteArray().decodeToString()
+                respond(
+                    content = ByteReadChannel("""{"id":"email_456"}"""),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+
+            val httpClient = HttpClient(mockEngine) {
+                install(ContentNegotiation) { json(json) }
+            }
+
+            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+
+            val user = User(
+                id = java.util.UUID.randomUUID(),
+                username = "testuser",
+                email = "test@example.com",
+                firstName = "John",
+                lastName = "Doe",
+                passwordHash = "hash123",
+                isActive = false
+            )
+
+            val result = emailService.sendVerificationEmail(user)
+
+            result.isRight() shouldBe true
+            val emailId = result.getOrNull()
+            emailId shouldBe "email_456"
+
+            // Verify token was stored with correct format and TTL
+            val storedKey = capturedKey.captured
+            storedKey shouldContain "medicate:test:verification:token:"
+            verify(exactly = 1) {
+                mockAsyncCommands.setex(
+                    match { it.startsWith("medicate:test:verification:token:") },
+                    86400L,
+                    user.id.toString()
+                )
+            }
+
+            // Verify email content
+            capturedEmailBody shouldContain "test@example.com"
+            capturedEmailBody shouldContain "Verify Your Medicate Account"
+            capturedEmailBody shouldContain "John Doe"
+            capturedEmailBody shouldContain "activate-account?token="
+        }
+
+        test("should return InvalidEmail error for blank email") {
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            val mockEngine = MockEngine { _ ->
+                respond(
+                    content = ByteReadChannel("""{"id":"email_456"}"""),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+
+            val httpClient = HttpClient(mockEngine) {
+                install(ContentNegotiation) { json(json) }
+            }
+
+            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+
+            val user = User(
+                id = java.util.UUID.randomUUID(),
+                username = "testuser",
+                email = "",
+                passwordHash = "hash123",
+                isActive = false
+            )
+
+            val result = emailService.sendVerificationEmail(user)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<EmailError.InvalidEmail>()
+            error.message shouldContain "Invalid email address"
+        }
+
+        test("should return InvalidEmail error for email without @") {
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            val mockEngine = MockEngine { _ ->
+                respond(
+                    content = ByteReadChannel("""{"id":"email_456"}"""),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+
+            val httpClient = HttpClient(mockEngine) {
+                install(ContentNegotiation) { json(json) }
+            }
+
+            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+
+            val user = User(
+                id = java.util.UUID.randomUUID(),
+                username = "testuser",
+                email = "invalidemail.com",
+                passwordHash = "hash123",
+                isActive = false
+            )
+
+            val result = emailService.sendVerificationEmail(user)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<EmailError.InvalidEmail>()
+        }
+
+        test("should return SendFailed error when token storage fails") {
+            every { mockConnection.async() } returns mockAsyncCommands
+            every {
+                mockAsyncCommands.setex(any(), any(), any())
+            } returns createFailedRedisFutureMock(RuntimeException("Redis error"))
+
+            val mockEngine = MockEngine { _ ->
+                respond(
+                    content = ByteReadChannel("""{"id":"email_456"}"""),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+
+            val httpClient = HttpClient(mockEngine) {
+                install(ContentNegotiation) { json(json) }
+            }
+
+            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+
+            val user = User(
+                id = java.util.UUID.randomUUID(),
+                username = "testuser",
+                email = "test@example.com",
+                passwordHash = "hash123",
+                isActive = false
+            )
+
+            val result = emailService.sendVerificationEmail(user)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<EmailError.SendFailed>()
+            error.message shouldContain "Failed to store verification token"
+        }
+
+        test("should return SendFailed error when email API fails") {
+            every { mockConnection.async() } returns mockAsyncCommands
+            every {
+                mockAsyncCommands.setex(any(), any(), any())
+            } returns createRedisFutureMock("OK")
+
+            val mockEngine = MockEngine { _ ->
+                respond(
+                    content = ByteReadChannel("""{"error":"API key invalid"}"""),
+                    status = HttpStatusCode.Unauthorized,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+
+            val httpClient = HttpClient(mockEngine) {
+                install(ContentNegotiation) { json(json) }
+            }
+
+            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+
+            val user = User(
+                id = java.util.UUID.randomUUID(),
+                username = "testuser",
+                email = "test@example.com",
+                passwordHash = "hash123",
+                isActive = false
+            )
+
+            val result = emailService.sendVerificationEmail(user)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<EmailError.SendFailed>()
+        }
+
+        test("should use firstName only when lastName is blank") {
+            every { mockConnection.async() } returns mockAsyncCommands
+            every {
+                mockAsyncCommands.setex(any(), any(), any())
+            } returns createRedisFutureMock("OK")
+
+            var capturedEmailBody = ""
+            val mockEngine = MockEngine { request ->
+                capturedEmailBody = request.body.toByteArray().decodeToString()
+                respond(
+                    content = ByteReadChannel("""{"id":"email_456"}"""),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+
+            val httpClient = HttpClient(mockEngine) {
+                install(ContentNegotiation) { json(json) }
+            }
+
+            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+
+            val user = User(
+                id = java.util.UUID.randomUUID(),
+                username = "testuser",
+                email = "test@example.com",
+                firstName = "Jane",
+                lastName = "",
+                passwordHash = "hash123",
+                isActive = false
+            )
+
+            val result = emailService.sendVerificationEmail(user)
+
+            result.isRight() shouldBe true
+
+            // Verify email uses first name only
+            capturedEmailBody shouldContain "Hello Jane"
+            (capturedEmailBody.contains("Jane ")).shouldBe(false)
+        }
+
+        test("should use 'there' when both names are blank") {
+            every { mockConnection.async() } returns mockAsyncCommands
+            every {
+                mockAsyncCommands.setex(any(), any(), any())
+            } returns createRedisFutureMock("OK")
+
+            var capturedEmailBody = ""
+            val mockEngine = MockEngine { request ->
+                capturedEmailBody = request.body.toByteArray().decodeToString()
+                respond(
+                    content = ByteReadChannel("""{"id":"email_456"}"""),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+
+            val httpClient = HttpClient(mockEngine) {
+                install(ContentNegotiation) { json(json) }
+            }
+
+            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+
+            val user = User(
+                id = java.util.UUID.randomUUID(),
+                username = "testuser",
+                email = "test@example.com",
+                firstName = "",
+                lastName = "",
+                passwordHash = "hash123",
+                isActive = false
+            )
+
+            val result = emailService.sendVerificationEmail(user)
+
+            result.isRight() shouldBe true
+
+            // Verify email uses username when no names provided
+            capturedEmailBody shouldContain "Hello testuser"
+        }
+
+        test("should generate unique tokens for multiple verification emails") {
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            val capturedKeys = mutableListOf<String>()
+            every {
+                mockAsyncCommands.setex(capture(capturedKeys), any(), any())
+            } returns createRedisFutureMock("OK")
+
+            val mockEngine = MockEngine { _ ->
+                respond(
+                    content = ByteReadChannel("""{"id":"email_456"}"""),
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            }
+
+            val httpClient = HttpClient(mockEngine) {
+                install(ContentNegotiation) { json(json) }
+            }
+
+            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+
+            val user = User(
+                id = java.util.UUID.randomUUID(),
+                username = "testuser",
+                email = "test@example.com",
+                passwordHash = "hash123",
+                isActive = false
+            )
+
+            // Send two verification emails
+            emailService.sendVerificationEmail(user)
+            emailService.sendVerificationEmail(user)
+
+            // Verify tokens are different
+            val token1 = capturedKeys[0].substringAfterLast(":")
+            val token2 = capturedKeys[1].substringAfterLast(":")
+            token1.isNotBlank() shouldBe true
+            token2.isNotBlank() shouldBe true
+            (token1 != token2) shouldBe true
         }
     }
 })

@@ -3,6 +3,7 @@ package dev.gertjanassies.routes
 import dev.gertjanassies.model.request.UserRequest
 import dev.gertjanassies.model.response.AuthResponse
 import dev.gertjanassies.model.response.toResponse
+import dev.gertjanassies.service.EmailService
 import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.StorageService
 import io.ktor.http.*
@@ -16,7 +17,7 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("UserRoutes")
 
-fun Route.userRoutes(storageService: StorageService, jwtService: JwtService) {
+fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, emailService: EmailService) {
     route("/user") {
         /**
          * POST /api/user/register
@@ -50,33 +51,35 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService) {
             val left = result.leftOrNull()
             if (left != null) {
                 logger.error("Failed to register user '${request.username}': ${left.message}")
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to left.message))
+                // Don't reveal specific details about what exists (username or email)
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Registration failed. Please try a different username or email."))
                 return@post
             }
 
             val user = result.getOrNull()!!
 
-            // Generate JWT tokens for newly registered user
-            val accessToken = jwtService.generateAccessToken(user.username, user.id.toString())
-            val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString())
-
-            // Set refresh token as HttpOnly cookie
-            call.response.cookies.append(
-                io.ktor.http.Cookie(
-                    name = "refresh_token",
-                    value = refreshToken,
-                    maxAge = 30 * 24 * 60 * 60, // 30 days in seconds
-                    httpOnly = true,
-                    secure = false, // Set to true in production with HTTPS
-                    path = "/",
-                    extensions = mapOf("SameSite" to "Strict")
+            // Send verification email (user is created but inactive)
+            val emailResult = emailService.sendVerificationEmail(user)
+            val emailError = emailResult.leftOrNull()
+            if (emailError != null) {
+                logger.error("Failed to send verification email to ${user.email}: ${emailError.message}")
+                // TODO: Implement deleteUser method to clean up orphaned user accounts when email fails
+                // Without cleanup, users remain in an inactive state and cannot re-register with the same email
+                // This creates unrecoverable accounts that can't be verified or deleted by the user
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to "Registration failed due to an internal error while sending the verification email. Please try again later.")
                 )
-            )
+                return@post
+            }
 
-            logger.debug("Successfully registered user '${request.username}' and generated JWT tokens")
+            logger.debug("Successfully registered user '${request.username}' and sent verification email")
             call.respond(
                 HttpStatusCode.Created,
-                AuthResponse(user = user.toResponse(), token = accessToken, refreshToken = "") // Don't send refresh token in response
+                mapOf(
+                    "message" to "Registration successful! Please check your email to verify your account.",
+                    "email" to user.email
+                )
             )
         }
 
@@ -159,12 +162,8 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService) {
             result.fold(
                 { error ->
                     logger.error("Failed to update password for user '${request.username}': ${error.message}")
-                    when (error) {
-                        is dev.gertjanassies.service.RedisError.NotFound ->
-                            call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
-                        else ->
-                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
-                    }
+                    // Don't reveal whether user exists or not
+                    call.respond(HttpStatusCode.OK, mapOf("message" to "Password updated successfully"))
                 },
                 {
                     logger.debug("Successfully updated password for user '${request.username}'")
@@ -195,12 +194,8 @@ fun Route.protectedUserRoutes(storageService: StorageService) {
             result.fold(
                 { error ->
                     logger.error("Failed to get profile for user ID '$userId': ${error.message}")
-                    when (error) {
-                        is dev.gertjanassies.service.RedisError.NotFound ->
-                            call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
-                        else ->
-                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
-                    }
+                    // Generic error - don't reveal details about user existence
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Failed to retrieve profile"))
                 },
                 { user ->
                     logger.debug("Successfully retrieved profile for user ID '$userId' (username: '${user.username}')")
@@ -240,7 +235,7 @@ fun Route.protectedUserRoutes(storageService: StorageService) {
             val userResult = storageService.getUserById(userId)
             if (userResult.isLeft()) {
                 logger.error("Failed to get user by ID '$userId' for profile update")
-                call.respond(HttpStatusCode.NotFound, mapOf("error" to "User not found"))
+                call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Failed to update profile"))
                 return@put
             }
             val username = userResult.getOrNull()!!.username
@@ -250,12 +245,8 @@ fun Route.protectedUserRoutes(storageService: StorageService) {
             result.fold(
                 { error ->
                     logger.error("Failed to update profile for user '$username': ${error.message}")
-                    when (error) {
-                        is dev.gertjanassies.service.RedisError.NotFound ->
-                            call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
-                        else ->
-                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
-                    }
+                    // Generic error message - don't reveal specific details
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Failed to update profile. Email may already be in use."))
                 },
                 { user ->
                     logger.debug("Successfully updated profile for user '$username'")

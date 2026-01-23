@@ -54,6 +54,16 @@ interface StorageService {
      */
     suspend fun verifyPasswordResetToken(token: String): Either<RedisError, String>
 
+    /**
+     * Activate user account (set isActive to true)
+     */
+    suspend fun activateUser(userId: String): Either<RedisError, User>
+
+    /**
+     * Verify email activation token and return user ID
+     */
+    suspend fun verifyActivationToken(token: String): Either<RedisError, String>
+
     // Medicine operations
 
     /**

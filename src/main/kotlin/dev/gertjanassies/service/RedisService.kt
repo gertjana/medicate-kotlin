@@ -934,8 +934,8 @@ class RedisService private constructor(
             // Hash the password using BCrypt
             val passwordHash = BCrypt.hashpw(password, BCrypt.gensalt())
 
-            // Create new user with UUID
-            val user = User(id = userId, username = username, email = email, passwordHash = passwordHash)
+            // Create new user with UUID - inactive by default, requires email verification
+            val user = User(id = userId, username = username, email = email, passwordHash = passwordHash, isActive = false)
             val jsonString = json.encodeToString(user)
 
             // Calculate updated user IDs list
@@ -1001,6 +1001,10 @@ class RedisService private constructor(
 
             // Check if password matches
             if (BCrypt.checkpw(password, user.passwordHash)) {
+                // Check if user account is active
+                if (!user.isActive) {
+                    raise(RedisError.OperationError("Account not activated. Please check your email for the verification link."))
+                }
                 return@either user
             }
         }
@@ -1273,6 +1277,64 @@ class RedisService private constructor(
         logger.debug("Successfully verified and deleted token for user: $username")
 
         username
+    }
+
+    /**
+     * Verify email activation token
+     * Token is single-use and will be deleted after successful verification
+     * Uses O(1) GET operation instead of O(N) SCAN for better performance
+     */
+    override suspend fun verifyActivationToken(token: String): Either<RedisError, String> = either {
+        // Use direct token lookup: verification:token:{token}
+        val key = "$keyPrefix:verification:token:$token"
+        logger.debug("Verifying activation token with direct lookup")
+
+        // Get the user ID directly with O(1) GET operation
+        val userId = get(key).bind() ?: raise(
+            RedisError.NotFound("Invalid or expired verification token")
+        )
+
+        logger.debug("Found user ID: $userId for verification token")
+
+        // Delete the token after successful verification (one-time use)
+        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+        Either.catch {
+            asyncCommands.del(key).await()
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to delete verification token: ${e.message}")
+        }.bind()
+
+        logger.debug("Successfully verified and deleted verification token for user ID: $userId")
+
+        userId
+    }
+
+    /**
+     * Activate user account by setting isActive to true
+     */
+    override suspend fun activateUser(userId: String): Either<RedisError, User> = either {
+        logger.debug("Activating user account for user ID: $userId")
+
+        // Get the user
+        val user = getUserById(userId).bind()
+
+        // Update user with isActive = true
+        val activatedUser = user.copy(isActive = true)
+        val userJson = json.encodeToString(activatedUser)
+
+        // Store the updated user
+        val key = "$keyPrefix:user:id:$userId"
+        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+
+        Either.catch {
+            asyncCommands.set(key, userJson).await()
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to activate user: ${e.message}")
+        }.bind()
+
+        logger.debug("Successfully activated user account for user ID: $userId")
+
+        activatedUser
     }
 
     // end of RedisService class

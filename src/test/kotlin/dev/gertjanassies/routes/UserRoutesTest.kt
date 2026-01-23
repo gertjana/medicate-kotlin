@@ -7,6 +7,7 @@ import dev.gertjanassies.model.request.UpdateProfileRequest
 import dev.gertjanassies.model.request.UserRequest
 import dev.gertjanassies.model.response.AuthResponse
 import dev.gertjanassies.model.response.UserResponse
+import dev.gertjanassies.service.EmailService
 import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
@@ -31,10 +32,12 @@ import io.mockk.*
 class UserRoutesTest : FunSpec({
     lateinit var mockRedisService: RedisService
     lateinit var mockJwtService: JwtService
+    lateinit var mockEmailService: EmailService
 
     beforeEach {
         mockRedisService = mockk()
         mockJwtService = mockk()
+        mockEmailService = mockk()
 
         // Mock JWT token generation with any username and userId
         every { mockJwtService.generateAccessToken(any(), any()) } returns "test-access-token-123"
@@ -46,21 +49,22 @@ class UserRoutesTest : FunSpec({
     }
 
     context("POST /user/register") {
-        test("should register a new user successfully and return JWT token") {
+        test("should register a new user successfully and send activation email") {
             val username = "testuser"
             val email = "testuser@example.com"
             val password = "password123"
             val userId = java.util.UUID.randomUUID()
             val request = UserRequest(username, email, password)
-            val user = User(id = userId, username = username, email = email, passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = email, passwordHash = "hashedpassword", isActive = false)
             coEvery { mockRedisService.registerUser(username, email, password) } returns user.right()
+            coEvery { mockEmailService.sendVerificationEmail(any()) } returns "email-id-123".right()
 
             testApplication {
                 environment {
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -69,23 +73,12 @@ class UserRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.Created
-                val body = response.body<AuthResponse>()
-                body.user.username shouldBe username
-                body.user.email shouldBe email
-                body.token shouldBe "test-access-token-123"
-                // Refresh token should not be in response body (empty string)
-                body.refreshToken shouldBe ""
-
-                // Verify refresh token cookie was set
-                val cookies = response.setCookie()
-                val refreshCookie = cookies.find { it.name == "refresh_token" }
-                refreshCookie shouldNotBe null
-                refreshCookie?.value shouldBe "test-refresh-token-456"
-                refreshCookie?.httpOnly shouldBe true
+                val body = response.body<Map<String, String>>()
+                body["message"] shouldBe "Registration successful! Please check your email to verify your account."
+                body["email"] shouldBe email
 
                 coVerify { mockRedisService.registerUser(username, email, password) }
-                verify { mockJwtService.generateAccessToken(username, userId.toString()) }
-                verify { mockJwtService.generateRefreshToken(username, userId.toString()) }
+                coVerify { mockEmailService.sendVerificationEmail(any()) }
             }
         }
 
@@ -97,7 +90,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -118,7 +111,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -139,7 +132,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -166,7 +159,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -186,7 +179,7 @@ class UserRoutesTest : FunSpec({
             val password = "password123"
             val userId = java.util.UUID.randomUUID()
             val request = UserRequest(username, "", password)
-            val user = User(id = userId, username = username, email = "", passwordHash = "hashedpassword")
+            val user = User(id = userId, username = username, email = "", passwordHash = "hashedpassword", isActive = true)
             coEvery { mockRedisService.loginUser(username, password) } returns user.right()
 
             testApplication {
@@ -194,7 +187,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -230,7 +223,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -251,7 +244,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -277,7 +270,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -304,7 +297,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {
@@ -327,7 +320,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {
@@ -348,7 +341,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {
@@ -369,7 +362,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {
@@ -382,7 +375,7 @@ class UserRoutesTest : FunSpec({
             }
         }
 
-        test("should return 404 when user not found") {
+        test("should return OK with generic message when user not found") {
             val username = "nonexistent"
             val newPassword = "newpassword123"
             val request = UserRequest(username, "", newPassword)
@@ -395,7 +388,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {
@@ -403,12 +396,16 @@ class UserRoutesTest : FunSpec({
                     setBody(request)
                 }
 
-                response.status shouldBe HttpStatusCode.NotFound
+                // Should return OK to avoid revealing user existence
+                response.status shouldBe HttpStatusCode.OK
+                val body = response.body<Map<String, String>>()
+                body["message"] shouldBe "Password updated successfully"
+
                 coVerify { mockRedisService.updatePassword(username, newPassword) }
             }
         }
 
-        test("should return 500 on update error") {
+        test("should return OK with generic message on update error") {
             val username = "testuser"
             val newPassword = "newpassword123"
             val request = UserRequest(username, "", newPassword)
@@ -421,7 +418,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.put("/user/password") {
@@ -429,7 +426,11 @@ class UserRoutesTest : FunSpec({
                     setBody(request)
                 }
 
-                response.status shouldBe HttpStatusCode.InternalServerError
+                // Should return OK to avoid revealing internal errors
+                response.status shouldBe HttpStatusCode.OK
+                val body = response.body<Map<String, String>>()
+                body["message"] shouldBe "Password updated successfully"
+
                 coVerify { mockRedisService.updatePassword(username, newPassword) }
             }
         }
@@ -438,15 +439,16 @@ class UserRoutesTest : FunSpec({
     context("Authentication Requirements") {
         test("POST /user/register should NOT require authentication (public endpoint)") {
             val request = UserRequest("testuser", "test@example.com", "password123")
-            val user = User(id = java.util.UUID.randomUUID(), username = "testuser", email = "test@example.com", passwordHash = "hashedpassword")
+            val user = User(id = java.util.UUID.randomUUID(), username = "testuser", email = "test@example.com", passwordHash = "hashedpassword", isActive = false)
             coEvery { mockRedisService.registerUser(any(), any(), any()) } returns user.right()
+            coEvery { mockEmailService.sendVerificationEmail(any()) } returns "email-id-123".right()
 
             testApplication {
                 environment {
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 // Should succeed WITHOUT authentication header
@@ -463,7 +465,7 @@ class UserRoutesTest : FunSpec({
 
         test("POST /user/login should NOT require authentication (public endpoint)") {
             val request = UserRequest("testuser", "", "password123")
-            val user = User(id = java.util.UUID.randomUUID(), username = "testuser", email = "", passwordHash = "hashedpassword")
+            val user = User(id = java.util.UUID.randomUUID(), username = "testuser", email = "", passwordHash = "hashedpassword", isActive = true)
             coEvery { mockRedisService.loginUser(any(), any()) } returns user.right()
 
             testApplication {
@@ -471,7 +473,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 // Should succeed WITHOUT authentication header
@@ -495,7 +497,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(mockRedisService, mockJwtService) }
+                routing { userRoutes(mockRedisService, mockJwtService, mockEmailService) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 // Can work without authentication (for password reset)
@@ -556,7 +558,7 @@ class UserRoutesTest : FunSpec({
             }
         }
 
-        test("should return 404 when user not found") {
+        test("should return InternalServerError with generic message when user not found") {
             val username = "nonexistent"
             val userId = java.util.UUID.randomUUID()
 
@@ -582,7 +584,11 @@ class UserRoutesTest : FunSpec({
                     header(HttpHeaders.Authorization, "Bearer $token")
                 }
 
-                response.status shouldBe HttpStatusCode.NotFound
+                // Return generic error message without revealing user existence
+                response.status shouldBe HttpStatusCode.InternalServerError
+                val body = response.body<Map<String, String>>()
+                body["error"] shouldBe "Failed to retrieve profile"
+
                 coVerify { mockRedisService.getUserById(userId.toString()) }
             }
         }
@@ -787,7 +793,7 @@ class UserRoutesTest : FunSpec({
             }
         }
 
-        test("should return 404 when user not found") {
+        test("should return InternalServerError with generic message when user not found") {
             val username = "nonexistent"
             val userId = java.util.UUID.randomUUID()
             val updateRequest = UpdateProfileRequest(
@@ -821,14 +827,18 @@ class UserRoutesTest : FunSpec({
                     setBody(updateRequest)
                 }
 
-                response.status shouldBe HttpStatusCode.NotFound
+                // Return generic error message
+                response.status shouldBe HttpStatusCode.InternalServerError
+                val body = response.body<Map<String, String>>()
+                body["error"] shouldBe "Failed to update profile"
+
                 coVerify { mockRedisService.getUserById(userId.toString()) }
                 // updateProfile should not be called since getUserById failed
                 coVerify(exactly = 0) { mockRedisService.updateProfile(any(), any(), any(), any()) }
             }
         }
 
-        test("should return 500 on Redis error") {
+        test("should return BadRequest with generic message on Redis error") {
             val username = "testuser"
             val userId = java.util.UUID.randomUUID()
             val updateRequest = UpdateProfileRequest(
@@ -873,7 +883,11 @@ class UserRoutesTest : FunSpec({
                     setBody(updateRequest)
                 }
 
-                response.status shouldBe HttpStatusCode.InternalServerError
+                // Return generic error message
+                response.status shouldBe HttpStatusCode.BadRequest
+                val body = response.body<Map<String, String>>()
+                body["error"] shouldBe "Failed to update profile. Email may already be in use."
+
                 coVerify { mockRedisService.getUserById(userId.toString()) }
                 coVerify { mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) }
             }

@@ -3,6 +3,7 @@ package dev.gertjanassies.routes
 import dev.gertjanassies.model.request.PasswordResetRequest
 import dev.gertjanassies.model.request.UserRequest
 import dev.gertjanassies.model.request.VerifyResetTokenRequest
+import dev.gertjanassies.model.response.toResponse
 import dev.gertjanassies.service.EmailError
 import dev.gertjanassies.service.EmailService
 import dev.gertjanassies.service.JwtService
@@ -84,6 +85,7 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
         /**
          * POST /api/auth/resetPassword
          * Request a password reset for a user by email address
+         * Note: Always returns success to prevent email enumeration attacks
          */
         post("/resetPassword") {
             val request = call.receive<PasswordResetRequest>()
@@ -96,16 +98,15 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
             // Get user by email
             val userResult = storageService.getUserByEmail(request.email)
             val userError = userResult.leftOrNull()
+
             if (userError != null) {
-                logger.error("Failed to get user for password reset (email: '${request.email}'): ${userError.message}")
-                when (userError) {
-                    is RedisError.NotFound -> {
-                        call.respond(HttpStatusCode.NotFound, mapOf("error" to "No account found with that email address"))
-                    }
-                    else -> {
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to userError.message))
-                    }
-                }
+                // Don't reveal whether the email exists or not - still log for debugging
+                logger.info("Password reset requested for non-existent email: '${request.email}'")
+                // Return success message anyway to prevent email enumeration
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "message" to "If an account exists with that email, you will receive a password reset link.",
+                    "emailId" to "no-email-sent"
+                ))
                 return@post
             }
 
@@ -116,23 +117,20 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
             val emailError = emailResult.leftOrNull()
             if (emailError != null) {
                 logger.error("Failed to send password reset email (email: '${request.email}'): ${emailError.message}")
-                when (emailError) {
-                    is EmailError.InvalidEmail -> {
-                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to emailError.message))
-                    }
-                    is EmailError.SendFailed -> {
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to emailError.message))
-                    }
-                    is EmailError.TokenGenerationFailed -> {
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to emailError.message))
-                    }
-                }
+                // Even if email sending fails, return success message to prevent enumeration
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "message" to "If an account exists with that email, you will receive a password reset link.",
+                    "emailId" to "email-send-failed"
+                ))
                 return@post
             }
 
             val emailId = emailResult.getOrNull()!!
             logger.debug("Successfully sent password reset email for email '${request.email}', emailId: $emailId")
-            call.respond(HttpStatusCode.OK, mapOf("message" to "Password reset email sent", "emailId" to emailId))
+            call.respond(HttpStatusCode.OK, mapOf(
+                "message" to "If an account exists with that email, you will receive a password reset link.",
+                "emailId" to emailId
+            ))
         }
 
         /**
@@ -165,6 +163,75 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
             val username = result.getOrNull()!!
             logger.debug("Successfully verified password reset token for user '$username'")
             call.respond(HttpStatusCode.OK, mapOf("username" to username))
+        }
+
+        /**
+         * POST /api/auth/activateAccount
+         * Verify activation token and activate user account
+         * Body: { "token": "verification-token" }
+         */
+        post("/activateAccount") {
+            val request = call.receive<VerifyResetTokenRequest>() // Reuse same request model
+
+            if (request.token.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Token cannot be empty"))
+                return@post
+            }
+
+            // Verify activation token and get user ID
+            val tokenResult = storageService.verifyActivationToken(request.token)
+            val tokenError = tokenResult.leftOrNull()
+            if (tokenError != null) {
+                logger.error("Failed to verify activation token: ${tokenError.message}")
+                when (tokenError) {
+                    is RedisError.NotFound -> {
+                        call.respond(HttpStatusCode.NotFound, mapOf("error" to "Invalid or expired activation token"))
+                    }
+                    else -> {
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to tokenError.message))
+                    }
+                }
+                return@post
+            }
+
+            val userId = tokenResult.getOrNull()!!
+
+            // Activate the user account
+            val activationResult = storageService.activateUser(userId)
+            val activationError = activationResult.leftOrNull()
+            if (activationError != null) {
+                logger.error("Failed to activate user account for user ID '$userId': ${activationError.message}")
+                call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Failed to activate account"))
+                return@post
+            }
+
+            val user = activationResult.getOrNull()!!
+
+            // Generate access and refresh tokens for the newly activated user
+            val accessToken = jwtService.generateAccessToken(user.username, user.id.toString())
+            val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString())
+
+            // Set refresh token as HttpOnly cookie
+            call.response.cookies.append(
+                io.ktor.http.Cookie(
+                    name = "refresh_token",
+                    value = refreshToken,
+                    maxAge = 30 * 24 * 3600, // 30 days
+                    httpOnly = true,
+                    secure = false,
+                    path = "/"
+                )
+            )
+
+            logger.debug("Successfully activated account for user '${user.username}' (ID: $userId)")
+            call.respond(
+                HttpStatusCode.OK,
+                dev.gertjanassies.model.response.ActivationResponse(
+                    message = "Account activated successfully",
+                    user = user.toResponse(),
+                    token = accessToken
+                )
+            )
         }
 
         /**

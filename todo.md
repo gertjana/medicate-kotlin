@@ -68,9 +68,15 @@
        - See: `ai_reports/MULTIPLE_USERS_SAME_USERNAME.md`
 
  - [ ] **Security**
-   - [ ] Don't give away information about whether username/email exists on login/register/reset password
+   - [x] Don't give away information about whether username/email exists on login/register/reset password
+   - [x] **Add rate limiting to register/login to prevent brute-force attacks**
+         - Implemented in nginx reverse proxy (most efficient)
+         - Login/Register: 5 requests per minute per IP (+ 2 burst)
+         - Password Reset: 3 requests per 5 minutes per IP (+ 1 burst)
+         - General API: 60 requests per minute per IP (+ 10 burst)
+         - Returns 429 status when limit exceeded
+         - See: `ai_reports/RATE_LIMITING.md`
    - [ ] **Activate User with email confirmation after registration**
-   - [ ] **Add rate limiting to register/login to prevent brute-force attacks**
 - [ ] **Allow users to delete their accounts**
 - [ ] **Optional, implement Postgres StorageService for production instead of Redis**
 - [ ] Investigate whether we can have a database of known medicines to let users select/search it from a list
