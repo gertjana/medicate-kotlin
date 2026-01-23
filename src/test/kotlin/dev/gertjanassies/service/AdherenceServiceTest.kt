@@ -31,7 +31,6 @@ class AdherenceServiceTest : FunSpec({
 
     val json = Json { ignoreUnknownKeys = true }
     val environment = "test"
-    val testUsername = "testuser"
     val testUserId = UUID.fromString("00000000-0000-0000-0000-000000000001")
 
 

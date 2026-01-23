@@ -3,6 +3,7 @@ package dev.gertjanassies.routes
 import dev.gertjanassies.model.request.PasswordResetRequest
 import dev.gertjanassies.model.request.UserRequest
 import dev.gertjanassies.model.request.VerifyResetTokenRequest
+import dev.gertjanassies.model.response.toResponse
 import dev.gertjanassies.service.EmailError
 import dev.gertjanassies.service.EmailService
 import dev.gertjanassies.service.JwtService
@@ -225,15 +226,10 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
             logger.debug("Successfully activated account for user '${user.username}' (ID: $userId)")
             call.respond(
                 HttpStatusCode.OK,
-                mapOf(
-                    "message" to "Account activated successfully",
-                    "user" to mapOf(
-                        "username" to user.username,
-                        "email" to user.email,
-                        "firstName" to user.firstName,
-                        "lastName" to user.lastName
-                    ),
-                    "token" to accessToken
+                dev.gertjanassies.model.response.ActivationResponse(
+                    message = "Account activated successfully",
+                    user = user.toResponse(),
+                    token = accessToken
                 )
             )
         }

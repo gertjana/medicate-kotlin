@@ -5,6 +5,7 @@ import dev.gertjanassies.util.createFailedRedisFutureMock
 import dev.gertjanassies.util.createRedisFutureMock
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.lettuce.core.TransactionResult
 import io.lettuce.core.api.StatefulRedisConnection
@@ -487,6 +488,328 @@ class UserServiceTest : FunSpec({
                     match { it.startsWith(existingUserId) && it.contains(",") }
                 )
             }
+        }
+    }
+
+    context("activateUser") {
+        test("should successfully activate an inactive user") {
+            val userId = java.util.UUID.randomUUID()
+            val username = "testuser"
+            val email = "test@example.com"
+            val userKey = "medicate:$environment:user:id:$userId"
+
+            val inactiveUser = User(
+                id = userId,
+                username = username,
+                email = email,
+                passwordHash = "hash123",
+                isActive = false
+            )
+            val inactiveUserJson = json.encodeToString(inactiveUser)
+
+            val activatedUser = inactiveUser.copy(isActive = true)
+            val activatedUserJson = json.encodeToString(activatedUser)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(inactiveUserJson)
+            every { mockAsyncCommands.set(userKey, activatedUserJson) } returns createRedisFutureMock("OK")
+
+            val result = redisService.activateUser(userId.toString())
+
+            result.isRight() shouldBe true
+            val user = result.getOrNull()
+            user?.isActive shouldBe true
+            user?.id shouldBe userId
+            user?.username shouldBe username
+            user?.email shouldBe email
+
+            verify(exactly = 1) { mockAsyncCommands.get(userKey) }
+            verify(exactly = 1) { mockAsyncCommands.set(userKey, activatedUserJson) }
+        }
+
+        test("should return NotFound when user doesn't exist") {
+            val userId = java.util.UUID.randomUUID()
+            val userKey = "medicate:$environment:user:id:$userId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(null as String?)
+
+            val result = redisService.activateUser(userId.toString())
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.NotFound>()
+            error.message shouldBe "User not found"
+
+            verify(exactly = 1) { mockAsyncCommands.get(userKey) }
+            verify(exactly = 0) { mockAsyncCommands.set(any(), any()) }
+        }
+
+        test("should return OperationError when Redis set fails") {
+            val userId = java.util.UUID.randomUUID()
+            val username = "testuser"
+            val email = "test@example.com"
+            val userKey = "medicate:$environment:user:id:$userId"
+
+            val inactiveUser = User(
+                id = userId,
+                username = username,
+                email = email,
+                passwordHash = "hash123",
+                isActive = false
+            )
+            val inactiveUserJson = json.encodeToString(inactiveUser)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(inactiveUserJson)
+            every {
+                mockAsyncCommands.set(any(), any())
+            } returns createFailedRedisFutureMock(RuntimeException("Redis write failed"))
+
+            val result = redisService.activateUser(userId.toString())
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.OperationError>()
+            error.message shouldContain "Failed to activate user"
+        }
+
+        test("should return SerializationError when user JSON is malformed") {
+            val userId = java.util.UUID.randomUUID()
+            val userKey = "medicate:$environment:user:id:$userId"
+            val malformedJson = "{invalid json"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(malformedJson)
+
+            val result = redisService.activateUser(userId.toString())
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.SerializationError>()
+        }
+
+        test("should handle activating an already active user") {
+            val userId = java.util.UUID.randomUUID()
+            val username = "testuser"
+            val email = "test@example.com"
+            val userKey = "medicate:$environment:user:id:$userId"
+
+            val alreadyActiveUser = User(
+                id = userId,
+                username = username,
+                email = email,
+                passwordHash = "hash123",
+                isActive = true
+            )
+            val userJson = json.encodeToString(alreadyActiveUser)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+            every { mockAsyncCommands.set(userKey, userJson) } returns createRedisFutureMock("OK")
+
+            val result = redisService.activateUser(userId.toString())
+
+            result.isRight() shouldBe true
+            val user = result.getOrNull()
+            user?.isActive shouldBe true
+
+            // Should still update the user (idempotent operation)
+            verify(exactly = 1) { mockAsyncCommands.set(userKey, userJson) }
+        }
+    }
+
+    context("verifyActivationToken") {
+        test("should successfully verify valid token and delete it") {
+            val userId = java.util.UUID.randomUUID()
+            val token = "valid-activation-token"
+            val verificationKey = "medicate:$environment:verification:$userId:$token"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            // Mock scan to find the verification key
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns listOf(verificationKey)
+            every { mockScanCursor.isFinished } returns true
+            every {
+                mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>())
+            } returns createRedisFutureMock(mockScanCursor)
+
+            // Mock get to return userId
+            every { mockAsyncCommands.get(verificationKey) } returns createRedisFutureMock(userId.toString())
+
+            // Mock delete
+            every { mockAsyncCommands.del(verificationKey) } returns createRedisFutureMock(1L)
+
+            val result = redisService.verifyActivationToken(token)
+
+            result.isRight() shouldBe true
+            result.getOrNull() shouldBe userId.toString()
+
+            verify(exactly = 1) { mockAsyncCommands.get(verificationKey) }
+            verify(exactly = 1) { mockAsyncCommands.del(verificationKey) }
+        }
+
+        test("should return NotFound when token doesn't exist") {
+            val token = "invalid-token"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            // Mock scan to find no keys
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns emptyList()
+            every { mockScanCursor.isFinished } returns true
+            every {
+                mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>())
+            } returns createRedisFutureMock(mockScanCursor)
+
+            val result = redisService.verifyActivationToken(token)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.NotFound>()
+            error.message shouldContain "Invalid or expired verification token"
+
+            verify(exactly = 0) { mockAsyncCommands.get(any()) }
+            verify(exactly = 0) { mockAsyncCommands.del(any()) }
+        }
+
+        test("should return NotFound when token value is null") {
+            val userId = java.util.UUID.randomUUID()
+            val token = "expired-token"
+            val verificationKey = "medicate:$environment:verification:$userId:$token"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns listOf(verificationKey)
+            every { mockScanCursor.isFinished } returns true
+            every {
+                mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>())
+            } returns createRedisFutureMock(mockScanCursor)
+
+            every { mockAsyncCommands.get(verificationKey) } returns createRedisFutureMock(null as String?)
+
+            val result = redisService.verifyActivationToken(token)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.NotFound>()
+            error.message shouldContain "Invalid or expired verification token"
+
+            verify(exactly = 1) { mockAsyncCommands.get(verificationKey) }
+            verify(exactly = 0) { mockAsyncCommands.del(any()) }
+        }
+
+        test("should return OperationError when multiple tokens found") {
+            val userId1 = java.util.UUID.randomUUID()
+            val userId2 = java.util.UUID.randomUUID()
+            val token = "duplicate-token"
+            val key1 = "medicate:$environment:verification:$userId1:$token"
+            val key2 = "medicate:$environment:verification:$userId2:$token"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns listOf(key1, key2)
+            every { mockScanCursor.isFinished } returns true
+            every {
+                mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>())
+            } returns createRedisFutureMock(mockScanCursor)
+
+            val result = redisService.verifyActivationToken(token)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.OperationError>()
+            error.message shouldContain "Multiple verification tokens found"
+
+            verify(exactly = 0) { mockAsyncCommands.get(any()) }
+            verify(exactly = 0) { mockAsyncCommands.del(any()) }
+        }
+
+        test("should return OperationError when scan fails") {
+            val token = "test-token"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every {
+                mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>())
+            } returns createFailedRedisFutureMock(RuntimeException("Redis connection error"))
+
+            val result = redisService.verifyActivationToken(token)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.OperationError>()
+            error.message shouldContain "Failed to scan for verification tokens"
+        }
+
+        test("should return OperationError when delete fails") {
+            val userId = java.util.UUID.randomUUID()
+            val token = "valid-token"
+            val verificationKey = "medicate:$environment:verification:$userId:$token"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor.keys } returns listOf(verificationKey)
+            every { mockScanCursor.isFinished } returns true
+            every {
+                mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>())
+            } returns createRedisFutureMock(mockScanCursor)
+
+            every { mockAsyncCommands.get(verificationKey) } returns createRedisFutureMock(userId.toString())
+            every {
+                mockAsyncCommands.del(verificationKey)
+            } returns createFailedRedisFutureMock(RuntimeException("Delete failed"))
+
+            val result = redisService.verifyActivationToken(token)
+
+            result.isLeft() shouldBe true
+            val error = result.leftOrNull()
+            error.shouldBeInstanceOf<RedisError.OperationError>()
+            error.message shouldContain "Failed to delete verification token"
+
+            verify(exactly = 1) { mockAsyncCommands.get(verificationKey) }
+        }
+
+        test("should handle pagination when scanning for tokens") {
+            val userId = java.util.UUID.randomUUID()
+            val token = "test-token"
+            val verificationKey = "medicate:$environment:verification:$userId:$token"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+
+            // First page has no keys, not finished
+            val mockScanCursor1 = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor1.keys } returns emptyList()
+            every { mockScanCursor1.isFinished } returns false
+            every { mockScanCursor1.cursor } returns "cursor-1"
+
+            // Second page has the key, finished
+            val mockScanCursor2 = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockScanCursor2.keys } returns listOf(verificationKey)
+            every { mockScanCursor2.isFinished } returns true
+
+            every {
+                mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>())
+            } returns createRedisFutureMock(mockScanCursor1)
+
+            every {
+                mockAsyncCommands.scan(any<io.lettuce.core.ScanCursor>(), any<io.lettuce.core.ScanArgs>())
+            } returns createRedisFutureMock(mockScanCursor2)
+
+            every { mockAsyncCommands.get(verificationKey) } returns createRedisFutureMock(userId.toString())
+            every { mockAsyncCommands.del(verificationKey) } returns createRedisFutureMock(1L)
+
+            val result = redisService.verifyActivationToken(token)
+
+            result.isRight() shouldBe true
+            result.getOrNull() shouldBe userId.toString()
+
+            // Verify pagination was used
+            verify(exactly = 1) { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) }
+            verify(exactly = 1) { mockAsyncCommands.scan(any<io.lettuce.core.ScanCursor>(), any<io.lettuce.core.ScanArgs>()) }
         }
     }
 })
