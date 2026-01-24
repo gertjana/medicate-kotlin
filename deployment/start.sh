@@ -3,6 +3,12 @@ set -e
 
 echo "=== Starting Medicate Application ==="
 
+# Check for required environment variables
+if [ -z "$RESEND_API_KEY" ]; then
+  echo "⚠ WARNING: RESEND_API_KEY is not set - email functionality will not work"
+  echo "⚠ Set the RESEND_API_KEY environment variable to enable password reset and account activation emails"
+fi
+
 # Start backend in background with logs to stdout (unbuffered)
 echo "Starting backend (Ktor)..."
 stdbuf -oL -eL java -jar /app/app.jar 2>&1 | stdbuf -oL -eL sed 's/^/[BACKEND] /' &

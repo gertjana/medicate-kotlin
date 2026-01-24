@@ -127,8 +127,8 @@ class RedisService private constructor(
     override suspend fun getMedicine(userId: String, id: String): Either<RedisError, Medicine> {
         return validateUserId(userId).fold(
             { error -> error.left() },
-            { userId ->
-                val key = "$keyPrefix:user:$userId:medicine:$id"
+            { validUserId ->
+                val key = "$keyPrefix:user:$validUserId:medicine:$id"
                 val jsonString = get(key).getOrNull()
 
                 when (jsonString) {
@@ -154,7 +154,7 @@ class RedisService private constructor(
         // Treat username parameter as userId directly (routes now pass userId)
         return validateUserId(userId).fold(
             { error -> error.left() },
-            { userId ->
+            { validUserId ->
                 val medicine = Medicine(
                     id = UUID.randomUUID(),
                     name = request.name,
@@ -163,7 +163,7 @@ class RedisService private constructor(
                     stock = request.stock,
                     description = request.description
                 )
-                val key = "$keyPrefix:user:$userId:medicine:${medicine.id}"
+                val key = "$keyPrefix:user:$validUserId:medicine:${medicine.id}"
 
                 Either.catch {
                     val jsonString = json.encodeToString(medicine)
@@ -185,8 +185,8 @@ class RedisService private constructor(
     override suspend fun updateMedicine(userId: String, id: String, medicine: Medicine): Either<RedisError, Medicine> {
         return validateUserId(userId).fold(
             { error -> error.left() },
-            { userId ->
-                val key = "$keyPrefix:user:$userId:medicine:$id"
+            { validUserId ->
+                val key = "$keyPrefix:user:$validUserId:medicine:$id"
 
                 // Check if medicine exists
                 val existing = get(key).getOrNull()
@@ -217,8 +217,8 @@ class RedisService private constructor(
     override suspend fun deleteMedicine(userId: String, id: String): Either<RedisError, Unit> {
         return validateUserId(userId).fold(
             { error -> error.left() },
-            { userId ->
-                val key = "$keyPrefix:user:$userId:medicine:$id"
+            { validUserId ->
+                val key = "$keyPrefix:user:$validUserId:medicine:$id"
 
                 Either.catch {
                     val deleted = connection?.async()?.del(key)?.await() ?: throw IllegalStateException("Not connected")
@@ -279,8 +279,8 @@ class RedisService private constructor(
     override suspend fun getSchedule(userId: String, id: String): Either<RedisError, Schedule> {
         return validateUserId(userId).fold(
             { error -> error.left() },
-            { userId ->
-                val key = "$keyPrefix:user:$userId:schedule:$id"
+            { validUserId ->
+                val key = "$keyPrefix:user:$validUserId:schedule:$id"
                 val jsonString = get(key).getOrNull()
 
                 when (jsonString) {

@@ -101,6 +101,11 @@ fun Application.module() {
     val appUrl = environment.config.propertyOrNull("app.url")?.getString()
         ?: System.getenv("APP_URL") ?: "http://localhost:5173"
 
+    if (resendApiKey.isEmpty()) {
+        log.warn("⚠️  RESEND_API_KEY is not set - email functionality will not work")
+        log.warn("⚠️  Set the RESEND_API_KEY environment variable to enable password reset and account activation emails")
+    }
+
     val httpClient = HttpClient(CIO) {
         install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })

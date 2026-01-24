@@ -10,6 +10,7 @@ services:
     - REDIS_PORT=6379
     - APP_ENV=production
     - LOG_LEVEL=INFO
+    - RESEND_API_KEY=${RESEND_API_KEY}  # Pass from host environment
     healthcheck:
       test: [CMD, curl, -f, http://localhost:80/health]
       interval: 30s

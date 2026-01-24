@@ -14,6 +14,7 @@
 	let medicines: Medicine[] = [];
 	let schedules: Schedule[] = [];
 	let error = '';
+	let loading = false;
 
 	// Toast notification state - support multiple stacked toasts
 	interface Toast {
