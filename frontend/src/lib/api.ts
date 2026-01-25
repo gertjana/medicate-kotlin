@@ -5,6 +5,14 @@ export interface Medicine {
 	unit: string;
 	stock: number;
 	description?: string;
+	bijsluiter?: string;
+}
+
+export interface MedicineSearchResult {
+	productnaam: string;
+	farmaceutischevorm: string;
+	werkzamestoffen: string;
+	bijsluiter_filenaam: string;
 }
 
 export interface User {
@@ -211,6 +219,17 @@ export async function getMedicines(): Promise<Medicine[]> {
 	return authenticatedFetch(`${API_BASE}/medicine`, {
 		cache: 'no-store'
 	});
+}
+
+export async function searchMedicines(query: string): Promise<MedicineSearchResult[]> {
+	if (query.length < 2) {
+		return [];
+	}
+	const response = await fetch(`${API_BASE}/medicines/search?q=${encodeURIComponent(query)}`);
+	if (!response.ok) {
+		return [];
+	}
+	return response.json();
 }
 
 export async function getMedicine(id: string): Promise<Medicine> {

@@ -107,20 +107,19 @@
 					/>
 				</div>
 
-				<div class="mb-4">
-					<label for="new-password" class="block mb-1 font-semibold">New Password</label>
-					<input
-						id="new-password"
-						type="password"
-						bind:value={newPassword}
-						class="input w-full"
-						placeholder="Enter new password"
-						required
-						minlength="6"
-						autofocus
-					/>
-					<p class="text-xs text-gray-600 mt-1">Minimum 6 characters</p>
-				</div>
+			<div class="mb-4">
+				<label for="new-password" class="block mb-1 font-semibold">New Password</label>
+				<input
+					id="new-password"
+					type="password"
+					bind:value={newPassword}
+					class="input w-full"
+					placeholder="Enter new password"
+					required
+					minlength="6"
+				/>
+				<p class="text-xs text-gray-600 mt-1">Minimum 6 characters</p>
+			</div>
 
 				<div class="mb-4">
 					<label for="confirm-password" class="block mb-1 font-semibold">Confirm Password</label>

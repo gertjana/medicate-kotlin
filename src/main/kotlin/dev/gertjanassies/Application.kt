@@ -10,6 +10,7 @@ import dev.gertjanassies.routes.dailyRoutes
 import dev.gertjanassies.routes.dosageHistoryRoutes
 import dev.gertjanassies.routes.healthRoutes
 import dev.gertjanassies.routes.medicineRoutes
+import dev.gertjanassies.routes.medicineSearchRoutes
 import dev.gertjanassies.routes.protectedUserRoutes
 import dev.gertjanassies.routes.scheduleRoutes
 import dev.gertjanassies.routes.userRoutes
@@ -157,6 +158,7 @@ fun Application.module() {
             healthRoutes()
             authRoutes(redisService, emailService, jwtService)
             userRoutes(redisService, jwtService, emailService)  // Login/register are public
+            medicineSearchRoutes()  // Medicine database search (public - used in add/edit forms)
 
             // Protected routes (require JWT authentication)
             authenticate("auth-jwt") {

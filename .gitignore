@@ -75,3 +75,6 @@ test-results/
 
 # Generated binaries (ignore at repo root)
 /bin/
+
+#anything in data is downloaeded during docker building
+/data/

@@ -2,9 +2,11 @@ package dev.gertjanassies.routes
 
 import arrow.core.raise.either
 import dev.gertjanassies.model.Medicine
+import dev.gertjanassies.model.MedicineSearchResult
 import dev.gertjanassies.model.request.AddStockRequest
 import dev.gertjanassies.model.request.DosageHistoryRequest
 import dev.gertjanassies.model.request.MedicineRequest
+import dev.gertjanassies.service.MedicineSearchService
 import dev.gertjanassies.service.StorageService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -22,6 +24,7 @@ private val logger = LoggerFactory.getLogger("MedicineRoutes")
  * Medicine routes
  */
 fun Route.medicineRoutes(storageService: StorageService) {
+
     // Get all medicines
     get("/medicine") {
         val userId = call.getUserId() ?: run {

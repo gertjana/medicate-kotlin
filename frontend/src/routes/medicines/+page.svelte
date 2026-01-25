@@ -9,7 +9,9 @@
 		updateMedicine,
 		deleteMedicine,
 		addStock,
-		type Medicine
+		searchMedicines,
+		type Medicine,
+		type MedicineSearchResult
 	} from '$lib/api';
 
 	// SvelteKit props - using const since they're not used internally
@@ -47,13 +49,59 @@
 		dose: '',
 		unit: '',
 		stock: '',
-		description: ''
+		description: '',
+		bijsluiter: ''
 	};
+
+	// Autocomplete state
+	let searchResults: MedicineSearchResult[] = [];
+	let showDropdown = false;
+	let searchTimeout: number;
+	let nameInput: HTMLInputElement;
 
 	function scrollToForm() {
 		if (formElement) {
 			formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
 		}
+	}
+
+	async function handleNameInput(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const value = input.value;
+		formData.name = value;
+
+		clearTimeout(searchTimeout);
+
+		if (value.length < 2) {
+			searchResults = [];
+			showDropdown = false;
+			return;
+		}
+
+		searchTimeout = window.setTimeout(async () => {
+			try {
+				searchResults = await searchMedicines(value);
+				showDropdown = searchResults.length > 0;
+			} catch (e) {
+				console.error('Failed to search medicines:', e);
+			}
+		}, 300);
+	}
+
+	function selectMedicine(result: MedicineSearchResult) {
+		formData.name = result.productnaam;
+		formData.bijsluiter = result.bijsluiter_filenaam || '';
+		searchResults = [];
+		showDropdown = false;
+		if (nameInput) {
+			nameInput.blur();
+		}
+	}
+
+	function hideDropdown() {
+		setTimeout(() => {
+			showDropdown = false;
+		}, 200);
 	}
 
 	async function loadMedicines() {
@@ -85,7 +133,7 @@
 
 	function startCreate() {
 		editingId = null;
-		formData = { name: '', dose: '', unit: '', stock: '', description: '' };
+		formData = { name: '', dose: '', unit: '', stock: '', description: '', bijsluiter: '' };
 		showForm = true;
 		setTimeout(scrollToForm, 50);
 	}
@@ -97,7 +145,8 @@
 			dose: medicine.dose.toString(),
 			unit: medicine.unit,
 			stock: medicine.stock.toString(),
-			description: medicine.description || ''
+			description: medicine.description || '',
+			bijsluiter: medicine.bijsluiter || ''
 		};
 		showForm = true;
 		setTimeout(scrollToForm, 50);
@@ -106,7 +155,7 @@
 	function cancelForm() {
 		showForm = false;
 		editingId = null;
-		formData = { name: '', dose: '', unit: '', stock: '', description: '' };
+		formData = { name: '', dose: '', unit: '', stock: '', description: '', bijsluiter: '' };
 	}
 
 	async function handleSubmit() {
@@ -117,7 +166,8 @@
 				dose: parseFloat(formData.dose),
 				unit: formData.unit,
 				stock: parseFloat(formData.stock),
-				description: formData.description || undefined
+				description: formData.description || undefined,
+				bijsluiter: formData.bijsluiter || undefined
 			};
 
 			if (editingId) {
@@ -209,9 +259,38 @@
 		<div class="card mb-6" bind:this={formElement}>
 			<h3 class="text-xl font-bold mb-4">{editingId ? 'Edit' : 'Add'} Medicine</h3>
 			<form on:submit|preventDefault={handleSubmit} class="space-y-4">
-				<div>
+				<div class="relative">
 					<label for="medicine-name" class="block mb-1 font-semibold">Name</label>
-					<input id="medicine-name" type="text" bind:value={formData.name} class="input w-full" required />
+					<input
+						id="medicine-name"
+						type="text"
+						bind:this={nameInput}
+						value={formData.name}
+						on:input={handleNameInput}
+						on:blur={hideDropdown}
+						class="input w-full"
+						autocomplete="off"
+						required
+					/>
+				{#if showDropdown && searchResults.length > 0}
+					<div class="absolute z-50 w-full mt-1 bg-white border-2 border-gray-300 shadow-lg rounded-md max-h-60 overflow-y-auto">
+						{#each searchResults as result}
+							<button
+								type="button"
+								on:mousedown={() => selectMedicine(result)}
+								class="w-full text-left px-4 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 cursor-pointer transition-colors"
+							>
+								<div class="font-semibold text-gray-900">{result.productnaam}</div>
+								<div class="text-sm text-gray-600">
+									{result.farmaceutischevorm}
+									{#if result.werkzamestoffen}
+										- {result.werkzamestoffen}
+									{/if}
+								</div>
+							</button>
+						{/each}
+					</div>
+				{/if}
 				</div>
 				<div class="grid grid-cols-2 gap-4">
 					<div>
@@ -251,6 +330,29 @@
 						placeholder="Enter medicine description..."
 					/>
 				</div>
+				<div>
+					<label for="medicine-bijsluiter" class="block mb-1 font-semibold">Package Leaflet URL (Optional)</label>
+					<input
+						id="medicine-bijsluiter"
+						type="url"
+						bind:value={formData.bijsluiter}
+						class="input w-full"
+						placeholder="Automatically filled when selecting from database..."
+						readonly={formData.bijsluiter !== ''}
+					/>
+					{#if formData.bijsluiter}
+						<p class="text-xs text-gray-500 mt-1">
+							<a
+								href={formData.bijsluiter}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="text-blue-600 hover:text-blue-800 underline"
+							>
+								View package leaflet
+							</a>
+						</p>
+					{/if}
+				</div>
 				<div class="flex gap-2">
 					<button type="submit" class="btn btn-primary">Save</button>
 					<button type="button" on:click={cancelForm} class="btn">Cancel</button>
@@ -264,16 +366,28 @@
 			<p class="text-gray-600">Loading medicines...</p>
 		</div>
 	{:else if sortedMedicines.length > 0}
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 			{#each sortedMedicines as medicine}
-				<div class="card flex flex-col">
+				<div class="card flex flex-col relative">
 					<div class="flex justify-between items-start mb-4">
 						<h3 class="text-xl font-bold">{medicine.name}</h3>
-						<button on:click={() => openStockModal(medicine.id)} class="btn btn-edit text-sm px-3 py-1">
-							+ Stock
-						</button>
+					{#if medicine.bijsluiter}
+					<a
+						href={medicine.bijsluiter}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="text-[steelblue] hover:text-[#4682b4]"
+						title="View package leaflet (PDF)"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="currentColor" viewBox="0 0 24 24">
+							<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
+							<path fill="#ffffff" d="M14 2v6h6"/>
+							<text x="7" y="19" font-size="6" font-weight="bold" fill="#ffffff">PDF</text>
+						</svg>
+					</a>
+					{/if}
 					</div>
-					<div class="flex-1">
+					<div class="flex-1 pb-8">
 						<p class="text-gray-600">
 							{medicine.dose}{medicine.unit} per dose
 						</p>
@@ -293,9 +407,12 @@
 						</p>
 					</div>
 					<div class="flex gap-2 mt-4">
-						<button on:click={() => startEdit(medicine)} class="btn btn-edit flex-1">Edit</button>
-						<button on:click={() => handleDelete(medicine.id, medicine.name)} class="btn btn-edit flex-1">
+						<button on:click={() => startEdit(medicine)} class="btn btn-edit text-sm px-3 py-1">Edit</button>
+						<button on:click={() => handleDelete(medicine.id, medicine.name)} class="btn btn-edit text-sm px-3 py-1">
 							Delete
+						</button>
+						<button on:click={() => openStockModal(medicine.id)} class="btn btn-edit text-sm px-3 py-1">
+							+ Stock
 						</button>
 					</div>
 				</div>

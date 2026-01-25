@@ -124,6 +124,29 @@ jobs:
         echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | sed 's/\//-/g')" >> $GITHUB_OUTPUT
 
+    - name: Download medicines database artifact (if available)
+      uses: dawidd6/action-download-artifact@v3
+      continue-on-error: true
+      with:
+        workflow: update-medicines.yml
+        name: medicines-database
+        path: scripts/
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        search_artifacts: true
+        if_no_artifact_found: warn
+
+    - name: Check if medicines database exists
+      id: check_medicines
+      run: |
+        if [ -f "scripts/medicines.json" ]; then
+          echo "medicines_exists=true" >> $GITHUB_OUTPUT
+          echo "Medicines database found, will be included in Docker image"
+          ls -lh scripts/medicines.json
+        else
+          echo "medicines_exists=false" >> $GITHUB_OUTPUT
+          echo "No medicines database found, proceeding without it"
+        fi
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
