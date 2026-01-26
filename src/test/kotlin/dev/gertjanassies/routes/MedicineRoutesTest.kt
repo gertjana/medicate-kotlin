@@ -671,7 +671,7 @@ class MedicineRoutesTest : FunSpec({
             }
         }
 
-        test("should return 400 when query parameter is missing") {
+        test("should return OK with empty list when query parameter is missing") {
             testApplication {
                 environment {
                     config = MapApplicationConfig()
@@ -687,7 +687,9 @@ class MedicineRoutesTest : FunSpec({
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/medicines/search")
 
-                response.status shouldBe HttpStatusCode.BadRequest
+                response.status shouldBe HttpStatusCode.OK
+                val results = response.body<List<MedicineSearchResult>>()
+                results.shouldBeEmpty()
             }
         }
 
