@@ -12,5 +12,6 @@ data class Medicine(
     val dose: Double,
     val unit: String,
     val stock: Double,
-    val description: String? = null
+    val description: String? = null,
+    val bijsluiter: String? = null
 )

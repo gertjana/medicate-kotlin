@@ -36,7 +36,7 @@ FROM eclipse-temurin:21-jre-alpine
 RUN apk add --no-cache nginx nodejs npm curl net-tools coreutils
 
 # Create directories
-RUN mkdir -p /usr/share/nginx/html /var/run/nginx /app /app/frontend
+RUN mkdir -p /usr/share/nginx/html /var/run/nginx /app /app/frontend /app/data
 
 # Copy nginx config
 COPY deployment/nginx.conf /etc/nginx/nginx.conf
@@ -48,6 +48,12 @@ COPY --from=frontend-builder /app/frontend/package.json /app/frontend/package.js
 
 # Copy backend jar
 COPY --from=backend-builder /app/build/libs/*.jar /app/app.jar
+
+# Copy medicines database (optional - created by GitHub Actions)
+COPY scripts/medicines.jso[n] /app/data/ || true
+
+# Set default medicines data directory (can be overridden)
+ENV MEDICINES_DATA_DIR=/app/data
 
 # Copy entrypoint script
 COPY deployment/start.sh /usr/local/bin/start.sh

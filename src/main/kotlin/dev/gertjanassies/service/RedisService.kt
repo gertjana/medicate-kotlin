@@ -161,7 +161,8 @@ class RedisService private constructor(
                     dose = request.dose,
                     unit = request.unit,
                     stock = request.stock,
-                    description = request.description
+                    description = request.description,
+                    bijsluiter = request.bijsluiter
                 )
                 val key = "$keyPrefix:user:$validUserId:medicine:${medicine.id}"
 

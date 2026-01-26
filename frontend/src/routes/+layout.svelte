@@ -231,7 +231,7 @@
 						<div class="flex-1">
 							<div class="flex justify-between items-center mb-0">
 								<div class="flex items-center gap-6">
-									<h1 class="text-2xl font-bold">Medicate</h1>
+									<h1 class="text-2xl font-bold text-[steelblue]">Medicate</h1>
 									<nav class="hidden md:flex items-center gap-2">
 										{#each navItems as item}
 											<a

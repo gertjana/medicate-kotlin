@@ -2,10 +2,13 @@ package dev.gertjanassies.routes
 
 import arrow.core.raise.either
 import dev.gertjanassies.model.Medicine
+import dev.gertjanassies.model.MedicineSearchResult
 import dev.gertjanassies.model.request.AddStockRequest
 import dev.gertjanassies.model.request.DosageHistoryRequest
 import dev.gertjanassies.model.request.MedicineRequest
+import dev.gertjanassies.service.MedicineSearchService
 import dev.gertjanassies.service.StorageService
+import dev.gertjanassies.util.ValidationUtils
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -22,6 +25,7 @@ private val logger = LoggerFactory.getLogger("MedicineRoutes")
  * Medicine routes
  */
 fun Route.medicineRoutes(storageService: StorageService) {
+
     // Get all medicines
     get("/medicine") {
         val userId = call.getUserId() ?: run {
@@ -75,6 +79,13 @@ fun Route.medicineRoutes(storageService: StorageService) {
 
         val request = call.receive<MedicineRequest>()
 
+        val validationError = ValidationUtils.validateBijsluiterUrl(request.bijsluiter)
+        if (validationError != null) {
+            logger.debug("Invalid bijsluiter URL for user ID '$userId': $validationError")
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to validationError))
+            return@post
+        }
+
         either {
             val created = storageService.createMedicine(userId, request).bind()
             logger.debug("Successfully created medicine '${created.name}' (${created.id}) for user ID: $userId")
@@ -98,6 +109,13 @@ fun Route.medicineRoutes(storageService: StorageService) {
         }
 
         val medicine = call.receive<Medicine>()
+
+        val validationError = ValidationUtils.validateBijsluiterUrl(medicine.bijsluiter)
+        if (validationError != null) {
+            logger.debug("Invalid bijsluiter URL for medicine '$id' for user ID '$userId': $validationError")
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to validationError))
+            return@put
+        }
 
         either {
             val updated = storageService.updateMedicine(userId, id, medicine).bind()

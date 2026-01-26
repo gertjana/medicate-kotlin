@@ -1,0 +1,59 @@
+name: Update Medicines Database
+
+on:
+  schedule:
+    # Run on the 1st of every month at 2 AM UTC
+  - cron: "0 2 1 * *"
+  workflow_dispatch:
+    # Allow manual triggering
+
+permissions:
+  contents: write
+
+jobs:
+  update-medicines:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Download and convert medicines data
+      working-directory: scripts
+      run: |
+        echo "Downloading metadata.csv from Dutch medicines database..."
+        curl -L -o metadata.csv "https://www.geneesmiddeleninformatiebank.nl/metadata.csv"
+
+        echo "Converting to JSON..."
+        python3 convert-metadata-to-json.py
+
+        echo "Verifying output..."
+        ls -lh medicines.json
+        head -20 medicines.json
+
+    - name: Upload medicines database as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: medicines-database
+        path: scripts/medicines.json
+        retention-days: 90
+
+    - name: Commit updated medicines database
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add scripts/medicines.json
+        git diff --staged --quiet || git commit -m "Update medicines database - $(date +'%Y-%m-%d')"
+
+    - name: Push changes
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.ref }}
