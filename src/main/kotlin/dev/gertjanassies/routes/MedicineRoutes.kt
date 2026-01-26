@@ -207,4 +207,19 @@ fun Route.medicineRoutes(storageService: StorageService) {
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
     }
+
+    // Search medicines endpoint (public - no auth required)
+    get("/medicines/search") {
+        val query = call.request.queryParameters["q"]
+
+        if (query == null) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Query parameter 'q' is required"))
+            return@get
+        }
+
+        logger.debug("Searching medicines with query: '$query'")
+        val results = MedicineSearchService.searchMedicines(query)
+        logger.debug("Found ${results.size} medicine search results for query: '$query'")
+        call.respond(HttpStatusCode.OK, results)
+    }
 }
