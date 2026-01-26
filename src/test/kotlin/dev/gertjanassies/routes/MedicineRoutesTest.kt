@@ -635,6 +635,7 @@ class MedicineRoutesTest : FunSpec({
                 }
                 routing {
                     medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
@@ -658,6 +659,7 @@ class MedicineRoutesTest : FunSpec({
                 }
                 routing {
                     medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
@@ -679,6 +681,7 @@ class MedicineRoutesTest : FunSpec({
                 }
                 routing {
                     medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
@@ -698,6 +701,7 @@ class MedicineRoutesTest : FunSpec({
                 }
                 routing {
                     medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
@@ -719,6 +723,7 @@ class MedicineRoutesTest : FunSpec({
                 }
                 routing {
                     medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
@@ -739,6 +744,7 @@ class MedicineRoutesTest : FunSpec({
                 }
                 routing {
                     medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }

@@ -16,8 +16,14 @@ private var medicinesCache: List<MedicineSearchResult>? = null
 fun Route.medicineSearchRoutes() {
     route("/medicines") {
         get("/search") {
-            val query = call.parameters["q"]?.lowercase() ?: ""
-            if (query.length < 2) {
+            val query = call.parameters["q"]
+            if (query == null) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Query parameter 'q' is required"))
+                return@get
+            }
+            
+            val queryLower = query.lowercase()
+            if (queryLower.length < 2) {
                 call.respond(emptyList<MedicineSearchResult>())
                 return@get
             }
@@ -25,7 +31,7 @@ fun Route.medicineSearchRoutes() {
             try {
                 val medicines = loadMedicinesDatabase()
                 val results = medicines
-                    .filter { it.productnaam.lowercase().contains(query) }
+                    .filter { it.productnaam.lowercase().contains(queryLower) }
                     .take(10)
 
                 call.respond(results)
