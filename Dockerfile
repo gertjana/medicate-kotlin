@@ -50,7 +50,7 @@ COPY --from=frontend-builder /app/frontend/package.json /app/frontend/package.js
 COPY --from=backend-builder /app/build/libs/*.jar /app/app.jar
 
 # Copy medicines database (optional - created by GitHub Actions)
-COPY scripts/medicines.jso[n] /app/data/ || true
+COPY data/medicines.jso[n] /app/data/ || true
 
 # Set default medicines data directory (can be overridden)
 ENV MEDICINES_DATA_DIR=/app/data
