@@ -84,6 +84,7 @@
 				showDropdown = searchResults.length > 0;
 			} catch (e) {
 				console.error('Failed to search medicines:', e);
+				showToastNotification('Failed to search medicines. Please try again.');
 			}
 		}, 300);
 	}
