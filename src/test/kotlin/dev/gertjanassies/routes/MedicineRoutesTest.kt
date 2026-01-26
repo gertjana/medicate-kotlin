@@ -634,7 +634,7 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
-                    medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
@@ -657,7 +657,7 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
-                    medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
@@ -669,7 +669,7 @@ class MedicineRoutesTest : FunSpec({
             }
         }
 
-        test("should return 400 when query parameter is missing") {
+        test("should return empty list when query parameter is missing") {
             testApplication {
                 environment {
                     config = MapApplicationConfig()
@@ -678,13 +678,15 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
-                    medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
                 val response = client.get("/medicines/search")
 
-                response.status shouldBe HttpStatusCode.BadRequest
+                response.status shouldBe HttpStatusCode.OK
+                val results = response.body<List<MedicineSearchResult>>()
+                results.shouldBeEmpty()
             }
         }
 
@@ -697,7 +699,7 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
-                    medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
@@ -718,7 +720,7 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
-                    medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
@@ -738,7 +740,7 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
-                    medicineRoutes(mockRedisService)
+                    medicineSearchRoutes()
                 }
 
                 val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
