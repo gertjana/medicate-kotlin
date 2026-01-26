@@ -13,24 +13,10 @@ private val logger = LoggerFactory.getLogger("MedicineSearchRoutes")
 fun Route.medicineSearchRoutes() {
     route("/medicines") {
         get("/search") {
-            val query = call.parameters["q"]
-            if (query == null) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Query parameter 'q' is required"))
-                return@get
-            }
-            
-            val queryLower = query.lowercase()
-            if (queryLower.length < 2) {
-                call.respond(emptyList<MedicineSearchResult>())
-                return@get
-            }
+            val query = call.parameters["q"] ?: ""
 
             try {
-                val medicines = loadMedicinesDatabase()
-                val results = medicines
-                    .filter { it.productnaam.lowercase().contains(queryLower) }
-                    .take(10)
-
+                val results = MedicineSearchService.searchMedicines(query)
                 call.respond(results)
             } catch (e: Exception) {
                 logger.error("Failed to search medicines: ${e.message}")
