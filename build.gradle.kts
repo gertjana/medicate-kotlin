@@ -27,6 +27,9 @@ dependencies {
     implementation("io.arrow-kt:arrow-core:1.2.1")
     implementation("io.arrow-kt:arrow-fx-coroutines:1.2.1")
 
+    // SQLite for medicine database
+    implementation("org.xerial:sqlite-jdbc:3.44.1.0")
+
     // Redis client (Lettuce)
     implementation("io.lettuce:lettuce-core:6.3.0.RELEASE")
 

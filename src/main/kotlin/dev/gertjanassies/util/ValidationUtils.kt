@@ -45,11 +45,11 @@ object ValidationUtils {
         if (!isValidUrl(url)) {
             return "Invalid URL format. Must be a valid HTTP or HTTPS URL."
         }
-        
+
         if (!isTrustedDomain(url)) {
             return "URL must be from a trusted domain (e.g., geneesmiddeleninformatiebank.nl, cbg-meb.nl)."
         }
-        
+
         return null
     }
 }

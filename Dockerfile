@@ -27,6 +27,7 @@ COPY build.gradle.kts settings.gradle.kts gradle.properties ./
 RUN chmod +x gradlew
 RUN ./gradlew dependencies --no-daemon || true
 COPY src ./src
+COPY data/medicines.db ./data/medicines.db
 RUN ./gradlew assemble --no-daemon -x test
 
 # Stage 3: Final runtime image - JRE base, Node, and nginx
@@ -49,8 +50,8 @@ COPY --from=frontend-builder /app/frontend/package.json /app/frontend/package.js
 # Copy backend jar
 COPY --from=backend-builder /app/build/libs/*.jar /app/app.jar
 
-# Copy medicines database (optional - created by GitHub Actions)
-COPY data/medicines.json /app/data/medicines.json
+# Copy medicines databasedo
+COPY data/medicines.db /app/data/medicines.db
 
 # Set default medicines data directory (can be overridden)
 ENV MEDICINES_DATA_DIR=/app/data

@@ -130,7 +130,7 @@ jobs:
       with:
         workflow: update-medicines.yml
         name: medicines-database
-        path: scripts/
+        path: data/
         github_token: ${{ secrets.GITHUB_TOKEN }}
         search_artifacts: true
         if_no_artifact_found: warn
@@ -138,13 +138,15 @@ jobs:
     - name: Check if medicines database exists
       id: check_medicines
       run: |
-        if [ -f "scripts/medicines.json" ]; then
+        if [ -f "data/medicines.db" ]; then
           echo "medicines_exists=true" >> $GITHUB_OUTPUT
-          echo "Medicines database found, will be included in Docker image"
-          ls -lh scripts/medicines.json
+          echo "Medicines SQLite database found, will be included in Docker image"
+          ls -lh data/medicines.db
+          sqlite3 data/medicines.db "SELECT COUNT(*) as total FROM medicines;" || echo "Could not query database"
         else
           echo "medicines_exists=false" >> $GITHUB_OUTPUT
           echo "No medicines database found, proceeding without it"
+          echo "The application will log a warning on startup"
         fi
 
     - name: Set up Docker Buildx

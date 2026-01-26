@@ -8,7 +8,7 @@ services:
     environment:
     - REDIS_HOST=host.docker.internal
     - REDIS_PORT=6379
-    - APP_ENV=production
+    - APP_ENV=test
     - LOG_LEVEL=INFO
     - RESEND_API_KEY=${RESEND_API_KEY}  # Pass from host environment
     healthcheck:

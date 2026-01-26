@@ -3,7 +3,7 @@ name: Update Medicines Database
 on:
   schedule:
     # Run on the 1st of every month at 2 AM UTC
-  - cron: "0 2 1 * *"
+  - cron: 0 2 1 * *
   workflow_dispatch:
     # Allow manual triggering
 
@@ -34,22 +34,39 @@ jobs:
         echo "Converting to JSON..."
         python3 convert-metadata-to-json.py
 
-        echo "Verifying output..."
+        echo "Verifying JSON output..."
         ls -lh medicines.json
         head -20 medicines.json
+
+        echo "Creating SQLite database for memory-efficient searches..."
+        chmod +x migrate-medicines-to-sqlite.py
+        python3 migrate-medicines-to-sqlite.py
+
+        echo "Verifying database..."
+        ls -lh medicines.db
+        sqlite3 medicines.db "SELECT COUNT(*) as total FROM medicines;"
+
+    - name: Move database files to data directory
+      run: |
+        mkdir -p data
+        mv scripts/medicines.json data/medicines.json || true
+        mv scripts/medicines.db data/medicines.db
+        ls -lh data/
 
     - name: Upload medicines database as artifact
       uses: actions/upload-artifact@v4
       with:
         name: medicines-database
-        path: scripts/medicines.json
+        path: |
+          data/medicines.json
+          data/medicines.db
         retention-days: 90
 
     - name: Commit updated medicines database
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add scripts/medicines.json
+        git add data/medicines.json data/medicines.db
         git diff --staged --quiet || git commit -m "Update medicines database - $(date +'%Y-%m-%d')"
 
     - name: Push changes

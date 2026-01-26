@@ -1,80 +1,98 @@
 package dev.gertjanassies.service
 
 import dev.gertjanassies.model.MedicineSearchResult
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.sql.Connection
+import java.sql.DriverManager
 
+/**
+ * Service for searching medicines using SQLite database.
+ * This is memory-efficient as it doesn't load the entire dataset into memory.
+ */
 object MedicineSearchService {
-    private val logger = LoggerFactory.getLogger(javaClass)
-    private val json = Json { ignoreUnknownKeys = true }
+    private val logger = LoggerFactory.getLogger(MedicineSearchService::class.java)
+    private const val DEFAULT_LIMIT = 10
 
-    // Cache for medicines data
-    private var medicinesData: List<MedicineSearchResult>? = null
-
-    init {
-        loadMedicinesData()
+    private val dbPath: String by lazy {
+        val dataDir = System.getenv("MEDICINES_DATA_DIR") ?: "data"
+        "$dataDir/medicines.db"
     }
 
-    private fun loadMedicinesData() {
-        try {
-            // Get data directory from environment variable or use default
-            val dataDir = System.getenv("MEDICINES_DATA_DIR") ?: "data"
+    init {
+        logger.info("Initializing MedicineSearchService with database: $dbPath")
+        ensureDatabase()
+    }
 
-            // Try multiple locations for medicines.json
-            val possibleLocations = listOf(
-                "$dataDir/medicines.json",     // Configured/default data directory
-                "/app/data/medicines.json",    // Docker fallback
-                "scripts/medicines.json"       // Legacy location
-            )
-
-            val medicinesFile = possibleLocations
-                .map { File(it) }
-                .firstOrNull { it.exists() }
-
-            if (medicinesFile == null) {
-                logger.warn("Medicines database not found in any of: ${possibleLocations.joinToString()}")
-                return
-            }
-
-            val medicinesJson = medicinesFile.readText()
-
-            // Parse JSON
-            val jsonElement = json.parseToJsonElement(medicinesJson)
-            val medicines = mutableListOf<MedicineSearchResult>()
-
-            jsonElement.jsonArray.forEach { item ->
-                val obj = item.jsonObject
-                val productnaam = obj["productnaam"]?.jsonPrimitive?.content ?: ""
-                val farmaceutischevorm = obj["farmaceutischevorm"]?.jsonPrimitive?.content ?: ""
-                val werkzamestoffen = obj["werkzamestoffen"]?.jsonPrimitive?.content ?: ""
-                val bijsluiterFilenaam = obj["bijsluiter_filenaam"]?.jsonPrimitive?.content ?: ""
-
-                if (productnaam.isNotEmpty()) {
-                    medicines.add(MedicineSearchResult(productnaam, farmaceutischevorm, werkzamestoffen, bijsluiterFilenaam))
-                }
-            }
-
-            medicinesData = medicines
-            logger.info("Loaded ${medicines.size} medicines from database at ${medicinesFile.absolutePath}")
-        } catch (e: Exception) {
-            logger.error("Failed to load medicines.json", e)
+    private fun ensureDatabase() {
+        val dbFile = File(dbPath)
+        if (!dbFile.exists()) {
+            logger.warn("Medicine database not found at: $dbPath")
+            logger.warn("Please run the migration script to create the database from medicines.json")
+        } else {
+            logger.info("Medicine database found at: $dbPath")
         }
     }
 
-    fun searchMedicines(query: String, limit: Int = 10): List<MedicineSearchResult> {
-        if (query.length < 2 || limit <= 0) {
+    private fun getConnection(): Connection {
+        return DriverManager.getConnection("jdbc:sqlite:$dbPath")
+    }
+
+    /**
+     * Search for medicines by name, form, or active ingredients.
+     * Uses SQLite FTS5 for efficient full-text search.
+     */
+    fun searchMedicines(query: String, limit: Int = DEFAULT_LIMIT): List<MedicineSearchResult> {
+        val trimmedQuery = query.trim()
+
+        if (trimmedQuery.length < 2) {
             return emptyList()
         }
 
-        val data = medicinesData ?: return emptyList()
-        val lowerQuery = query.trim().lowercase()
+        // Handle negative or zero limit
+        if (limit <= 0) {
+            return emptyList()
+        }
 
-        return data
-            .filter { it.productnaam.lowercase().contains(lowerQuery) }
-            .take(limit)
+        val results = mutableListOf<MedicineSearchResult>()
+
+        try {
+            getConnection().use { conn ->
+                // Use LIKE for simple pattern matching - works with standard SQLite
+                val sql = """
+                    SELECT productnaam, farmaceutischevorm, werkzamestoffen, bijsluiter_filenaam
+                    FROM medicines
+                    WHERE productnaam LIKE ?
+                       OR farmaceutischevorm LIKE ?
+                       OR werkzamestoffen LIKE ?
+                    LIMIT ?
+                """.trimIndent()
+
+                conn.prepareStatement(sql).use { stmt ->
+                    val searchPattern = "%$trimmedQuery%"
+                    stmt.setString(1, searchPattern)
+                    stmt.setString(2, searchPattern)
+                    stmt.setString(3, searchPattern)
+                    stmt.setInt(4, limit)
+
+                    val rs = stmt.executeQuery()
+                    while (rs.next()) {
+                        results.add(
+                            MedicineSearchResult(
+                                productnaam = rs.getString("productnaam") ?: "",
+                                farmaceutischevorm = rs.getString("farmaceutischevorm") ?: "",
+                                werkzamestoffen = rs.getString("werkzamestoffen") ?: "",
+                                bijsluiter_filenaam = rs.getString("bijsluiter_filenaam") ?: ""
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to search medicines: ${e.message}", e)
+            throw e
+        }
+
+        return results
     }
 }

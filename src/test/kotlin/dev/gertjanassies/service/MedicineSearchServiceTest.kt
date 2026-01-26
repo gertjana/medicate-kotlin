@@ -8,6 +8,7 @@ import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import java.io.File
+import java.sql.DriverManager
 
 /**
  * Test suite for MedicineSearchService.
@@ -23,12 +24,13 @@ class MedicineSearchServiceTest : FunSpec({
     // Use IsolationMode.InstancePerLeaf to ensure clean state for each test
     isolationMode = IsolationMode.InstancePerLeaf
 
-    // Create test data in the data directory
+    // Create test database
     val testDataDir = File("data")
-    val testMedicinesFile = File(testDataDir, "medicines.json")
-    val backupFile = if (testMedicinesFile.exists()) {
-        File(testDataDir, "medicines.json.backup").also { backup ->
-            testMedicinesFile.copyTo(backup, overwrite = true)
+    val testDbFile = File(testDataDir, "medicines_test.db")
+    val originalDbFile = File(testDataDir, "medicines.db")
+    val backupDbFile = if (originalDbFile.exists()) {
+        File(testDataDir, "medicines.db.backup").also { backup ->
+            originalDbFile.copyTo(backup, overwrite = true)
         }
     } else null
 
@@ -36,67 +38,86 @@ class MedicineSearchServiceTest : FunSpec({
         // Ensure data directory exists
         testDataDir.mkdirs()
 
-        // Create test medicines data
-        val testData = """
-            [
-                {
-                    "registratienummer": "TEST001",
-                    "soort": "RVG",
-                    "productnaam": "Paracetamol 500mg tabletten",
-                    "farmaceutischevorm": "Tablet",
-                    "werkzamestoffen": "PARACETAMOL"
-                },
-                {
-                    "registratienummer": "TEST002",
-                    "soort": "RVG",
-                    "productnaam": "Ibuprofen 400mg capsules",
-                    "farmaceutischevorm": "Capsule",
-                    "werkzamestoffen": "IBUPROFEN"
-                },
-                {
-                    "registratienummer": "TEST003",
-                    "soort": "RVG",
-                    "productnaam": "Paracetamol 1000mg zetpil",
-                    "farmaceutischevorm": "Zetpil",
-                    "werkzamestoffen": "PARACETAMOL"
-                },
-                {
-                    "registratienummer": "TEST004",
-                    "soort": "RVG",
-                    "productnaam": "Aspirine 100mg tabletten",
-                    "farmaceutischevorm": "Tablet",
-                    "werkzamestoffen": "ACETYLSALICYLZUUR"
-                },
-                {
-                    "registratienummer": "TEST005",
-                    "soort": "RVG",
-                    "productnaam": "Omeprazol 20mg capsules",
-                    "farmaceutischevorm": "Capsule",
-                    "werkzamestoffen": "OMEPRAZOL"
-                }
-            ]
-        """.trimIndent()
+        // Create test database with sample data
+        testDbFile.delete() // Clean slate
 
-        testMedicinesFile.writeText(testData)
+        val testDbUrl = "jdbc:sqlite:${testDbFile.absolutePath}"
+        DriverManager.getConnection(testDbUrl).use { conn ->
+            // Create table
+            conn.createStatement().execute("""
+                CREATE TABLE IF NOT EXISTS medicines (
+                    registratienummer TEXT PRIMARY KEY,
+                    soort TEXT,
+                    productnaam TEXT NOT NULL,
+                    inschrijvingsdatum TEXT,
+                    handelsvergunninghouder TEXT,
+                    afleverstatus TEXT,
+                    farmaceutischevorm TEXT,
+                    potentie TEXT,
+                    procedurenummer TEXT,
+                    toedieningsweg TEXT,
+                    aanvullendemonitoring TEXT,
+                    smpc_filenaam TEXT,
+                    bijsluiter_filenaam TEXT,
+                    par_filenaam TEXT,
+                    spar_filenaam TEXT,
+                    armm_filenaam TEXT,
+                    smpc_wijzig_datum TEXT,
+                    bijsluiter_wijzig_datum TEXT,
+                    atc TEXT,
+                    werkzamestoffen TEXT,
+                    hulpstoffen TEXT,
+                    productdetail_link TEXT,
+                    nieuws_links TEXT,
+                    nieuws_link_datums TEXT,
+                    referentie TEXT,
+                    smpc_vorige_versie TEXT,
+                    smpc_vorige_vorige_versie TEXT
+                )
+            """.trimIndent())
 
-        // Force reload of medicines data in the service
-        MedicineSearchService.javaClass.getDeclaredField("medicinesData").apply {
-            isAccessible = true
-            set(MedicineSearchService, null)
+            // Insert test data
+            val insertStmt = conn.prepareStatement("""
+                INSERT INTO medicines (registratienummer, soort, productnaam, farmaceutischevorm, werkzamestoffen, bijsluiter_filenaam)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """.trimIndent())
+
+            val testData = listOf(
+                listOf("TEST001", "RVG", "Paracetamol 500mg tabletten", "Tablet", "PARACETAMOL", "https://example.com/para500.pdf"),
+                listOf("TEST002", "RVG", "Ibuprofen 400mg capsules", "Capsule", "IBUPROFEN", "https://example.com/ibu400.pdf"),
+                listOf("TEST003", "RVG", "Paracetamol 1000mg zetpil", "Zetpil", "PARACETAMOL", "https://example.com/para1000.pdf"),
+                listOf("TEST004", "RVG", "Aspirine 100mg tabletten", "Tablet", "ACETYLSALICYLZUUR", "https://example.com/asp100.pdf"),
+                listOf("TEST005", "RVG", "Omeprazol 20mg capsules", "Capsule", "OMEPRAZOL", "https://example.com/ome20.pdf")
+            )
+
+            testData.forEach { row ->
+                insertStmt.setString(1, row[0])
+                insertStmt.setString(2, row[1])
+                insertStmt.setString(3, row[2])
+                insertStmt.setString(4, row[3])
+                insertStmt.setString(5, row[4])
+                insertStmt.setString(6, row[5])
+                insertStmt.executeUpdate()
+            }
         }
-        val loadMethod = MedicineSearchService.javaClass.getDeclaredMethod("loadMedicinesData")
-        loadMethod.isAccessible = true
-        loadMethod.invoke(MedicineSearchService)
+
+        // Replace production database with test database temporarily
+        if (originalDbFile.exists()) {
+            originalDbFile.delete()
+        }
+        testDbFile.copyTo(originalDbFile, overwrite = true)
     }
 
     afterSpec {
-        // Restore original medicines.json if it existed
-        if (backupFile != null && backupFile.exists()) {
-            backupFile.copyTo(testMedicinesFile, overwrite = true)
-            backupFile.delete()
+        // Restore original database if it existed
+        if (backupDbFile != null && backupDbFile.exists()) {
+            originalDbFile.delete()
+            backupDbFile.copyTo(originalDbFile, overwrite = true)
+            backupDbFile.delete()
         } else {
-            testMedicinesFile.delete()
+            originalDbFile.delete()
         }
+        testDbFile.delete()
     }
 
     context("searchMedicines") {
