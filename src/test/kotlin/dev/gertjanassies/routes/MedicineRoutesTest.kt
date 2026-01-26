@@ -634,6 +634,7 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
+                    medicineRoutes(mockRedisService)
                     medicineSearchRoutes()
                 }
 
@@ -657,6 +658,7 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
+                    medicineRoutes(mockRedisService)
                     medicineSearchRoutes()
                 }
 
@@ -669,7 +671,7 @@ class MedicineRoutesTest : FunSpec({
             }
         }
 
-        test("should return empty list when query parameter is missing") {
+        test("should return OK with empty list when query parameter is missing") {
             testApplication {
                 environment {
                     config = MapApplicationConfig()
@@ -678,6 +680,7 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
+                    medicineRoutes(mockRedisService)
                     medicineSearchRoutes()
                 }
 
@@ -699,6 +702,7 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
+                    medicineRoutes(mockRedisService)
                     medicineSearchRoutes()
                 }
 
@@ -720,6 +724,7 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
+                    medicineRoutes(mockRedisService)
                     medicineSearchRoutes()
                 }
 
@@ -740,6 +745,7 @@ class MedicineRoutesTest : FunSpec({
                     install(ContentNegotiation) { json() }
                 }
                 routing {
+                    medicineRoutes(mockRedisService)
                     medicineSearchRoutes()
                 }
 
