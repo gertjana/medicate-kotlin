@@ -227,6 +227,98 @@ class MedicineRoutesTest : FunSpec({
             }
         }
 
+        test("should create medicine with valid bijsluiter URL") {
+            mockGetUser()
+            val createdMedicine = Medicine(UUID.randomUUID(), "New Medicine", 250.0, "mg", 60.0, bijsluiter = "https://geneesmiddeleninformatiebank.nl/document")
+            val request = MedicineRequest("New Medicine", 250.0, "mg", 60.0, bijsluiter = "https://geneesmiddeleninformatiebank.nl/document")
+            coEvery { mockRedisService.createMedicine(testUserId.toString(), any()) } returns createdMedicine.right()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
+
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.post("/medicine") {
+                    header("Authorization", "Bearer $jwtToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+
+                response.status shouldBe HttpStatusCode.Created
+                coVerify { mockRedisService.createMedicine(testUserId.toString(), any()) }
+            }
+        }
+
+        test("should return 400 for invalid bijsluiter URL format") {
+            mockGetUser()
+            val request = MedicineRequest("New Medicine", 250.0, "mg", 60.0, bijsluiter = "not a valid url")
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
+
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.post("/medicine") {
+                    header("Authorization", "Bearer $jwtToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+
+                response.status shouldBe HttpStatusCode.BadRequest
+                coVerify(exactly = 0) { mockRedisService.createMedicine(any(), any()) }
+            }
+        }
+
+        test("should return 400 for untrusted bijsluiter URL domain") {
+            mockGetUser()
+            val request = MedicineRequest("New Medicine", 250.0, "mg", 60.0, bijsluiter = "https://malicious.com/document")
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
+
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.post("/medicine") {
+                    header("Authorization", "Bearer $jwtToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+
+                response.status shouldBe HttpStatusCode.BadRequest
+                coVerify(exactly = 0) { mockRedisService.createMedicine(any(), any()) }
+            }
+        }
+
         test("should return 500 on create error") {
             mockGetUser()
             val request = MedicineRequest("New Medicine", 250.0, "mg", 60.0)
@@ -295,6 +387,100 @@ class MedicineRoutesTest : FunSpec({
 
                 response.status shouldBe HttpStatusCode.OK
                 coVerify { mockRedisService.updateMedicine(testUserId.toString(), medicineId.toString(), any()) }
+            }
+        }
+
+        test("should update medicine with valid bijsluiter URL") {
+            mockGetUser()
+            val medicineId = UUID.randomUUID()
+            val medicine = Medicine(medicineId, "Updated Medicine", 750.0, "mg", 150.0, bijsluiter = "https://cbg-meb.nl/document")
+            coEvery { mockRedisService.updateMedicine(testUserId.toString(), medicineId.toString(), any()) } returns medicine.right()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
+
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.put("/medicine/$medicineId") {
+                    header("Authorization", "Bearer $jwtToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(medicine)
+                }
+
+                response.status shouldBe HttpStatusCode.OK
+                coVerify { mockRedisService.updateMedicine(testUserId.toString(), medicineId.toString(), any()) }
+            }
+        }
+
+        test("should return 400 for invalid bijsluiter URL format on update") {
+            mockGetUser()
+            val medicineId = UUID.randomUUID()
+            val medicine = Medicine(medicineId, "Updated Medicine", 750.0, "mg", 150.0, bijsluiter = "invalid url")
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
+
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.put("/medicine/$medicineId") {
+                    header("Authorization", "Bearer $jwtToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(medicine)
+                }
+
+                response.status shouldBe HttpStatusCode.BadRequest
+                coVerify(exactly = 0) { mockRedisService.updateMedicine(any(), any(), any()) }
+            }
+        }
+
+        test("should return 400 for untrusted bijsluiter URL domain on update") {
+            mockGetUser()
+            val medicineId = UUID.randomUUID()
+            val medicine = Medicine(medicineId, "Updated Medicine", 750.0, "mg", 150.0, bijsluiter = "https://untrusted.com/doc")
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        medicineRoutes(mockRedisService)
+                    }
+                }
+
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.put("/medicine/$medicineId") {
+                    header("Authorization", "Bearer $jwtToken")
+                    contentType(ContentType.Application.Json)
+                    setBody(medicine)
+                }
+
+                response.status shouldBe HttpStatusCode.BadRequest
+                coVerify(exactly = 0) { mockRedisService.updateMedicine(any(), any(), any()) }
             }
         }
 

@@ -8,6 +8,7 @@ import dev.gertjanassies.model.request.DosageHistoryRequest
 import dev.gertjanassies.model.request.MedicineRequest
 import dev.gertjanassies.service.MedicineSearchService
 import dev.gertjanassies.service.StorageService
+import dev.gertjanassies.util.ValidationUtils
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -78,6 +79,13 @@ fun Route.medicineRoutes(storageService: StorageService) {
 
         val request = call.receive<MedicineRequest>()
 
+        val validationError = ValidationUtils.validateBijsluiterUrl(request.bijsluiter)
+        if (validationError != null) {
+            logger.debug("Invalid bijsluiter URL for user ID '$userId': $validationError")
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to validationError))
+            return@post
+        }
+
         either {
             val created = storageService.createMedicine(userId, request).bind()
             logger.debug("Successfully created medicine '${created.name}' (${created.id}) for user ID: $userId")
@@ -101,6 +109,13 @@ fun Route.medicineRoutes(storageService: StorageService) {
         }
 
         val medicine = call.receive<Medicine>()
+
+        val validationError = ValidationUtils.validateBijsluiterUrl(medicine.bijsluiter)
+        if (validationError != null) {
+            logger.debug("Invalid bijsluiter URL for medicine '$id' for user ID '$userId': $validationError")
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to validationError))
+            return@put
+        }
 
         either {
             val updated = storageService.updateMedicine(userId, id, medicine).bind()
@@ -206,20 +221,5 @@ fun Route.medicineRoutes(storageService: StorageService) {
             logger.error("Failed to get medicine expiry for user ID '$userId': ${error.message}")
             call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
         }
-    }
-
-    // Search medicines endpoint (public - no auth required)
-    get("/medicines/search") {
-        val query = call.request.queryParameters["q"]
-
-        if (query == null) {
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Query parameter 'q' is required"))
-            return@get
-        }
-
-        logger.debug("Searching medicines with query: '$query'")
-        val results = MedicineSearchService.searchMedicines(query)
-        logger.debug("Found ${results.size} medicine search results for query: '$query'")
-        call.respond(HttpStatusCode.OK, results)
     }
 }
