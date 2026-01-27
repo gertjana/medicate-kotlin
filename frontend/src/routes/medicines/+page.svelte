@@ -60,7 +60,7 @@
 	let nameInput: HTMLInputElement;
 	let selectedIndex = -1; // -1 means no selection, use typed value
 	let dropdownElement: HTMLDivElement;
-	const MAX_VISIBLE_RESULTS = 5; // Show 5 items, scroll for more
+	const MAX_VISIBLE_RESULTS = 5; // Threshold for showing the navigation hint when many results are returned
 
 	function scrollToForm() {
 		if (formElement) {
