@@ -3,6 +3,7 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/user';
+	import { _ } from 'svelte-i18n';
 	import {
 		getMedicines,
 		createMedicine,
@@ -237,7 +238,7 @@
 	}
 
 	async function handleDelete(id: string, name: string) {
-		if (!confirm(`Delete ${name}?`)) return;
+		if (!confirm($_('medicines.confirmDelete'))) return;
 		error = '';
 		try {
 			await deleteMedicine(id);
@@ -299,8 +300,8 @@
 {:else}
 <div class="max-w-6xl">
 	<div class="flex justify-between items-center mb-6">
-		<h2 class="text-3xl font-bold">Medicines</h2>
-		<button on:click={startCreate} class="btn btn-primary">Add Medicine</button>
+		<h2 class="text-3xl font-bold">{$_('medicines.title')}</h2>
+		<button on:click={startCreate} class="btn btn-primary">{$_('medicines.add')}</button>
 	</div>
 
 	{#if error}
@@ -311,10 +312,10 @@
 
 	{#if showForm}
 		<div class="card mb-6" bind:this={formElement}>
-			<h3 class="text-xl font-bold mb-4">{editingId ? 'Edit' : 'Add'} Medicine</h3>
+			<h3 class="text-xl font-bold mb-4">{editingId ? $_('medicines.edit') : $_('medicines.add')}</h3>
 			<form on:submit|preventDefault={handleSubmit} class="space-y-4">
 				<div class="relative">
-					<label for="medicine-name" class="block mb-1 font-semibold">Name</label>
+					<label for="medicine-name" class="block mb-1 font-semibold">{$_('medicines.name')}</label>
 					<input
 						id="medicine-name"
 						type="text"
@@ -358,17 +359,17 @@
 								</div>
 							</div>
 						{/each}
-						{#if searchResults.length >= MAX_VISIBLE_RESULTS}
-							<div class="px-4 py-2 text-xs text-gray-500 text-center border-t border-gray-200 bg-gray-50">
-								{searchResults.length} result{searchResults.length > 1 ? 's' : ''} - Use ↑/↓ to navigate
-							</div>
-						{/if}
+					{#if searchResults.length >= MAX_VISIBLE_RESULTS}
+						<div class="px-4 py-2 text-xs text-gray-500 text-center border-t border-gray-200 bg-gray-50">
+							{$_('medicines.searchResults', { values: { count: searchResults.length, plural: searchResults.length > 1 ? 's' : '' } })}
+						</div>
+					{/if}
 					</div>
 				{/if}
 				</div>
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label for="medicine-dose" class="block mb-1 font-semibold">Dose</label>
+						<label for="medicine-dose" class="block mb-1 font-semibold">{$_('medicines.dose')}</label>
 						<input
 							id="medicine-dose"
 							type="number"
@@ -379,12 +380,12 @@
 						/>
 					</div>
 					<div>
-						<label for="medicine-unit" class="block mb-1 font-semibold">Unit</label>
+						<label for="medicine-unit" class="block mb-1 font-semibold">{$_('medicines.unit')}</label>
 						<input id="medicine-unit" type="text" bind:value={formData.unit} class="input w-full" required />
 					</div>
 				</div>
 				<div>
-					<label for="medicine-stock" class="block mb-1 font-semibold">Stock</label>
+					<label for="medicine-stock" class="block mb-1 font-semibold">{$_('medicines.stock')}</label>
 					<input
 						id="medicine-stock"
 						type="number"
@@ -394,24 +395,22 @@
 						required
 					/>
 				</div>
-				<div>
-					<label for="medicine-description" class="block mb-1 font-semibold">Description (Optional)</label>
-					<textarea
-						id="medicine-description"
+			<div>
+				<label for="medicine-description" class="block mb-1 font-semibold">{$_('medicines.description')} ({$_('medicines.optional')})</label>
+				<textarea
+					id="medicine-description"
 						bind:value={formData.description}
 						class="input w-full"
 						rows="3"
-						placeholder="Enter medicine description..."
 					/>
 				</div>
 				<div>
-					<label for="medicine-bijsluiter" class="block mb-1 font-semibold">Package Leaflet URL (Optional)</label>
+					<label for="medicine-bijsluiter" class="block mb-1 font-semibold">{$_('medicines.leaflet')} ({$_('medicines.optional')})</label>
 					<input
 						id="medicine-bijsluiter"
 						type="url"
 						bind:value={formData.bijsluiter}
 						class="input w-full"
-						placeholder="Automatically filled when selecting from database..."
 						readonly={formData.bijsluiter !== ''}
 					/>
 					{#if formData.bijsluiter}
@@ -422,14 +421,14 @@
 								rel="noopener noreferrer"
 								class="text-blue-600 hover:text-blue-800 underline"
 							>
-								View package leaflet
+								{$_('medicines.leaflet')}
 							</a>
 						</p>
 					{/if}
 				</div>
 				<div class="flex gap-2">
-					<button type="submit" class="btn btn-primary">Save</button>
-					<button type="button" on:click={cancelForm} class="btn">Cancel</button>
+					<button type="submit" class="btn btn-primary">{$_('common.save')}</button>
+					<button type="button" on:click={cancelForm} class="btn">{$_('common.cancel')}</button>
 				</div>
 			</form>
 		</div>
@@ -437,7 +436,7 @@
 
 	{#if loading}
 		<div class="text-center py-12">
-			<p class="text-gray-600">Loading medicines...</p>
+			<p class="text-gray-600">{$_('common.loading')}</p>
 		</div>
 	{:else if sortedMedicines.length > 0}
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -445,14 +444,14 @@
 				<div class="card flex flex-col relative">
 					<div class="flex justify-between items-start mb-4">
 						<h3 class="text-xl font-bold">{medicine.name}</h3>
-					{#if medicine.bijsluiter}
-					<a
-						href={medicine.bijsluiter}
-						target="_blank"
-						rel="noopener noreferrer"
-						class="text-[steelblue] hover:text-[#4682b4]"
-						title="View package leaflet (PDF)"
-					>
+				{#if medicine.bijsluiter}
+				<a
+					href={medicine.bijsluiter}
+					target="_blank"
+					rel="noopener noreferrer"
+					class="text-[steelblue] hover:text-[#4682b4]"
+					title={$_('medicines.leafletTooltip')}
+				>
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="currentColor" viewBox="0 0 24 24">
 							<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/>
 							<path fill="#ffffff" d="M14 2v6h6"/>
@@ -463,7 +462,7 @@
 					</div>
 					<div class="flex-1 pb-8">
 						<p class="text-gray-600">
-							{medicine.dose}{medicine.unit} per dose
+							{medicine.dose}{medicine.unit} {$_('medicines.perDose')}
 						</p>
 						{#if medicine.description}
 							<p class="text-sm text-gray-600 mt-2 italic">
@@ -471,22 +470,22 @@
 							</p>
 						{/if}
 						<p class="mt-2">
-							<span class="font-semibold">Stock:</span>
+							<span class="font-semibold">{$_('medicines.stockLabel')}</span>
 							<span class={medicine.stock <= 10 ? 'text-red-600 font-semibold' : ''}>
 								{medicine.stock}
 							</span>
 							{#if medicine.stock <= 10}
-								<span class="text-red-600 ml-2">⚠ Low stock</span>
+								<span class="text-red-600 ml-2">⚠ {$_('medicines.lowStock')}</span>
 							{/if}
 						</p>
 					</div>
 					<div class="flex gap-2 mt-4">
-						<button on:click={() => startEdit(medicine)} class="btn btn-edit text-sm px-3 py-1">Edit</button>
+						<button on:click={() => startEdit(medicine)} class="btn btn-edit text-sm px-3 py-1">{$_('common.edit')}</button>
 						<button on:click={() => handleDelete(medicine.id, medicine.name)} class="btn btn-edit text-sm px-3 py-1">
-							Delete
+							{$_('common.delete')}
 						</button>
 						<button on:click={() => openStockModal(medicine.id)} class="btn btn-edit text-sm px-3 py-1">
-							+ Stock
+							{$_('common.addStock')}
 						</button>
 					</div>
 				</div>
@@ -494,8 +493,8 @@
 		</div>
 	{:else}
 		<div class="card text-center py-12">
-			<p class="text-gray-600 mb-4">No medicines found</p>
-			<button on:click={startCreate} class="btn btn-primary">Add your first medicine</button>
+			<p class="text-gray-600 mb-4">{$_('medicines.noMedicines')}</p>
+			<button on:click={startCreate} class="btn btn-primary">{$_('medicines.add')}</button>
 		</div>
 	{/if}
 </div>
@@ -504,10 +503,10 @@
 {#if showStockModal}
 	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
 		<div class="bg-white border border-black p-6 max-w-md w-full">
-			<h3 class="text-xl font-bold mb-4">Add Stock</h3>
+			<h3 class="text-xl font-bold mb-4">{$_('medicines.addStock')}</h3>
 			<form on:submit|preventDefault={handleAddStock}>
 				<div class="mb-4">
-					<label for="stock-amount" class="block mb-1 font-semibold">Amount to add</label>
+					<label for="stock-amount" class="block mb-1 font-semibold">{$_('medicines.addStockAmount')}</label>
 					<input
 						id="stock-amount"
 						type="number"
@@ -518,8 +517,8 @@
 					/>
 				</div>
 				<div class="flex gap-2">
-					<button type="submit" class="btn btn-edit">Add Stock</button>
-					<button type="button" on:click={closeStockModal} class="btn">Cancel</button>
+					<button type="submit" class="btn btn-edit">{$_('medicines.addStockButton')}</button>
+					<button type="button" on:click={closeStockModal} class="btn">{$_('common.cancel')}</button>
 				</div>
 			</form>
 		</div>

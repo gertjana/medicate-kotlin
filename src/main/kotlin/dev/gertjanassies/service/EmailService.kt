@@ -47,6 +47,36 @@ class EmailService(
     private val logger = LoggerFactory.getLogger(EmailService::class.java)
 
     /**
+     * Load email template from resources
+     */
+    private fun loadTemplate(templateName: String, locale: String = "en"): String {
+        val resourcePath = "/email-templates/$templateName-$locale.html"
+        return try {
+            this::class.java.getResource(resourcePath)?.readText()
+                ?: throw IllegalStateException("Template not found: $resourcePath")
+        } catch (e: Exception) {
+            logger.warn("Failed to load template $resourcePath, falling back to 'en': ${e.message}")
+            // Fallback to English if the requested locale template doesn't exist
+            if (locale != "en") {
+                loadTemplate(templateName, "en")
+            } else {
+                throw e
+            }
+        }
+    }
+
+    /**
+     * Replace template variables
+     */
+    private fun replaceTemplateVars(template: String, vars: Map<String, String>): String {
+        var result = template
+        vars.forEach { (key, value) ->
+            result = result.replace("{{$key}}", value)
+        }
+        return result
+    }
+
+    /**
      * Generate a secure random token for password reset
      */
     private fun generateToken(): String {
@@ -116,7 +146,7 @@ class EmailService(
     /**
      * Generate HTML content for password reset email
      */
-    private fun generatePasswordResetEmailHtml(user: User, token: String): String {
+    private fun generatePasswordResetEmailHtml(user: User, token: String, locale: String = "en"): String {
         val displayName = if (user.firstName.isNotBlank() && user.lastName.isNotBlank()) {
             "${user.firstName} ${user.lastName}"
         } else if (user.firstName.isNotBlank()) {
@@ -126,67 +156,28 @@ class EmailService(
         }
 
         val resetUrl = "$appUrl/reset-password?token=$token"
-        return """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background-color: #4682b4; color: white; padding: 20px; text-align: center; }
-                    .content { background-color: #f9f9f9; padding: 30px; }
-                    .button {
-                        display: inline-block;
-                        padding: 12px 24px;
-                        background-color: #4682b4;
-                        color: white !important;
-                        text-decoration: none;
-                        border-radius: 4px;
-                        margin: 20px 0;
-                        font-weight: bold;
-                    }
-                    .button:visited {
-                        color: white !important;
-                        text-decoration: none;
-                    }
-                    .button:hover {
-                        color: white !important;
-                        text-decoration: none;
-                    }
-                    .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>Medicate - Password Reset</h1>
-                    </div>
-                    <div class="content">
-                        <h2>Hello $displayName,</h2>
-                        <p>We received a request to reset your password. Click the button below to create a new password:</p>
-                        <p style="text-align: center;">
-                            <a href="$resetUrl" class="button">Reset Password</a>
-                        </p>
-                        <p>Or copy and paste this link into your browser:</p>
-                        <p style="word-break: break-all; color: #4682b4;">$resetUrl</p>
-                        <p><strong>This link will expire in 1 hour.</strong></p>
-                        <p>If you didn't request a password reset, you can safely ignore this email.</p>
-                    </div>
-                    <div class="footer">
-                        <p>&copy; 2026 Medicate. All rights reserved.</p>
-                        <p>This is an automated email. Please do not reply.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-        """.trimIndent()
+
+        val template = loadTemplate("password-reset", locale)
+        return replaceTemplateVars(template, mapOf(
+            "displayName" to displayName,
+            "resetUrl" to resetUrl
+        ))
+    }
+
+    /**
+     * Get email subject for password reset based on locale
+     */
+    private fun getPasswordResetSubject(locale: String): String {
+        return when (locale) {
+            "nl" -> "Reset Uw Medicate Wachtwoord"
+            else -> "Reset Your Medicate Password"
+        }
     }
 
     /**
      * Reset password - generate token, store it with TTL, and send email
      */
-    suspend fun resetPassword(user: User): Either<EmailError, String> = either {
+    suspend fun resetPassword(user: User, locale: String = "en"): Either<EmailError, String> = either {
         // Validate user has an email
         if (user.email.isBlank()) {
             raise(EmailError.InvalidEmail("User has no email address"))
@@ -203,12 +194,12 @@ class EmailService(
         }.bind()
 
         // Generate email HTML
-        val emailHtml = generatePasswordResetEmailHtml(user, token)
+        val emailHtml = generatePasswordResetEmailHtml(user, token, locale)
 
         // Send email
         val emailId = sendEmail(
             to = user.email,
-            subject = "Reset Your Medicate Password",
+            subject = getPasswordResetSubject(locale),
             htmlContent = emailHtml
         ).bind()
 
@@ -228,7 +219,7 @@ class EmailService(
     /**
      * Send email verification email to newly registered user
      */
-    suspend fun sendVerificationEmail(user: User): Either<EmailError, String> = either {
+    suspend fun sendVerificationEmail(user: User, locale: String = "en"): Either<EmailError, String> = either {
         logger.debug("Sending verification email to ${user.email} for user ID: ${user.id}")
 
         // Validate email format
@@ -245,12 +236,12 @@ class EmailService(
         }.bind()
 
         // Generate email HTML
-        val emailHtml = generateVerificationEmailHtml(user, token)
+        val emailHtml = generateVerificationEmailHtml(user, token, locale)
 
         // Send email
         val emailId = sendEmail(
             to = user.email,
-            subject = "Verify Your Medicate Account",
+            subject = getVerificationSubject(locale),
             htmlContent = emailHtml
         ).bind()
 
@@ -277,7 +268,7 @@ class EmailService(
     /**
      * Generate HTML content for verification email
      */
-    private fun generateVerificationEmailHtml(user: User, token: String): String {
+    private fun generateVerificationEmailHtml(user: User, token: String, locale: String = "en"): String {
         val verificationLink = "$appUrl/activate-account?token=$token"
         val displayName = if (user.firstName.isNotBlank() && user.lastName.isNotBlank()) {
             "${user.firstName} ${user.lastName}"
@@ -287,60 +278,20 @@ class EmailService(
             user.username
         }
 
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .header { background-color: #4682b4; color: white; padding: 20px; text-align: center; }
-                .content { background-color: #f9f9f9; padding: 30px; }
-                .button {
-                    display: inline-block;
-                    padding: 12px 24px;
-                    background-color: #4682b4;
-                    color: white !important;
-                    text-decoration: none;
-                    border-radius: 4px;
-                    margin: 20px 0;
-                    font-weight: bold;
-                }
-                .button:visited {
-                    color: white !important;
-                    text-decoration: none;
-                }
-                .button:hover {
-                    color: white !important;
-                    text-decoration: none;
-                }
-                .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>Medicate - Activate Your Account</h1>
-                </div>
-                <div class="content">
-                    <h2>Hello $displayName,</h2>
-                    <p>Thank you for registering with Medicate. To complete your registration and activate your account, please verify your email address by clicking the button below:</p>
-                    <p style="text-align: center;">
-                        <a href="$verificationLink" class="button">Activate Account</a>
-                    </p>
-                    <p>Or copy and paste this link into your browser:</p>
-                    <p style="word-break: break-all; color: #4682b4;">$verificationLink</p>
-                    <p><strong>This link will expire in 24 hours.</strong></p>
-                    <p>If you didn't create an account with Medicate, you can safely ignore this email.</p>
-                </div>
-                <div class="footer">
-                    <p>&copy; 2026 Medicate. All rights reserved.</p>
-                    <p>This is an automated email. Please do not reply.</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """.trimIndent()
+        val template = loadTemplate("account-activation", locale)
+        return replaceTemplateVars(template, mapOf(
+            "displayName" to displayName,
+            "verificationLink" to verificationLink
+        ))
+    }
+
+    /**
+     * Get email subject for account verification based on locale
+     */
+    private fun getVerificationSubject(locale: String): String {
+        return when (locale) {
+            "nl" -> "Verifieer Uw Medicate Account"
+            else -> "Verify Your Medicate Account"
+        }
     }
 }

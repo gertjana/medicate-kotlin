@@ -58,8 +58,11 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
 
             val user = result.getOrNull()!!
 
+            // Get locale from request header (sent by frontend)
+            val locale = call.request.headers["Accept-Language"]?.take(2) ?: "en"
+
             // Send verification email (user is created but inactive)
-            val emailResult = emailService.sendVerificationEmail(user)
+            val emailResult = emailService.sendVerificationEmail(user, locale)
             val emailError = emailResult.leftOrNull()
             if (emailError != null) {
                 logger.error("Failed to send verification email to ${user.email}: ${emailError.message}")

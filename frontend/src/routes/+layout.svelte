@@ -5,16 +5,19 @@
 	import { onMount } from 'svelte';
 	import { userStore } from '$lib/stores/user';
 	import { registerUser, loginUser, requestPasswordReset } from '$lib/api';
+	import { _, locale, isLoading } from 'svelte-i18n';
+	import { setLocale } from '$lib/i18n/i18n';
+	import '$lib/i18n/i18n';
 
 	// SvelteKit props - using const since they're not used internally
 	export const data = {};
 	export const params = {};
 
 	const navItems = [
-		{ path: '/', label: 'Dashboard' },
-		{ path: '/medicines', label: 'Medicines' },
-		{ path: '/schedules', label: 'Schedules' },
-		{ path: '/history', label: 'History' }
+		{ path: '/', label: 'nav.dashboard' },
+		{ path: '/medicines', label: 'nav.medicines' },
+		{ path: '/schedules', label: 'nav.schedules' },
+		{ path: '/history', label: 'nav.history' }
 	];
 
 	let showAuthModal = false;
@@ -32,6 +35,21 @@
 	let forgotPasswordUsername = '';
 	let forgotPasswordError = '';
 	let forgotPasswordSuccess = '';
+	let showLanguageDropdown = false;
+
+	// Language options
+	const languages = [
+		{ code: 'en', name: 'English', flag: 'EN' },
+		{ code: 'nl', name: 'Nederlands', flag: 'NL' }
+	];
+
+	// Get current language flag
+	$: currentLanguage = languages.find(lang => lang.code === $locale) || languages[0];
+
+	function changeLanguage(langCode: string) {
+		setLocale(langCode);
+		showLanguageDropdown = false;
+	}
 
 	// Toast notification state - support multiple stacked toasts
 	interface Toast {
@@ -56,8 +74,11 @@
 
 	onMount(() => {
 		userStore.init();
-		// Close profile when clicking outside
-		const onDocClick = () => { showProfile = false; };
+		// Close profile and language dropdown when clicking outside
+		const onDocClick = () => {
+			showProfile = false;
+			showLanguageDropdown = false;
+		};
 		window.addEventListener('click', onDocClick);
 		return () => window.removeEventListener('click', onDocClick);
 	});
@@ -86,7 +107,7 @@
 		try {
 			if (authMode === 'register') {
 				// Registration: show success message, do NOT log user in
-				const registrationResponse = await registerUser(username.trim(), password, email.trim());
+				const registrationResponse = await registerUser(username.trim(), password, email.trim(), $locale || 'en');
 
 				// Close modal and show success notification
 				showAuthModal = false;
@@ -123,22 +144,21 @@
 	}
 
 	async function handleChangePassword() {
-		// Close profile popup
 		showProfile = false;
 
 		if (!$userStore?.email) {
-			showToastNotification('No email address found for your account', 'error');
+			showToastNotification($_('auth.emailRequired'), 'error');
 			return;
 		}
 
 		// Show immediate feedback that email is being sent
-		showToastNotification('Sending password reset email...', 'info');
+		showToastNotification($_('auth.sendingResetEmail'), 'info');
 
 		try {
-			await requestPasswordReset($userStore.email);
-			showToastNotification('Password reset email sent! Check your inbox for instructions.', 'success');
+			await requestPasswordReset($userStore.email, $locale || 'en');
+			showToastNotification($_('auth.resetEmailSuccess'), 'success');
 		} catch (e) {
-			showToastNotification(e instanceof Error ? e.message : 'Failed to send password reset email', 'error');
+			showToastNotification(e instanceof Error ? e.message : $_('auth.resetEmailSent'), 'error');
 		}
 	}
 
@@ -174,7 +194,7 @@
 		}
 
 		try {
-			await requestPasswordReset(forgotPasswordUsername.trim());
+			await requestPasswordReset(forgotPasswordUsername.trim(), $locale || 'en');
 			forgotPasswordSuccess = 'Password reset email sent! Please check your inbox.';
 			forgotPasswordUsername = '';
 		} catch (e) {
@@ -232,54 +252,91 @@
 							<div class="flex justify-between items-center mb-0">
 								<div class="flex items-center gap-6">
 									<h1 class="text-2xl font-bold text-[steelblue]">Medicate</h1>
-									<nav class="hidden md:flex items-center gap-2">
-										{#each navItems as item}
-											<a
-												href={item.path}
-												class="nav-link {$page.url.pathname === item.path ? 'nav-link-active' : ''}"
-											>
-												{item.label}
-											</a>
-										{/each}
-									</nav>
+									{#if !$isLoading}
+										<nav class="hidden md:flex items-center gap-2">
+											{#each navItems as item}
+												<a
+													href={item.path}
+													class="nav-link {$page.url.pathname === item.path ? 'nav-link-active' : ''}"
+												>
+													{$_(item.label)}
+												</a>
+											{/each}
+										</nav>
+									{/if}
 								</div>
 								<div class="flex items-center gap-2">
-									{#if $userStore}
-										<div class="relative flex items-center gap-2 overflow-visible">
-											<button on:click={toggleProfile} class="text-sm font-semibold flex items-center gap-2" aria-expanded={showProfile} aria-haspopup="true">
-												<span>{$userStore.username}</span>
-											</button>
-											{#if showProfile}
-												<div
-													on:click|stopPropagation
-													on:keydown={(e) => e.key === 'Escape' && (showProfile = false)}
-													role="menu"
-													tabindex="-1"
-													class="absolute bg-white border border-gray-200 shadow-lg rounded p-3 z-50 flex flex-col gap-2"
-													style={profileInlineStyle}
-												>
-													{#if $userStore.firstName || $userStore.lastName}
-														<p class="text-sm text-gray-700 font-semibold border-b border-gray-200 pb-2 mb-1">
-															{$userStore.firstName || ''} {$userStore.lastName || ''}
-														</p>
-													{/if}
-													{#if $userStore.email}
-														<p class="text-xs text-gray-500 mb-2" style="max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{$userStore.email}</p>
-													{/if}
-													<a href="/profile" on:click={() => showProfile = false} class="text-sm text-blue-600 hover:text-blue-800 hover:underline">
-														Edit Profile
-													</a>
-													<button on:click={handleChangePassword} class="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left">
-														Change Password
+									<!-- Language Selector -->
+									<div class="relative">
+										<button
+											on:click|stopPropagation={() => showLanguageDropdown = !showLanguageDropdown}
+											class="text-sm font-semibold hover:opacity-80 transition-opacity px-2 py-1 border border-gray-300 rounded"
+											aria-label="Change language"
+											aria-expanded={showLanguageDropdown}
+											aria-haspopup="true"
+										>
+											{currentLanguage.flag}
+										</button>
+										{#if showLanguageDropdown}
+											<div
+												on:click|stopPropagation
+												on:keydown={(e) => e.key === 'Escape' && (showLanguageDropdown = false)}
+												role="menu"
+												tabindex="-1"
+												class="absolute right-0 top-full mt-2 bg-white border border-gray-200 shadow-lg rounded p-2 z-50 min-w-[150px]"
+											>
+												{#each languages as lang}
+													<button
+														on:click={() => changeLanguage(lang.code)}
+														class="w-full text-left px-3 py-2 hover:bg-gray-100 rounded flex items-center gap-2 {$locale === lang.code ? 'bg-gray-50 font-semibold' : ''}"
+														role="menuitem"
+													>
+														<span class="text-sm font-semibold">{lang.flag}</span>
+														<span class="text-sm">{lang.name}</span>
 													</button>
-												</div>
-											{/if}
-											<button on:click={handleLogout} class="btn btn-nav text-xs">Logout</button>
-										</div>
-									{:else}
-										<button on:click={() => openAuthModal('login')} class="btn btn-nav text-xs">Login</button>
-										<button on:click={() => openAuthModal('register')} class="btn btn-nav text-xs">Register</button>
-									{/if}
+												{/each}
+											</div>
+										{/if}
+									</div>
+
+							{#if !$isLoading}
+								{#if $userStore}
+									<div class="relative flex items-center gap-2 overflow-visible">
+										<button on:click={toggleProfile} class="text-sm font-semibold flex items-center gap-2" aria-expanded={showProfile} aria-haspopup="true">
+											<span>{$userStore.username}</span>
+										</button>
+										{#if showProfile}
+											<div
+												on:click|stopPropagation
+												on:keydown={(e) => e.key === 'Escape' && (showProfile = false)}
+												role="menu"
+												tabindex="-1"
+												class="absolute bg-white border border-gray-200 shadow-lg rounded p-3 z-50 flex flex-col gap-2"
+												style={profileInlineStyle}
+											>
+												{#if $userStore.firstName || $userStore.lastName}
+													<p class="text-sm text-gray-700 font-semibold border-b border-gray-200 pb-2 mb-1">
+														{$userStore.firstName || ''} {$userStore.lastName || ''}
+													</p>
+												{/if}
+												{#if $userStore.email}
+													<p class="text-xs text-gray-500 mb-2" style="max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{$userStore.email}</p>
+												{/if}
+												<a href="/profile" on:click={() => showProfile = false} class="text-sm text-blue-600 hover:text-blue-800 hover:underline">
+													{$_('nav.profile')}
+												</a>
+												<button on:click={handleChangePassword} class="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left">
+													{$_('profile.changePassword')}
+												</button>
+											</div>
+										{/if}
+										<button on:click={handleLogout} class="btn btn-nav text-xs">{$_('nav.logout')}</button>
+									</div>
+								{:else}
+									<button on:click={() => openAuthModal('login')} class="btn btn-nav text-xs">{$_('nav.login')}</button>
+									<button on:click={() => openAuthModal('register')} class="btn btn-nav text-xs">{$_('nav.register')}</button>
+								{/if}
+							{/if}
 								</div>
 							</div>
 						</div>
@@ -299,42 +356,42 @@
 </div>
 
 <!-- Auth Modal -->
-{#if showAuthModal}
+{#if showAuthModal && !$isLoading}
 	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
 		<div class="bg-white border border-black p-6 max-w-md w-full rounded-tr-lg rounded-bl-lg">
 			<h3 class="text-xl font-bold mb-4">
-				{authMode === 'register' ? 'Register' : 'Login'}
+				{authMode === 'register' ? $_('auth.register') : $_('auth.login')}
 			</h3>
 			<form on:submit|preventDefault={handleAuth}>
 				<div class="mb-4">
-					<label for="auth-username" class="block mb-1 font-semibold">Username</label>
+					<label for="auth-username" class="block mb-1 font-semibold">{$_('auth.username')}</label>
 					<input
 						id="auth-username"
 						type="text"
 						bind:value={username}
 						class="input w-full"
-						placeholder="Enter your username"
+						placeholder={$_('auth.enterUsername')}
 						required
 					/>
 				</div>
 				<div class="mb-4">
-					<label for="auth-password" class="block mb-1 font-semibold">Password</label>
+					<label for="auth-password" class="block mb-1 font-semibold">{$_('auth.password')}</label>
 					<input
 						id="auth-password"
 						type="password"
 						bind:value={password}
 						class="input w-full"
-						placeholder="Enter your password"
+						placeholder={$_('auth.enterPassword')}
 						required
 						minlength="6"
 					/>
 					{#if authMode === 'register'}
-						<p class="text-xs text-gray-600 mt-1">Minimum 6 characters</p>
+						<p class="text-xs text-gray-600 mt-1">{$_('auth.minPasswordLength')}</p>
 					{/if}
 					{#if authMode === 'register'}
 					<div class="mb-4 mt-2">
-						<label for="auth-email" class="block mb-1 font-semibold">Email</label>
-						<input id="auth-email" type="email" bind:value={email} class="input w-full" placeholder="Enter your email" required />
+						<label for="auth-email" class="block mb-1 font-semibold">{$_('auth.email')}</label>
+						<input id="auth-email" type="email" bind:value={email} class="input w-full" placeholder={$_('auth.enterEmail')} required />
 					</div>
 					{/if}
 				</div>
@@ -345,10 +402,10 @@
 				{/if}
 				<div class="flex gap-2">
 					<button type="submit" class="btn btn-nav flex-1">
-						{authMode === 'register' ? 'Register' : 'Login'}
+						{authMode === 'register' ? $_('auth.register') : $_('auth.login')}
 					</button>
 					<button type="button" on:click={() => showAuthModal = false} class="btn btn-nav flex-1">
-						Cancel
+						{$_('auth.cancel')}
 					</button>
 				</div>
 				<div class="mt-4 text-center text-sm">
@@ -358,7 +415,7 @@
 							on:click={() => { authMode = 'register'; authError = ''; password = ''; }}
 							class="text-[steelblue] hover:underline"
 						>
-							Don't have an account? Register
+							{$_('auth.noAccount')} {$_('auth.register')}
 						</button>
 						<div class="mt-2">
 							<button
@@ -366,7 +423,7 @@
 								on:click={openForgotPassword}
 								class="text-[steelblue] hover:underline text-xs"
 							>
-								Forgot password?
+								{$_('auth.forgotPassword')}
 							</button>
 						</div>
 					{:else}
@@ -375,7 +432,7 @@
 							on:click={() => { authMode = 'login'; authError = ''; password = ''; }}
 							class="text-[steelblue] hover:underline"
 						>
-							Already have an account? Login
+							{$_('auth.alreadyHaveAccount')} {$_('auth.login')}
 						</button>
 					{/if}
 				</div>
@@ -385,22 +442,22 @@
 {/if}
 
 <!-- Forgot Password Modal -->
-{#if showForgotPassword}
+{#if showForgotPassword && !$isLoading}
 	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
 		<div class="bg-white border border-black p-6 max-w-md w-full rounded-tr-lg rounded-bl-lg">
-			<h3 class="text-xl font-bold mb-4">Reset Password</h3>
+			<h3 class="text-xl font-bold mb-4">{$_('auth.resetPassword')}</h3>
 			<form on:submit|preventDefault={handleForgotPassword}>
 				<div class="mb-4">
-					<label for="forgot-email" class="block mb-1 font-semibold">Email Address</label>
+					<label for="forgot-email" class="block mb-1 font-semibold">{$_('auth.emailAddress')}</label>
 					<input
 						id="forgot-email"
 						type="email"
 						bind:value={forgotPasswordUsername}
 						class="input w-full"
-						placeholder="Enter your email address"
+						placeholder={$_('auth.enterEmailAddress')}
 						required
 					/>
-					<p class="text-xs text-gray-600 mt-1">We'll send a password reset link to this email</p>
+					<p class="text-xs text-gray-600 mt-1">{$_('auth.resetEmailHint')}</p>
 				</div>
 				{#if forgotPasswordError}
 					<div class="mb-4 p-3 bg-red-50 border border-red-300 text-red-800 text-sm rounded">
@@ -414,10 +471,10 @@
 				{/if}
 				<div class="flex gap-2">
 					<button type="submit" class="btn btn-nav flex-1">
-						Send Reset Link
+						{$_('auth.sendResetLink')}
 					</button>
 					<button type="button" on:click={() => { showForgotPassword = false; showAuthModal = true; }} class="btn btn-nav flex-1">
-						Back to Login
+						{$_('auth.backToLogin')}
 					</button>
 				</div>
 			</form>

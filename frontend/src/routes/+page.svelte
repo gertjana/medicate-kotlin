@@ -3,6 +3,7 @@
 	import { browser } from '$app/environment';
 	import { userStore } from '$lib/stores/user';
 	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, takeDose, deleteDosageHistory, getMedicineExpiry, getMedicines, getSchedules, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine, type MedicineExpiry, type Schedule } from '$lib/api';
+	import { _ } from 'svelte-i18n';
 
 	// SvelteKit props - using const since they're not used internally
 	export const data = {};
@@ -67,18 +68,19 @@
 		saveSuppressedIds();
 	}
 
-	function getDayName(dayOfWeek: string): string {
+	// Reactive day name mapping - recreates when language changes
+	$: getDayName = (dayOfWeek: string): string => {
 		const dayMap: { [key: string]: string } = {
-			'MONDAY': 'Mon',
-			'TUESDAY': 'Tue',
-			'WEDNESDAY': 'Wed',
-			'THURSDAY': 'Thu',
-			'FRIDAY': 'Fri',
-			'SATURDAY': 'Sat',
-			'SUNDAY': 'Sun'
+			'MONDAY': $_('dashboard.monday'),
+			'TUESDAY': $_('dashboard.tuesday'),
+			'WEDNESDAY': $_('dashboard.wednesday'),
+			'THURSDAY': $_('dashboard.thursday'),
+			'FRIDAY': $_('dashboard.friday'),
+			'SATURDAY': $_('dashboard.saturday'),
+			'SUNDAY': $_('dashboard.sunday')
 		};
 		return dayMap[dayOfWeek] || dayOfWeek.substring(0, 3);
-	}
+	};
 
 	function showToastNotification(message: string) {
 		const id = toastIdCounter++;
@@ -150,10 +152,10 @@
 		takingDose[key] = true;
 		try {
 			await takeDose(medicineId, amount, scheduledTime);
-			showToastNotification(`Recorded: ${amount}x ${medicineName}`);
+			showToastNotification($_('dashboard.recordedDose', { values: { amount, medicine: medicineName } }));
 			await Promise.all([loadSchedule(), loadMedicineExpiry()]);
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to record dose';
+			error = e instanceof Error ? e.message : $_('dashboard.failedToRecord');
 		} finally {
 			takingDose[key] = false;
 		}
@@ -166,7 +168,7 @@
 		);
 
 		if (medicinesToTake.length === 0) {
-			showToastNotification('No medicines to take at this time');
+			showToastNotification($_('dashboard.noMedicinesToTake'));
 			return;
 		}
 
@@ -181,10 +183,10 @@
 			}
 
 			const medicineNames = medicinesToTake.map(item => item.medicine.name).join(', ');
-			showToastNotification(`Recorded: ${medicineNames}`);
+			showToastNotification($_('dashboard.recordedMedicines', { values: { medicines: medicineNames } }));
 			await Promise.all([loadSchedule(), loadMedicineExpiry()]);
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to record doses';
+			error = e instanceof Error ? e.message : $_('dashboard.failedToRecordDoses');
 		} finally {
 			for (const item of medicinesToTake) {
 				const key = `${item.medicine.id}-${item.amount}`;
@@ -208,7 +210,7 @@
 			});
 
 			if (dosageHistoriesToUndo.length === 0) {
-				error = 'No doses found for this time slot';
+				error = $_('dashboard.noDosesFound');
 				return;
 			}
 
@@ -217,10 +219,10 @@
 				await deleteDosageHistory(history.id);
 			}
 
-			showToastNotification(`Undone: ${dosageHistoriesToUndo.length} dose(s) at ${scheduledTime}`);
+			showToastNotification($_('dashboard.undone', { values: { count: dosageHistoriesToUndo.length, time: scheduledTime } }));
 			await Promise.all([loadSchedule(), loadMedicineExpiry()]);
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to undo doses';
+			error = e instanceof Error ? e.message : $_('dashboard.failedToUndo');
 		}
 	}
 
@@ -250,12 +252,12 @@
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
 				</svg>
 			</div>
-			<h2 class="text-3xl font-bold mb-4">Welcome to Medicate</h2>
+			<h2 class="text-3xl font-bold mb-4">{$_('dashboard.welcomeTitle')}</h2>
 			<p class="text-gray-600 mb-6 text-lg">
-				Your personal medicine tracking assistant
+				{$_('dashboard.welcomeSubtitle')}
 			</p>
 			<p class="text-gray-700 mb-8">
-				Please <strong>login</strong> or <strong>register</strong> to start tracking your medicines, schedules, and adherence.
+				{@html $_('dashboard.pleaseLogin')}
 			</p>
 		</div>
 	</div>
@@ -333,7 +335,7 @@
 	{/if}
 
 	<div class="flex justify-between items-center mb-6">
-		<h2 class="text-2xl font-bold">Today's Schedule</h2>
+		<h2 class="text-2xl font-bold">{$_('dashboard.dailySchedule')}</h2>
 	</div>
 
 	{#if error}
@@ -344,7 +346,7 @@
 
 	{#if loading}
 		<div class="text-center py-12">
-			<p class="text-gray-600">Loading schedule...</p>
+			<p class="text-gray-600">{$_('dashboard.loadingSchedule')}</p>
 		</div>
 	{:else if dailySchedule && dailySchedule.schedule && dailySchedule.schedule.length > 0}
 		<div class="columns-1 md:columns-2 gap-4 space-y-4">
@@ -358,12 +360,12 @@
 						<div class="flex gap-2">
 							{#if allTaken}
 								<button class="btn btn-taken ml-0 cursor-not-allowed" disabled>
-									✓ All Taken
+									✓ {$_('dashboard.allTaken')}
 								</button>
 								<button
 									on:click={() => handleUndoTimeSlot(timeSlot.time)}
 									class="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-full transition-colors"
-									title="Undo"
+									title={$_('dashboard.undo')}
 								>
 									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
@@ -374,7 +376,7 @@
 									on:click={() => takeAllForTimeSlot(timeSlot)}
 									class="btn btn-action"
 								>
-									Take All
+									{$_('dashboard.takeAll')}
 								</button>
 							{/if}
 						</div>
@@ -390,18 +392,18 @@
 										{item.amount}x {item.medicine.dose}{item.medicine.unit}
 										{#if item.medicine.stock < item.amount}
 											<span class="text-red-600 font-semibold ml-2">
-												⚠ Low stock ({item.medicine.stock} left)
+												⚠ {$_('dashboard.lowStock')} ({item.medicine.stock} {$_('dashboard.left')})
 											</span>
 										{:else}
 											<span class="text-gray-500 ml-2">
-												({item.medicine.stock} in stock)
+												({item.medicine.stock} {$_('dashboard.inStock')})
 											</span>
 										{/if}
 									</p>
 								</div>
 								{#if takenToday}
 									<button class="btn btn-taken ml-4 cursor-not-allowed" disabled>
-										✓ Taken
+										✓ {$_('dashboard.taken')}
 									</button>
 								{:else}
 									<button
@@ -409,7 +411,7 @@
 										class="btn btn-action ml-4"
 										disabled={takingDose[key] || item.medicine.stock < item.amount}
 									>
-										{takingDose[key] ? 'Recording...' : 'Take Dose'}
+										{takingDose[key] ? 'Recording...' : $_('dashboard.take')}
 									</button>
 								{/if}
 							</div>
@@ -422,22 +424,22 @@
 		<div class="card text-center py-12">
 			{#if medicines.length === 0}
 				<!-- No medicines at all -->
-				<p class="text-gray-600 mb-2 text-lg font-semibold">Welcome to Medicate!</p>
+				<p class="text-gray-600 mb-2 text-lg font-semibold">{$_('dashboard.welcomeTitle')}!</p>
 				<p class="text-gray-500 mb-4">Get started by adding your first medicine</p>
 				<a href="/medicines?add=true" class="btn btn-primary">
-					Add Medicine
+					{$_('medicines.add')}
 				</a>
 			{:else if schedules.length === 0}
 				<!-- Has medicines but no schedules -->
 				<p class="text-gray-600 mb-2 text-lg font-semibold">You have {medicines.length} medicine{medicines.length !== 1 ? 's' : ''}</p>
 				<p class="text-gray-500 mb-4">Create a schedule to get started with reminders</p>
 				<a href="/schedules?add=true" class="btn btn-primary">
-					Add Schedule
+					{$_('schedules.add')}
 				</a>
 			{:else}
 				<!-- Has both medicines and schedules, but no schedule for today -->
-				<p class="text-gray-600 mb-4">No scheduled medicines for today</p>
-				<a href="/schedules?add=true" class="btn btn-primary">Add Schedule</a>
+				<p class="text-gray-600 mb-4">{$_('dashboard.noSchedule')}</p>
+				<a href="/schedules?add=true" class="btn btn-primary">{$_('schedules.add')}</a>
 			{/if}
 		</div>
 	{/if}
@@ -445,15 +447,15 @@
 	<!-- Medicine Expiry Forecast -->
 	{#if !expiryLoading && medicineExpiry.length > 0}
 		<div class="mt-10">
-			<h2 class="text-xl font-bold mb-2">Medicine Expiry Forecast</h2>
+			<h2 class="text-xl font-bold mb-2">{$_('dashboard.expiryForecast')}</h2>
 			<div class="overflow-x-auto">
 				<table class="min-w-full bg-white border border-gray-200 rounded-lg">
 					<thead>
 						<tr class="bg-gray-100">
-							<th class="px-4 py-2 text-left">Name</th>
-							<th class="px-4 py-2 text-left">Dose</th>
-							<th class="px-4 py-2 text-left">Stock</th>
-							<th class="px-4 py-2 text-left">Expiry</th>
+							<th class="px-4 py-2 text-left">{$_('dashboard.expiryTableName')}</th>
+							<th class="px-4 py-2 text-left">{$_('dashboard.expiryTableDose')}</th>
+							<th class="px-4 py-2 text-left">{$_('dashboard.expiryTableStock')}</th>
+							<th class="px-4 py-2 text-left">{$_('dashboard.expiryTableExpiry')}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -479,7 +481,7 @@
 			</div>
 		</div>
 	{:else if expiryLoading}
-		<div class="mt-10 text-gray-500">Loading expiry forecast...</div>
+		<div class="mt-10 text-gray-500">{$_('dashboard.loadingExpiryForecast')}</div>
 	{:else if expiryError}
 		<div class="mt-10 text-red-600">{expiryError}</div>
 	{/if}

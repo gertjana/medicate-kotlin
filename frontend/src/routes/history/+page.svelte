@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	import { userStore } from '$lib/stores/user';
+	import { _ } from 'svelte-i18n';
 	import { getDosageHistories, getMedicines, getSchedules, takeDose, deleteDosageHistory, type DosageHistory, type Medicine, type Schedule } from '$lib/api';
 	import { page } from '$app/stores';
 	import { tick } from 'svelte';
@@ -153,15 +154,15 @@
 				await takeDose(med.medicineId, med.amount, time, datetimeString);
 			}
 			const medicineNames = scheduledMedicines.map(m => getMedicineName(m.medicineId)).join(', ');
-			showToastNotification(`Recorded: ${medicineNames}`);
+			showToastNotification($_('history.recorded', { values: { medicines: medicineNames } }));
 			await loadData();
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to record doses';
+			error = e instanceof Error ? e.message : $_('dashboard.failedToRecordDoses');
 		}
 	}
 
 	async function handleUndoTimeSlot(histories: DosageHistory[]) {
-		if (!confirm(`Are you sure you want to undo ${histories.length} dose(s)? The stock will be restored.`)) {
+		if (!confirm($_('history.confirmUndo', { values: { count: histories.length } }))) {
 			return;
 		}
 
@@ -169,7 +170,7 @@
 			for (const history of histories) {
 				await deleteDosageHistory(history.id);
 			}
-			showToastNotification(`Undone: ${histories.length} dose(s)`);
+			showToastNotification($_('history.undone', { values: { count: histories.length } }));
 			await loadData();
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to undo doses';
@@ -208,23 +209,23 @@
 </script>
 
 <svelte:head>
-	<title>History - Medicine Scheduler</title>
+	<title>{$_('history.title')} - Medicine Scheduler</title>
 </svelte:head>
 
 {#if !$userStore}
 	<!-- Not logged in message -->
 	<div class="max-w-2xl mx-auto mt-12">
 		<div class="card text-center py-12">
-			<h2 class="text-2xl font-bold mb-4">Authentication Required</h2>
+			<h2 class="text-2xl font-bold mb-4">{$_('dashboard.welcomeTitle')}</h2>
 			<p class="text-gray-600 mb-6">
-				Please login or register to view your dosage history.
+				{@html $_('dashboard.pleaseLogin')}
 			</p>
 		</div>
 	</div>
 {:else}
 <div class="max-w-6xl">
 	<div class="flex justify-between items-center mb-6">
-		<h2 class="text-3xl font-bold">Dosage History</h2>
+		<h2 class="text-3xl font-bold">{$_('history.title')}</h2>
 	</div>
 
 	{#if error}
@@ -235,7 +236,7 @@
 
 	{#if loading}
 		<div class="text-center py-12">
-			<p class="text-gray-600">Loading history...</p>
+			<p class="text-gray-600">{$_('common.loading')}</p>
 		</div>
 	{:else if groupedHistories.length > 0}
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -250,7 +251,7 @@
 								<div class="bg-yellow-50 border border-yellow-200 rounded p-3">
 									<div class="flex justify-between items-center mb-2">
 										<span class="font-semibold text-gray-700">{timeSlot.time}</span>
-										<span class="text-xs text-yellow-700 bg-yellow-100 px-2 py-1 rounded">Missed</span>
+										<span class="text-xs text-yellow-700 bg-yellow-100 px-2 py-1 rounded">{$_('history.missed')}</span>
 									</div>
 									<div class="text-sm text-yellow-800 mb-2">
 										{#each timeSlot.scheduledMedicines || [] as med}
@@ -261,7 +262,7 @@
 										on:click={() => takeAllMissing(dateGroup.dateObj, timeSlot.time, timeSlot.scheduledMedicines || [])}
 										class="btn btn-action w-full text-sm"
 									>
-										Take All
+										{$_('history.takeAll')}
 									</button>
 								</div>
 							{:else if timeSlot.histories.length > 0}
@@ -271,7 +272,7 @@
 										<button
 											on:click={() => handleUndoTimeSlot(timeSlot.histories)}
 											class="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-full transition-colors"
-											title="Undo"
+											title={$_('history.undoTooltip')}
 										>
 											<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
@@ -300,8 +301,8 @@
 		</div>
 	{:else}
 		<div class="card text-center py-12">
-			<p class="text-gray-600 mb-4">No dosage history found</p>
-			<a href="/" class="btn btn-primary">Go to Dashboard</a>
+			<p class="text-gray-600 mb-4">{$_('history.noHistoryFound')}</p>
+			<a href="/" class="btn btn-primary">{$_('history.goToDashboard')}</a>
 		</div>
 	{/if}
 </div>

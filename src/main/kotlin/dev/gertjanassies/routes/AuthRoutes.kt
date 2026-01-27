@@ -112,8 +112,11 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
 
             val user = userResult.getOrNull()!!
 
+            // Get locale from request header (sent by frontend)
+            val locale = call.request.headers["Accept-Language"]?.take(2) ?: "en"
+
             // Send reset password email
-            val emailResult = emailService.resetPassword(user)
+            val emailResult = emailService.resetPassword(user, locale)
             val emailError = emailResult.leftOrNull()
             if (emailError != null) {
                 logger.error("Failed to send password reset email (email: '${request.email}'): ${emailError.message}")

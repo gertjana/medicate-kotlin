@@ -3,6 +3,7 @@
 	import { getProfile, updateProfile, type User } from '$lib/api';
 	import { userStore } from '$lib/stores/user';
 	import { goto } from '$app/navigation';
+	import { _ } from 'svelte-i18n';
 
 	let user: User | null = null;
 	let email = '';
@@ -40,7 +41,7 @@
 			firstName = user.firstName || '';
 			lastName = user.lastName || '';
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load profile';
+			error = e instanceof Error ? e.message : $_('profile.loadFailed');
 		} finally {
 			loading = false;
 		}
@@ -50,24 +51,24 @@
 		error = '';
 
 		if (!email.trim()) {
-			error = 'Email is required';
+			error = $_('profile.emailRequired');
 			return;
 		}
 
 		if (!firstName.trim()) {
-			error = 'First name is required';
+			error = $_('profile.firstNameRequired');
 			return;
 		}
 
 		if (!lastName.trim()) {
-			error = 'Last name is required';
+			error = $_('profile.lastNameRequired');
 			return;
 		}
 
 		// Robust email validation regex
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		if (!emailRegex.test(email)) {
-			error = 'Please enter a valid email address';
+			error = $_('profile.validEmailRequired');
 			return;
 		}
 
@@ -78,13 +79,13 @@
 			user = updatedUser;
 			// Update user store
 			userStore.set(updatedUser);
-			showToastNotification('Profile updated successfully!');
+			showToastNotification($_('profile.updateSuccess'));
 			// Redirect to main page after a short delay
 			setTimeout(() => {
 				goto('/');
 			}, 1500);
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to update profile';
+			error = e instanceof Error ? e.message : $_('profile.updateFailed');
 		} finally {
 			saving = false;
 		}
@@ -92,15 +93,15 @@
 </script>
 
 <svelte:head>
-	<title>Profile - Medicate</title>
+	<title>{$_('profile.title')} - Medicate</title>
 </svelte:head>
 
 <div class="container mx-auto px-4 py-8 max-w-2xl">
-	<h1 class="text-3xl font-bold mb-6">Profile Settings</h1>
+	<h1 class="text-3xl font-bold mb-6">{$_('profile.title')}</h1>
 
 	{#if loading}
 		<div class="flex justify-center items-center py-12">
-			<div class="text-gray-600">Loading profile...</div>
+			<div class="text-gray-600">{$_('profile.loading')}</div>
 		</div>
 	{:else}
 		<div class="bg-white rounded-lg shadow-md p-6">
@@ -108,7 +109,7 @@
 				<!-- Username (read-only) -->
 				<div class="mb-6">
 					<label for="username" class="block text-sm font-medium text-gray-700 mb-2">
-						Username
+						{$_('profile.username')}
 					</label>
 					<input
 						type="text"
@@ -117,13 +118,13 @@
 						disabled
 						class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
 					/>
-					<p class="mt-1 text-sm text-gray-500">Username cannot be changed</p>
+					<p class="mt-1 text-sm text-gray-500">{$_('profile.usernameCannotChange')}</p>
 				</div>
 
 				<!-- Email -->
 				<div class="mb-6">
 					<label for="email" class="block text-sm font-medium text-gray-700 mb-2">
-						Email Address <span class="text-red-500">*</span>
+						{$_('profile.emailAddress')} <span class="text-red-500">{$_('profile.required')}</span>
 					</label>
 					<input
 						type="email"
@@ -138,7 +139,7 @@
 				<!-- First Name -->
 				<div class="mb-6">
 					<label for="firstName" class="block text-sm font-medium text-gray-700 mb-2">
-						First Name <span class="text-red-500">*</span>
+						{$_('profile.firstName')} <span class="text-red-500">{$_('profile.required')}</span>
 					</label>
 					<input
 						type="text"
@@ -153,7 +154,7 @@
 				<!-- Last Name -->
 				<div class="mb-6">
 					<label for="lastName" class="block text-sm font-medium text-gray-700 mb-2">
-						Last Name <span class="text-red-500">*</span>
+						{$_('profile.lastName')} <span class="text-red-500">{$_('profile.required')}</span>
 					</label>
 					<input
 						type="text"
@@ -179,14 +180,14 @@
 						disabled={saving}
 						class="btn btn-primary"
 					>
-						{saving ? 'Saving...' : 'Save Changes'}
+						{saving ? $_('profile.saving') : $_('profile.save')}
 					</button>
 					<button
 						type="button"
 						on:click={() => goto('/')}
 						class="btn"
 					>
-						Cancel
+						{$_('profile.cancel')}
 					</button>
 				</div>
 			</form>
