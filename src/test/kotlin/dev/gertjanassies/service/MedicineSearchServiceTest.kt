@@ -260,6 +260,59 @@ class MedicineSearchServiceTest : FunSpec({
         }
     }
 
+    context("multi-word search") {
+        test("should find medicines matching all words in multi-word query") {
+            val results = MedicineSearchService.searchMedicines("paracetamol tablet")
+
+            results shouldHaveSize 1
+            results[0].productnaam shouldBe "Paracetamol 500mg tabletten"
+        }
+
+        test("should handle queries with multiple spaces between words") {
+            val results = MedicineSearchService.searchMedicines("paracetamol    tablet")
+
+            results shouldHaveSize 1
+            results[0].productnaam shouldBe "Paracetamol 500mg tabletten"
+        }
+
+        test("should match words across different columns") {
+            val crossColumnResults = MedicineSearchService.searchMedicines("aspirine acetylsalicylzuur")
+
+            crossColumnResults shouldHaveSize 1
+            crossColumnResults[0].productnaam shouldBe "Aspirine 100mg tabletten"
+            crossColumnResults[0].werkzamestoffen shouldBe "ACETYLSALICYLZUUR"
+        }
+
+        test("should be order independent for multi-word queries") {
+            val results1 = MedicineSearchService.searchMedicines("tablet paracetamol")
+            val results2 = MedicineSearchService.searchMedicines("paracetamol tablet")
+
+            results1 shouldHaveSize 1
+            results2 shouldHaveSize 1
+            results1 shouldBe results2
+        }
+
+        test("should require all words to match") {
+            val results = MedicineSearchService.searchMedicines("paracetamol nonexistent")
+
+            results.shouldBeEmpty()
+        }
+
+        test("should match multi-word query with dosage and form") {
+            val results = MedicineSearchService.searchMedicines("500mg tablet")
+
+            results shouldHaveSize 1
+            results[0].productnaam shouldBe "Paracetamol 500mg tabletten"
+        }
+
+        test("should handle three-word queries") {
+            val results = MedicineSearchService.searchMedicines("paracetamol 500mg tablet")
+
+            results shouldHaveSize 1
+            results[0].productnaam shouldBe "Paracetamol 500mg tabletten"
+        }
+    }
+
     context("data loading") {
         test("should handle missing medicines.json gracefully") {
             // This is tested implicitly - if the service can't load data,
