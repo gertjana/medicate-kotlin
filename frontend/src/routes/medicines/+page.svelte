@@ -329,7 +329,7 @@
 						aria-autocomplete="list"
 						aria-controls={DROPDOWN_ID}
 						aria-expanded={showDropdown}
-						aria-activedescendant={selectedIndex >= 0 ? getOptionId(selectedIndex) : undefined}
+						aria-activedescendant={selectedIndex >= 0 ? getOptionId(selectedIndex) : ''}
 						required
 					/>
 				{#if showDropdown && searchResults.length > 0}
@@ -340,13 +340,19 @@
 						class="absolute z-50 w-full mt-1 bg-white border-2 border-gray-300 shadow-lg rounded-md max-h-60 overflow-y-auto"
 					>
 						{#each searchResults as result, index}
-							<button
+							<div
 								id={getOptionId(index)}
-								type="button"
 								role="option"
 								aria-selected={index === selectedIndex}
 								on:mousedown={() => selectMedicine(result)}
 								on:mouseenter={() => selectedIndex = index}
+								on:keydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										selectMedicine(result);
+									}
+								}}
+								tabindex="-1"
 								class="w-full text-left px-4 py-2 border-b border-gray-200 last:border-b-0 cursor-pointer transition-colors {index === selectedIndex ? 'bg-blue-100' : 'hover:bg-blue-50'}"
 							>
 								<div class="font-semibold text-gray-900">{result.productnaam}</div>
@@ -356,7 +362,7 @@
 										- {result.werkzamestoffen}
 									{/if}
 								</div>
-							</button>
+							</div>
 						{/each}
 						{#if searchResults.length >= MAX_VISIBLE_RESULTS}
 							<div class="px-4 py-2 text-xs text-gray-500 text-center border-t border-gray-200 bg-gray-50">
