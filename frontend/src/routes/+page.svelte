@@ -360,7 +360,7 @@
 						<div class="flex gap-2">
 							{#if allTaken}
 								<button class="btn btn-taken ml-0 cursor-not-allowed" disabled>
-									✓ {$_('dashboard.allTaken')}
+									{$_('dashboard.allTaken')}
 								</button>
 								<button
 									on:click={() => handleUndoTimeSlot(timeSlot.time)}
@@ -392,7 +392,7 @@
 										{item.amount}x {item.medicine.dose}{item.medicine.unit}
 										{#if item.medicine.stock < item.amount}
 											<span class="text-red-600 font-semibold ml-2">
-												⚠ {$_('dashboard.lowStock')} ({item.medicine.stock} {$_('dashboard.left')})
+												{$_('dashboard.lowStock')} ({item.medicine.stock} {$_('dashboard.left')})
 											</span>
 										{:else}
 											<span class="text-gray-500 ml-2">
@@ -403,7 +403,7 @@
 								</div>
 								{#if takenToday}
 									<button class="btn btn-taken ml-4 cursor-not-allowed" disabled>
-										✓ {$_('dashboard.taken')}
+										{$_('dashboard.taken')}
 									</button>
 								{:else}
 									<button
