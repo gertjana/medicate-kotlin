@@ -61,6 +61,11 @@
 	let selectedIndex = -1; // -1 means no selection, use typed value
 	let dropdownElement: HTMLDivElement;
 	const MAX_VISIBLE_RESULTS = 5; // Threshold for showing the navigation hint when many results are returned
+	const DROPDOWN_ID = 'medicine-search-dropdown';
+	
+	function getOptionId(index: number): string {
+		return `medicine-option-${index}`;
+	}
 
 	function scrollToForm() {
 		if (formElement) {
@@ -313,6 +318,7 @@
 					<input
 						id="medicine-name"
 						type="text"
+						role="combobox"
 						bind:this={nameInput}
 						value={formData.name}
 						on:input={handleNameInput}
@@ -320,18 +326,27 @@
 						on:blur={hideDropdown}
 						class="input w-full"
 						autocomplete="off"
+						aria-autocomplete="list"
+						aria-controls={DROPDOWN_ID}
+						aria-expanded={showDropdown}
+						aria-activedescendant={selectedIndex >= 0 ? getOptionId(selectedIndex) : ''}
 						required
 					/>
 				{#if showDropdown && searchResults.length > 0}
 					<div
+						id={DROPDOWN_ID}
 						bind:this={dropdownElement}
+						role="listbox"
 						class="absolute z-50 w-full mt-1 bg-white border-2 border-gray-300 shadow-lg rounded-md max-h-60 overflow-y-auto"
 					>
 						{#each searchResults as result, index}
-							<button
-								type="button"
+							<div
+								id={getOptionId(index)}
+								role="option"
+								aria-selected={index === selectedIndex}
 								on:mousedown={() => selectMedicine(result)}
 								on:mouseenter={() => selectedIndex = index}
+								tabindex="-1"
 								class="w-full text-left px-4 py-2 border-b border-gray-200 last:border-b-0 cursor-pointer transition-colors {index === selectedIndex ? 'bg-blue-100' : 'hover:bg-blue-50'}"
 							>
 								<div class="font-semibold text-gray-900">{result.productnaam}</div>
@@ -341,7 +356,7 @@
 										- {result.werkzamestoffen}
 									{/if}
 								</div>
-							</button>
+							</div>
 						{/each}
 						{#if searchResults.length >= MAX_VISIBLE_RESULTS}
 							<div class="px-4 py-2 text-xs text-gray-500 text-center border-t border-gray-200 bg-gray-50">
