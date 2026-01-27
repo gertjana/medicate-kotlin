@@ -62,7 +62,7 @@
 	let dropdownElement: HTMLDivElement;
 	const MAX_VISIBLE_RESULTS = 5; // Threshold for showing the navigation hint when many results are returned
 	const DROPDOWN_ID = 'medicine-search-dropdown';
-	
+
 	function getOptionId(index: number): string {
 		return `medicine-option-${index}`;
 	}
