@@ -105,7 +105,7 @@ export function setAccessToken(token: string | null): void {
 }
 
 // Helper function to get headers with JWT token
-function getHeaders(includeContentType: boolean = false): HeadersInit {
+function getHeaders(includeContentType: boolean = false, locale?: string): HeadersInit {
 	const headers: HeadersInit = {};
 
 	// Get JWT token from memory (not localStorage)
@@ -115,6 +115,11 @@ function getHeaders(includeContentType: boolean = false): HeadersInit {
 
 	if (includeContentType) {
 		headers['Content-Type'] = 'application/json';
+	}
+
+	// Add locale header if provided
+	if (locale) {
+		headers['Accept-Language'] = locale;
 	}
 
 	return headers;
@@ -341,15 +346,19 @@ export interface RegistrationResponse {
 }
 
 // User authentication API
-export async function registerUser(username: string, password: string, email?: string): Promise<RegistrationResponse> {
-    const body: any = { username, password };
-    if (email) body.email = email;
+export async function registerUser(username: string, password: string, email: string, locale: string = 'en'): Promise<RegistrationResponse> {
+    const body: any = { username, password, email };
 
     const url = `${API_BASE}/user/register`;
 
+    const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Accept-Language': locale
+    };
+
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(body)
     });
 
@@ -385,10 +394,15 @@ export async function loginUser(username: string, password: string): Promise<Use
 	return authResponse.user;
 }
 
-export async function requestPasswordReset(email: string): Promise<{ message: string; emailId: string }> {
+export async function requestPasswordReset(email: string, locale: string = 'en'): Promise<{ message: string; emailId: string }> {
+	const headers: HeadersInit = {
+		'Content-Type': 'application/json',
+		'Accept-Language': locale
+	};
+
 	const response = await fetch(`${API_BASE}/auth/resetPassword`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
+		headers,
 		body: JSON.stringify({ email })
 	});
 	if (!response.ok) {
@@ -468,6 +482,26 @@ export async function updateProfile(email: string, firstName: string, lastName: 
 	}
 
 	return user;
+}
+
+// Request password change (sends email with reset link)
+export async function requestPasswordChange(email: string, locale: string = 'en'): Promise<{ message: string; emailId: string }> {
+	const headers: HeadersInit = {
+		'Content-Type': 'application/json',
+		'Accept-Language': locale
+	};
+
+	const response = await fetch(`${API_BASE}/auth/resetPassword`, {
+		method: 'POST',
+		headers,
+		credentials: 'include',
+		body: JSON.stringify({ email })
+	});
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.error || 'Failed to request password change');
+	}
+	return response.json();
 }
 
 // Helper to check if user is logged in

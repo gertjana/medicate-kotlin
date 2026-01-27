@@ -3,6 +3,7 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/user';
+	import { _ } from 'svelte-i18n';
 	import {
 		getSchedules,
 		getMedicines,
@@ -174,10 +175,10 @@
 			const medicineName = getMedicineName(schedule.medicineId);
 			if (editingId) {
 				await updateSchedule(editingId, { id: editingId, ...schedule });
-				showToastNotification(`Updated schedule for ${medicineName}`);
+				showToastNotification($_('schedules.updatedSchedule', { values: { medicine: medicineName } }));
 			} else {
 				await createSchedule(schedule);
-				showToastNotification(`Created schedule for ${medicineName}`);
+				showToastNotification($_('schedules.createdSchedule', { values: { medicine: medicineName } }));
 			}
 			await loadData();
 			cancelForm();
@@ -187,7 +188,7 @@
 	}
 
 	async function handleDelete(id: string) {
-		if (!confirm('Delete this schedule?')) return;
+		if (!confirm($_('schedules.confirmDelete'))) return;
 		error = '';
 		try {
 			await deleteSchedule(id);
@@ -203,12 +204,12 @@
 
 	function formatDaysOfWeek(daysStr: string): string {
 		if (!daysStr || daysStr.trim() === '') {
-			return 'Every day';
+			return $_('schedules.everyDay');
 		}
 		const days = daysStr.split(',').map(d => d.trim());
 		const labels = days.map(code => {
 			const day = dayOptions.find(d => d.code === code);
-			return day ? day.label : code;
+			return day ? $_(`schedules.${day.label.toLowerCase()}`) : code;
 		});
 		return labels.join(', ');
 	}
@@ -268,9 +269,9 @@
 {:else}
 <div class="max-w-6xl">
 	<div class="flex justify-between items-center mb-6">
-		<h2 class="text-3xl font-bold">Schedules</h2>
+		<h2 class="text-3xl font-bold">{$_('schedules.title')}</h2>
 		<button on:click={startCreate} class="btn btn-primary" disabled={medicines.length === 0}>
-			Add Schedule
+			{$_('schedules.add')}
 		</button>
 	</div>
 
@@ -282,18 +283,18 @@
 
 	{#if medicines.length === 0 && !loading}
 		<div class="card text-center py-12">
-			<p class="text-gray-600 mb-4">No medicines available</p>
-			<a href="/medicines" class="btn btn-primary">Add medicines first</a>
+			<p class="text-gray-600 mb-4">{$_('schedules.noMedicines')}</p>
+			<a href="/medicines" class="btn btn-primary">{$_('schedules.addMedicinesFirst')}</a>
 		</div>
 	{:else}
 		{#if showForm}
 			<div class="card mb-6" bind:this={formElement}>
-				<h3 class="text-xl font-bold mb-4">{editingId ? 'Edit' : 'Add'} Schedule</h3>
+				<h3 class="text-xl font-bold mb-4">{editingId ? $_('schedules.edit') : $_('schedules.add')}</h3>
 				<form on:submit|preventDefault={handleSubmit} class="space-y-4">
 					<div>
-						<label for="schedule-medicine" class="block mb-1 font-semibold">Medicine</label>
+						<label for="schedule-medicine" class="block mb-1 font-semibold">{$_('schedules.medicine')}</label>
 						<select id="schedule-medicine" bind:value={formData.medicineId} class="input w-full" required>
-							<option value="">Select a medicine</option>
+							<option value="">{$_('schedules.selectMedicine')}</option>
 							{#each medicines as medicine}
 								<option value={medicine.id}>
 									{medicine.name} ({medicine.dose}{medicine.unit})
@@ -302,11 +303,11 @@
 						</select>
 					</div>
 					<div>
-						<label for="schedule-time" class="block mb-1 font-semibold">Time</label>
+						<label for="schedule-time" class="block mb-1 font-semibold">{$_('schedules.time')}</label>
 						<input id="schedule-time" type="time" bind:value={formData.time} class="input w-full" required />
 					</div>
 					<div>
-						<label for="schedule-amount" class="block mb-1 font-semibold">Amount (number of doses)</label>
+						<label for="schedule-amount" class="block mb-1 font-semibold">{$_('schedules.amountLabel')}</label>
 						<input
 							id="schedule-amount"
 							type="number"
@@ -317,7 +318,7 @@
 						/>
 					</div>
 					<div>
-						<label for="schedule-days" class="block mb-2 font-semibold">Days of Week</label>
+						<label for="schedule-days" class="block mb-2 font-semibold">{$_('schedules.daysOfWeek')}</label>
 						<div class="flex flex-wrap gap-3 mb-2">
 							<label class="flex items-center gap-2 cursor-pointer">
 								<input
@@ -326,7 +327,7 @@
 									on:change={toggleAllDays}
 									class="w-4 h-4"
 								/>
-								<span class="font-semibold">All Days</span>
+								<span class="font-semibold">{$_('schedules.allDays')}</span>
 							</label>
 						</div>
 						<div class="flex flex-wrap gap-3">
@@ -339,14 +340,14 @@
 										disabled={allDays}
 										class="w-4 h-4"
 									/>
-									<span class:text-gray-400={allDays}>{day.label}</span>
+									<span class:text-gray-400={allDays}>{$_(`schedules.${day.label.toLowerCase()}`)}</span>
 								</label>
 							{/each}
 						</div>
 					</div>
 					<div class="flex gap-2">
-						<button type="submit" class="btn btn-primary">Save</button>
-						<button type="button" on:click={cancelForm} class="btn">Cancel</button>
+						<button type="submit" class="btn btn-primary">{$_('common.save')}</button>
+						<button type="button" on:click={cancelForm} class="btn">{$_('common.cancel')}</button>
 					</div>
 				</form>
 			</div>
@@ -354,7 +355,7 @@
 
 		{#if loading}
 			<div class="text-center py-12">
-				<p class="text-gray-600">Loading schedules...</p>
+				<p class="text-gray-600">{$_('common.loading')}</p>
 			</div>
 		{:else if schedules.length > 0}
 			<div class="columns-1 md:columns-2 gap-4 space-y-4">
@@ -370,18 +371,18 @@
 								<div class="flex justify-between items-center bg-gray-50 p-3 rounded">
 									<div class="flex-1">
 										<p class="font-semibold">
-											{med ? med.name : 'Unknown medicine'}
+											{med ? med.name : $_('schedules.medicineNotFound')}
 											{med ? ` (${med.dose}${med.unit})` : ''}
 										</p>
 										<p class="text-sm text-gray-600">
-											{schedule.amount} dose(s)
+											{schedule.amount} {$_('schedules.doses')}
 											{med ? ` = ${schedule.amount * med.dose} ${med.unit}` : ''}
-											{!med ? ' ⚠️ Medicine not found' : ''}
+											{!med ? $_('schedules.medicineNotFound') : ''}
 										</p>
 									</div>
 									<div class="flex gap-2">
-										<button on:click={() => startEdit(schedule)} class="btn btn-edit text-sm">Edit</button>
-										<button on:click={() => handleDelete(schedule.id)} class="btn btn-edit text-sm">Delete</button>
+										<button on:click={() => startEdit(schedule)} class="btn btn-edit text-sm">{$_('common.edit')}</button>
+										<button on:click={() => handleDelete(schedule.id)} class="btn btn-edit text-sm">{$_('common.delete')}</button>
 									</div>
 								</div>
 							{/each}
@@ -391,8 +392,8 @@
 			</div>
 		{:else}
 			<div class="card text-center py-12">
-				<p class="text-gray-600 mb-4">No schedules found</p>
-				<button on:click={startCreate} class="btn btn-primary">Add your first schedule</button>
+				<p class="text-gray-600 mb-4">{$_('schedules.noSchedulesFound')}</p>
+				<button on:click={startCreate} class="btn btn-primary">{$_('schedules.addFirstSchedule')}</button>
 			</div>
 		{/if}
 	{/if}

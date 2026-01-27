@@ -79,7 +79,8 @@
    - [x] **Activate User with email confirmation after registration**
 - [ ] Create an admin page that only shows up for admin users, (an admin is a user with isAdmin = true in their user record).
       This page should allow the admin to see a list of all users, and delete any user.
-- [ ] WON'T DO **Optional, implement Postgres StorageService for production instead of Redis**
+- [ ] Multilingual support (i18n) for at least English and Dutch.
+- [-] WON'T DO **Optional, implement Postgres StorageService for production instead of Redis**
 - [x] **Investigate whether we can have a database of known medicines to let users select/search it from a list**
       - Research completed - multiple viable options identified
       - Recommended approach: OpenFDA Drug API for MVP (free, RESTful, no auth required)
