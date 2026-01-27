@@ -266,8 +266,6 @@ class MedicineSearchServiceTest : FunSpec({
 
             results shouldHaveSize 1
             results[0].productnaam shouldBe "Paracetamol 500mg tabletten"
-            results[0].productnaam.lowercase() shouldContain "paracetamol"
-            results[0].productnaam.lowercase() shouldContain "tablet"
         }
 
         test("should handle queries with multiple spaces between words") {
@@ -278,11 +276,11 @@ class MedicineSearchServiceTest : FunSpec({
         }
 
         test("should match words across different columns") {
-            val results = MedicineSearchService.searchMedicines("aspirine acetylsalicylzuur")
+            val crossColumnResults = MedicineSearchService.searchMedicines("aspirine acetylsalicylzuur")
 
-            results shouldHaveSize 1
-            results[0].productnaam shouldBe "Aspirine 100mg tabletten"
-            results[0].werkzamestoffen shouldBe "ACETYLSALICYLZUUR"
+            crossColumnResults shouldHaveSize 1
+            crossColumnResults[0].productnaam shouldBe "Aspirine 100mg tabletten"
+            crossColumnResults[0].werkzamestoffen shouldBe "ACETYLSALICYLZUUR"
         }
 
         test("should be order independent for multi-word queries") {
