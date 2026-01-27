@@ -475,7 +475,7 @@
 								{medicine.stock}
 							</span>
 							{#if medicine.stock <= 10}
-								<span class="text-red-600 ml-2">⚠ {$_('medicines.lowStock')}</span>
+								<span class="text-red-600 ml-2">{$_('medicines.lowStock')}</span>
 							{/if}
 						</p>
 					</div>
