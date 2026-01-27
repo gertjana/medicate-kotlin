@@ -377,7 +377,7 @@
 										<p class="text-sm text-gray-600">
 											{schedule.amount} {$_('schedules.doses')}
 											{med ? ` = ${schedule.amount * med.dose} ${med.unit}` : ''}
-											{!med ? ' ⚠️ ' + $_('schedules.medicineNotFound') : ''}
+											{!med ? $_('schedules.medicineNotFound') : ''}
 										</p>
 									</div>
 									<div class="flex gap-2">
