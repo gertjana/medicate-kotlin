@@ -347,10 +347,10 @@
 			<p class="text-gray-600">Loading schedule...</p>
 		</div>
 	{:else if dailySchedule && dailySchedule.schedule && dailySchedule.schedule.length > 0}
-		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+		<div class="columns-1 md:columns-2 gap-4 space-y-4">
 			{#each dailySchedule.schedule as timeSlot}
 				{@const allTaken = timeSlot.medicines.every(item => isTakenToday(item.medicine.id, timeSlot.time))}
-				<div class="card">
+				<div class="card break-inside-avoid mb-4">
 					<div class="flex justify-between items-center mb-4 border-b border-gray-200 pb-2">
 						<h3 class="text-xl font-bold">
 							{timeSlot.time}
