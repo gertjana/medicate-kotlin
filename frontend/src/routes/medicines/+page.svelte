@@ -58,6 +58,14 @@
 	let showDropdown = false;
 	let searchTimeout: number;
 	let nameInput: HTMLInputElement;
+	let selectedIndex = -1; // -1 means no selection, use typed value
+	let dropdownElement: HTMLDivElement;
+	const MAX_VISIBLE_RESULTS = 5; // Threshold for showing the navigation hint when many results are returned
+	const DROPDOWN_ID = 'medicine-search-dropdown';
+	
+	function getOptionId(index: number): string {
+		return `medicine-option-${index}`;
+	}
 
 	function scrollToForm() {
 		if (formElement) {
@@ -75,6 +83,7 @@
 		if (value.length < 2) {
 			searchResults = [];
 			showDropdown = false;
+			selectedIndex = -1;
 			return;
 		}
 
@@ -82,6 +91,7 @@
 			try {
 				searchResults = await searchMedicines(value);
 				showDropdown = searchResults.length > 0;
+				selectedIndex = -1; // Reset selection when results change
 			} catch (e) {
 				console.error('Failed to search medicines:', e);
 				showToastNotification('Failed to search medicines. Please try again.');
@@ -94,6 +104,7 @@
 		formData.bijsluiter = result.bijsluiter_filenaam || '';
 		searchResults = [];
 		showDropdown = false;
+		selectedIndex = -1;
 		if (nameInput) {
 			nameInput.blur();
 		}
@@ -102,7 +113,49 @@
 	function hideDropdown() {
 		setTimeout(() => {
 			showDropdown = false;
+			selectedIndex = -1;
 		}, 200);
+	}
+
+	function handleKeyDown(event: KeyboardEvent) {
+		if (!showDropdown || searchResults.length === 0) return;
+
+		switch (event.key) {
+			case 'ArrowDown':
+				event.preventDefault();
+				selectedIndex = Math.min(selectedIndex + 1, searchResults.length - 1);
+				scrollToSelected();
+				break;
+			case 'ArrowUp':
+				event.preventDefault();
+				selectedIndex = Math.max(selectedIndex - 1, -1);
+				scrollToSelected();
+				break;
+			case 'Enter':
+				event.preventDefault();
+				if (selectedIndex >= 0 && selectedIndex < searchResults.length) {
+					selectMedicine(searchResults[selectedIndex]);
+				}
+				break;
+			case 'Escape':
+				event.preventDefault();
+				showDropdown = false;
+				selectedIndex = -1;
+				break;
+		}
+	}
+
+	function scrollToSelected() {
+		if (!dropdownElement || selectedIndex < 0) return;
+
+		const selectedElement = dropdownElement.children[selectedIndex] as HTMLElement;
+		if (selectedElement) {
+			// Scroll the selected element into view
+			selectedElement.scrollIntoView({
+				block: 'nearest',
+				behavior: 'smooth'
+			});
+		}
 	}
 
 	async function loadMedicines() {
@@ -265,21 +318,36 @@
 					<input
 						id="medicine-name"
 						type="text"
+						role="combobox"
 						bind:this={nameInput}
 						value={formData.name}
 						on:input={handleNameInput}
+						on:keydown={handleKeyDown}
 						on:blur={hideDropdown}
 						class="input w-full"
 						autocomplete="off"
+						aria-autocomplete="list"
+						aria-controls={DROPDOWN_ID}
+						aria-expanded={showDropdown}
+						aria-activedescendant={selectedIndex >= 0 ? getOptionId(selectedIndex) : ''}
 						required
 					/>
 				{#if showDropdown && searchResults.length > 0}
-					<div class="absolute z-50 w-full mt-1 bg-white border-2 border-gray-300 shadow-lg rounded-md max-h-60 overflow-y-auto">
-						{#each searchResults as result}
-							<button
-								type="button"
+					<div
+						id={DROPDOWN_ID}
+						bind:this={dropdownElement}
+						role="listbox"
+						class="absolute z-50 w-full mt-1 bg-white border-2 border-gray-300 shadow-lg rounded-md max-h-60 overflow-y-auto"
+					>
+						{#each searchResults as result, index}
+							<div
+								id={getOptionId(index)}
+								role="option"
+								aria-selected={index === selectedIndex}
 								on:mousedown={() => selectMedicine(result)}
-								class="w-full text-left px-4 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 cursor-pointer transition-colors"
+								on:mouseenter={() => selectedIndex = index}
+								tabindex="-1"
+								class="w-full text-left px-4 py-2 border-b border-gray-200 last:border-b-0 cursor-pointer transition-colors {index === selectedIndex ? 'bg-blue-100' : 'hover:bg-blue-50'}"
 							>
 								<div class="font-semibold text-gray-900">{result.productnaam}</div>
 								<div class="text-sm text-gray-600">
@@ -288,8 +356,13 @@
 										- {result.werkzamestoffen}
 									{/if}
 								</div>
-							</button>
+							</div>
 						{/each}
+						{#if searchResults.length >= MAX_VISIBLE_RESULTS}
+							<div class="px-4 py-2 text-xs text-gray-500 text-center border-t border-gray-200 bg-gray-50">
+								{searchResults.length} result{searchResults.length > 1 ? 's' : ''} - Use ↑/↓ to navigate
+							</div>
+						{/if}
 					</div>
 				{/if}
 				</div>
