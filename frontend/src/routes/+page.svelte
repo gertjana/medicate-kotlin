@@ -392,7 +392,7 @@
 										{item.amount}x {item.medicine.dose}{item.medicine.unit}
 										{#if item.medicine.stock < item.amount}
 											<span class="text-red-600 font-semibold ml-2">
-												{$_('dashboard.lowStock')} ({item.medicine.stock} {$_('dashboard.left')})
+												{$_('dashboard.warning')}: {$_('dashboard.lowStock')} ({item.medicine.stock} {$_('dashboard.left')})
 											</span>
 										{:else}
 											<span class="text-gray-500 ml-2">
