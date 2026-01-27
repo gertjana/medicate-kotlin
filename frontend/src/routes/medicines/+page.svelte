@@ -61,6 +61,11 @@
 	let selectedIndex = -1; // -1 means no selection, use typed value
 	let dropdownElement: HTMLDivElement;
 	const MAX_VISIBLE_RESULTS = 5; // Threshold for showing the navigation hint when many results are returned
+	const DROPDOWN_ID = 'medicine-search-dropdown';
+	
+	function getOptionId(index: number): string {
+		return `medicine-option-${index}`;
+	}
 
 	function scrollToForm() {
 		if (formElement) {
@@ -313,6 +318,7 @@
 					<input
 						id="medicine-name"
 						type="text"
+						role="combobox"
 						bind:this={nameInput}
 						value={formData.name}
 						on:input={handleNameInput}
@@ -320,16 +326,25 @@
 						on:blur={hideDropdown}
 						class="input w-full"
 						autocomplete="off"
+						aria-autocomplete="list"
+						aria-controls={DROPDOWN_ID}
+						aria-expanded={showDropdown}
+						aria-activedescendant={selectedIndex >= 0 ? getOptionId(selectedIndex) : undefined}
 						required
 					/>
 				{#if showDropdown && searchResults.length > 0}
 					<div
+						id={DROPDOWN_ID}
 						bind:this={dropdownElement}
+						role="listbox"
 						class="absolute z-50 w-full mt-1 bg-white border-2 border-gray-300 shadow-lg rounded-md max-h-60 overflow-y-auto"
 					>
 						{#each searchResults as result, index}
 							<button
+								id={getOptionId(index)}
 								type="button"
+								role="option"
+								aria-selected={index === selectedIndex}
 								on:mousedown={() => selectMedicine(result)}
 								on:mouseenter={() => selectedIndex = index}
 								class="w-full text-left px-4 py-2 border-b border-gray-200 last:border-b-0 cursor-pointer transition-colors {index === selectedIndex ? 'bg-blue-100' : 'hover:bg-blue-50'}"
