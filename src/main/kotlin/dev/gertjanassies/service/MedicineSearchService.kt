@@ -12,7 +12,7 @@ import java.sql.DriverManager
  */
 object MedicineSearchService {
     private val logger = LoggerFactory.getLogger(MedicineSearchService::class.java)
-    private const val DEFAULT_LIMIT = 10
+    private const val DEFAULT_LIMIT = 30
 
     private val dbPath: String by lazy {
         val dataDir = System.getenv("MEDICINES_DATA_DIR") ?: "data"
@@ -40,7 +40,8 @@ object MedicineSearchService {
 
     /**
      * Search for medicines by name, form, or active ingredients.
-     * Uses SQLite FTS5 for efficient full-text search.
+     * Treats query as separate words - all words must match (in any order).
+     * For example, "foo bar" will match "some bar text foo something".
      */
     fun searchMedicines(query: String, limit: Int = DEFAULT_LIMIT): List<MedicineSearchResult> {
         val trimmedQuery = query.trim()
@@ -54,26 +55,45 @@ object MedicineSearchService {
             return emptyList()
         }
 
+        // Split query into words (split on whitespace)
+        val words = trimmedQuery.split("\\s+".toRegex())
+            .filter { it.isNotBlank() }
+            .map { it.trim() }
+
+        if (words.isEmpty()) {
+            return emptyList()
+        }
+
         val results = mutableListOf<MedicineSearchResult>()
 
         try {
             getConnection().use { conn ->
-                // Use LIKE for simple pattern matching - works with standard SQLite
+                // Build WHERE clause: each word must match at least one column
+                // (productnaam LIKE '%word1%' OR farmaceutischevorm LIKE '%word1%' OR werkzamestoffen LIKE '%word1%')
+                // AND (productnaam LIKE '%word2%' OR farmaceutischevorm LIKE '%word2%' OR werkzamestoffen LIKE '%word2%')
+                // etc.
+                val wordConditions = words.map {
+                    "(productnaam LIKE ? OR farmaceutischevorm LIKE ? OR werkzamestoffen LIKE ?)"
+                }
+                val whereClause = wordConditions.joinToString(" AND ")
+
                 val sql = """
                     SELECT productnaam, farmaceutischevorm, werkzamestoffen, bijsluiter_filenaam
                     FROM medicines
-                    WHERE productnaam LIKE ?
-                       OR farmaceutischevorm LIKE ?
-                       OR werkzamestoffen LIKE ?
+                    WHERE $whereClause
                     LIMIT ?
                 """.trimIndent()
 
                 conn.prepareStatement(sql).use { stmt ->
-                    val searchPattern = "%$trimmedQuery%"
-                    stmt.setString(1, searchPattern)
-                    stmt.setString(2, searchPattern)
-                    stmt.setString(3, searchPattern)
-                    stmt.setInt(4, limit)
+                    var paramIndex = 1
+                    // Set parameters for each word (3 parameters per word: productnaam, form, ingredients)
+                    words.forEach { word ->
+                        val searchPattern = "%$word%"
+                        stmt.setString(paramIndex++, searchPattern)
+                        stmt.setString(paramIndex++, searchPattern)
+                        stmt.setString(paramIndex++, searchPattern)
+                    }
+                    stmt.setInt(paramIndex, limit)
 
                     val rs = stmt.executeQuery()
                     while (rs.next()) {
