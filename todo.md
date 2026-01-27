@@ -79,19 +79,27 @@
    - [x] **Activate User with email confirmation after registration**
 - [ ] Create an admin page that only shows up for admin users, (an admin is a user with isAdmin = true in their user record).
       This page should allow the admin to see a list of all users, and delete any user.
-- [ ] Multilingual support (i18n) for at least English and Dutch.
+- [x] **Multilingual support (i18n) for at least English and Dutch**
+      - Implemented full i18n using svelte-i18n
+      - Language switcher in header (EN/NL)
+      - All frontend pages, forms, buttons, and messages translated
+      - Email templates translated (password reset, activation)
+      - Backend sends emails in user's preferred language
+      - Persisted language preference in localStorage
+      - All toast notifications localized
+      - Complete coverage: dashboard, medicines, schedules, history, profile
 - [-] WON'T DO **Optional, implement Postgres StorageService for production instead of Redis**
-- [x] **Investigate whether we can have a database of known medicines to let users select/search it from a list**
-      - Research completed - multiple viable options identified
-      - Recommended approach: OpenFDA Drug API for MVP (free, RESTful, no auth required)
-      - Alternative: RxNorm API (clinical-grade data, requires free UMLS license)
-      - Alternative: Download FDA NDC database for local/offline searches
-      - Implementation plan: Add autocomplete search to medicine form using OpenFDA API
-      - See detailed analysis: `ai_reports/MEDICINE_DATABASE_RESEARCH.md`
-- [ ] **Implement medicine search/autocomplete feature**
-      - Add medicine search endpoint using OpenFDA Drug API
-      - Add autocomplete to medicine form (frontend)
-      - Allow pre-filling form from search results
-      - Keep manual entry option for unlisted medicines
+- [x] **Medicine database with autocomplete search**
+      - Downloaded Dutch medicine database from Geneesmiddeleninformatiebank.nl
+      - Converted metadata.csv (28MB, 48k+ medicines) to JSON format
+      - Implemented SQLite-based search service for memory efficiency
+      - Added autocomplete to medicine form with multi-word matching
+      - Search supports partial name matches (2+ characters)
+      - Keyboard navigation (up/down arrows) through results
+      - Scrollable dropdown showing up to 5 results (30 retrieved)
+      - Links to official product information (bijsluiter PDF)
+      - GitHub Actions workflow for monthly database updates
+      - Fallback to manual entry for unlisted medicines
+      - See: `ai_reports/MEDICINE_DATABASE_RESEARCH.md`
 
 ---
