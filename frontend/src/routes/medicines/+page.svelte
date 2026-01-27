@@ -346,12 +346,6 @@
 								aria-selected={index === selectedIndex}
 								on:mousedown={() => selectMedicine(result)}
 								on:mouseenter={() => selectedIndex = index}
-								on:keydown={(e) => {
-									if (e.key === 'Enter' || e.key === ' ') {
-										e.preventDefault();
-										selectMedicine(result);
-									}
-								}}
 								tabindex="-1"
 								class="w-full text-left px-4 py-2 border-b border-gray-200 last:border-b-0 cursor-pointer transition-colors {index === selectedIndex ? 'bg-blue-100' : 'hover:bg-blue-50'}"
 							>
