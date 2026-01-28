@@ -1,6 +1,8 @@
 package dev.gertjanassies.util
 
+import io.lettuce.core.KeyScanCursor
 import io.lettuce.core.RedisFuture
+import io.lettuce.core.ScanCursor
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -51,4 +53,19 @@ fun <T> createFailedRedisFutureMock(exception: Exception): RedisFuture<T> {
     val future = CompletableFuture<T>()
     future.completeExceptionally(exception)
     return TestRedisFuture(future)
+}
+
+/**
+ * Creates a KeyScanCursor mock for testing scan operations.
+ *
+ * @param keys The keys to be returned by the scan
+ * @param isFinished Whether this is the final cursor (true means cursor is "0")
+ * @return A KeyScanCursor mock
+ */
+fun createKeyScanCursorMock(keys: List<String>, isFinished: Boolean = true): KeyScanCursor<String> {
+    return object : KeyScanCursor<String>() {
+        override fun getKeys(): List<String> = keys
+        override fun getCursor(): String = if (isFinished) "0" else "1"
+        override fun isFinished(): Boolean = isFinished
+    }
 }

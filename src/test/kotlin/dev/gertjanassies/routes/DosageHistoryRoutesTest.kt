@@ -1,13 +1,12 @@
 package dev.gertjanassies.routes
 
-import arrow.core.left
-import arrow.core.right
 import dev.gertjanassies.model.DosageHistory
 import dev.gertjanassies.model.User
-import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
 import dev.gertjanassies.test.TestJwtConfig
 import dev.gertjanassies.test.TestJwtConfig.installTestJwtAuth
+import dev.gertjanassies.util.createFailedRedisFutureMock
+import dev.gertjanassies.util.createRedisFutureMock
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.call.*
@@ -21,18 +20,29 @@ import io.ktor.server.config.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
+import io.lettuce.core.api.StatefulRedisConnection
+import io.lettuce.core.api.async.RedisAsyncCommands
 import io.mockk.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.LocalDateTime
 import java.util.*
 
 class DosageHistoryRoutesTest : FunSpec({
-    lateinit var mockRedisService: RedisService
+    lateinit var mockConnection: StatefulRedisConnection<String, String>
+    lateinit var mockAsyncCommands: RedisAsyncCommands<String, String>
+    lateinit var redisService: RedisService
+
+    val json = Json { ignoreUnknownKeys = true }
+    val environment = "test"
     val testUsername = "testuser"
     val testUserId = UUID.randomUUID()
     val jwtToken = TestJwtConfig.generateToken(testUsername, testUserId.toString())
 
     beforeEach {
-        mockRedisService = mockk()
+        mockConnection = mockk()
+        mockAsyncCommands = mockk()
+        redisService = RedisService(environment = environment, connection = mockConnection)
     }
 
     afterEach {
@@ -49,13 +59,23 @@ class DosageHistoryRoutesTest : FunSpec({
             lastName = "User",
             passwordHash = "hashedpassword"
         )
-        coEvery { mockRedisService.getUserById(testUserId.toString()) } returns testUser.right()
+        val userJson = json.encodeToString(testUser)
+        val userKey = "medicate:$environment:user:id:$testUserId"
+
+        every { mockConnection.async() } returns mockAsyncCommands
+        every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
     }
 
     context("GET /history") {
         test("should return empty list when no histories exist") {
             mockGetUser()
-            coEvery { mockRedisService.getAllDosageHistories(testUserId.toString()) } returns emptyList<DosageHistory>().right()
+
+            // Mock scan to return empty list
+            every { mockConnection.async() } returns mockAsyncCommands
+            val emptyCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { emptyCursor.keys } returns emptyList()
+            every { emptyCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(emptyCursor)
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -66,7 +86,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 routing {
                     route("/api") {
                         authenticate("auth-jwt") {
-                            dosageHistoryRoutes(mockRedisService)
+                            dosageHistoryRoutes(redisService)
                         }
                     }
                 }
@@ -78,7 +98,6 @@ class DosageHistoryRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<List<DosageHistory>>()
                 body.size shouldBe 0
-                coVerify { mockRedisService.getAllDosageHistories(testUserId.toString()) }
             }
         }
 
@@ -109,7 +128,20 @@ class DosageHistoryRoutesTest : FunSpec({
                 )
             )
 
-            coEvery { mockRedisService.getAllDosageHistories(testUserId.toString()) } returns histories.right()
+            // Mock scan for dosage histories
+            every { mockConnection.async() } returns mockAsyncCommands
+            val historyKeys = histories.map { "medicate:$environment:user:$testUserId:dosagehistory:${it.id}" }
+            val historyCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { historyCursor.keys } returns historyKeys
+            every { historyCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(historyCursor)
+
+            // Mock get for each history
+            histories.forEach { history ->
+                val key = "medicate:$environment:user:$testUserId:dosagehistory:${history.id}"
+                val historyJson = json.encodeToString(history)
+                every { mockAsyncCommands.get(key) } returns createRedisFutureMock(historyJson)
+            }
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -120,7 +152,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 routing {
                     route("/api") {
                         authenticate("auth-jwt") {
-                            dosageHistoryRoutes(mockRedisService)
+                            dosageHistoryRoutes(redisService)
                         }
                     }
                 }
@@ -136,7 +168,6 @@ class DosageHistoryRoutesTest : FunSpec({
                 body[0].amount shouldBe 100.0
                 body[1].datetime shouldBe LocalDateTime.of(2026, 1, 6, 14, 30)
                 body[2].datetime shouldBe LocalDateTime.of(2026, 1, 5, 10, 0)
-                coVerify { mockRedisService.getAllDosageHistories(testUserId.toString()) }
             }
         }
 
@@ -162,7 +193,20 @@ class DosageHistoryRoutesTest : FunSpec({
                 )
             )
 
-            coEvery { mockRedisService.getAllDosageHistories(testUserId.toString()) } returns histories.right()
+            // Mock scan for dosage histories
+            every { mockConnection.async() } returns mockAsyncCommands
+            val historyKeys = histories.map { "medicate:$environment:user:$testUserId:dosagehistory:${it.id}" }
+            val historyCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { historyCursor.keys } returns historyKeys
+            every { historyCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(historyCursor)
+
+            // Mock get for each history
+            histories.forEach { history ->
+                val key = "medicate:$environment:user:$testUserId:dosagehistory:${history.id}"
+                val historyJson = json.encodeToString(history)
+                every { mockAsyncCommands.get(key) } returns createRedisFutureMock(historyJson)
+            }
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -173,7 +217,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 routing {
                     route("/api") {
                         authenticate("auth-jwt") {
-                            dosageHistoryRoutes(mockRedisService)
+                            dosageHistoryRoutes(redisService)
                         }
                     }
                 }
@@ -189,13 +233,16 @@ class DosageHistoryRoutesTest : FunSpec({
                 body[0].amount shouldBe 1000.0
                 body[1].medicineId shouldBe medicineId1
                 body[1].amount shouldBe 100.0
-                coVerify { mockRedisService.getAllDosageHistories(testUserId.toString()) }
             }
         }
 
         test("should return 500 on error") {
             mockGetUser()
-            coEvery { mockRedisService.getAllDosageHistories(testUserId.toString()) } returns RedisError.OperationError("Database error").left()
+
+            // Mock scan to fail
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns
+                createFailedRedisFutureMock(RuntimeException("Database error"))
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -206,7 +253,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 routing {
                     route("/api") {
                         authenticate("auth-jwt") {
-                            dosageHistoryRoutes(mockRedisService)
+                            dosageHistoryRoutes(redisService)
                         }
                     }
                 }
@@ -215,7 +262,6 @@ class DosageHistoryRoutesTest : FunSpec({
                     header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.InternalServerError
-                coVerify { mockRedisService.getAllDosageHistories(testUserId.toString()) }
             }
         }
     }
@@ -223,8 +269,32 @@ class DosageHistoryRoutesTest : FunSpec({
     context("DELETE /history/{id}") {
         test("should delete dosage history successfully") {
             mockGetUser()
+            val medicineId = UUID.randomUUID()
             val dosageHistoryId = UUID.randomUUID()
-            coEvery { mockRedisService.deleteDosageHistory(testUserId.toString(), dosageHistoryId) } returns Unit.right()
+            val dosageHistory = DosageHistory(
+                id = dosageHistoryId,
+                datetime = LocalDateTime.now(),
+                medicineId = medicineId,
+                amount = 1.0
+            )
+            val dosageKey = "medicate:$environment:user:$testUserId:dosagehistory:$dosageHistoryId"
+            val medicineKey = "medicate:$environment:user:$testUserId:medicine:$medicineId"
+            val dosageJson = json.encodeToString(dosageHistory)
+            val medicine = dev.gertjanassies.model.Medicine(medicineId, "Test Medicine", 500.0, "mg", 99.0)
+            val medicineJson = json.encodeToString(medicine)
+            val updatedMedicine = medicine.copy(stock = 100.0)
+            val updatedMedicineJson = json.encodeToString(updatedMedicine)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(dosageKey) } returns createRedisFutureMock(dosageJson)
+            every { mockAsyncCommands.watch(medicineKey, dosageKey) } returns createRedisFutureMock("OK")
+            every { mockAsyncCommands.get(medicineKey) } returns createRedisFutureMock(medicineJson)
+            every { mockAsyncCommands.multi() } returns createRedisFutureMock("OK")
+            every { mockAsyncCommands.set(medicineKey, updatedMedicineJson) } returns createRedisFutureMock("OK")
+            every { mockAsyncCommands.del(dosageKey) } returns createRedisFutureMock(1L)
+            val mockTransactionResult = mockk<io.lettuce.core.TransactionResult>()
+            every { mockTransactionResult.wasDiscarded() } returns false
+            every { mockAsyncCommands.exec() } returns createRedisFutureMock(mockTransactionResult)
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -235,7 +305,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 routing {
                     route("/api") {
                         authenticate("auth-jwt") {
-                            dosageHistoryRoutes(mockRedisService)
+                            dosageHistoryRoutes(redisService)
                         }
                     }
                 }
@@ -244,7 +314,6 @@ class DosageHistoryRoutesTest : FunSpec({
                     header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.NoContent
-                coVerify { mockRedisService.deleteDosageHistory(testUserId.toString(), dosageHistoryId) }
             }
         }
 
@@ -260,7 +329,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 routing {
                     route("/api") {
                         authenticate("auth-jwt") {
-                            dosageHistoryRoutes(mockRedisService)
+                            dosageHistoryRoutes(redisService)
                         }
                     }
                 }
@@ -281,7 +350,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 routing {
                     route("/api") {
                         authenticate("auth-jwt") {
-                            dosageHistoryRoutes(mockRedisService)
+                            dosageHistoryRoutes(redisService)
                         }
                     }
                 }
@@ -296,7 +365,10 @@ class DosageHistoryRoutesTest : FunSpec({
         test("should return 404 when dosage history not found") {
             mockGetUser()
             val dosageHistoryId = UUID.randomUUID()
-            coEvery { mockRedisService.deleteDosageHistory(testUserId.toString(), dosageHistoryId) } returns RedisError.NotFound("Not found").left()
+            val dosageKey = "medicate:$environment:user:$testUserId:dosagehistory:$dosageHistoryId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(dosageKey) } returns createRedisFutureMock(null as String?)
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -307,7 +379,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 routing {
                     route("/api") {
                         authenticate("auth-jwt") {
-                            dosageHistoryRoutes(mockRedisService)
+                            dosageHistoryRoutes(redisService)
                         }
                     }
                 }
@@ -316,14 +388,16 @@ class DosageHistoryRoutesTest : FunSpec({
                     header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.NotFound
-                coVerify { mockRedisService.deleteDosageHistory(testUserId.toString(), dosageHistoryId) }
             }
         }
 
         test("should return 500 on operation error") {
             mockGetUser()
             val dosageHistoryId = UUID.randomUUID()
-            coEvery { mockRedisService.deleteDosageHistory(testUserId.toString(), dosageHistoryId) } returns RedisError.OperationError("Database error").left()
+            val dosageKey = "medicate:$environment:user:$testUserId:dosagehistory:$dosageHistoryId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(dosageKey) } returns createFailedRedisFutureMock(RuntimeException("Database error"))
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -334,7 +408,7 @@ class DosageHistoryRoutesTest : FunSpec({
                 routing {
                     route("/api") {
                         authenticate("auth-jwt") {
-                            dosageHistoryRoutes(mockRedisService)
+                            dosageHistoryRoutes(redisService)
                         }
                     }
                 }
@@ -343,7 +417,6 @@ class DosageHistoryRoutesTest : FunSpec({
                     header("Authorization", "Bearer $jwtToken")
                 }
                 response.status shouldBe HttpStatusCode.InternalServerError
-                coVerify { mockRedisService.deleteDosageHistory(testUserId.toString(), dosageHistoryId) }
             }
         }
     }
