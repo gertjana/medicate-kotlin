@@ -64,6 +64,43 @@ interface StorageService {
      */
     suspend fun verifyActivationToken(token: String): Either<RedisError, String>
 
+    // Admin operations
+
+    /**
+     * Check if a user has admin privileges
+     */
+    suspend fun isUserAdmin(userId: String): Either<RedisError, Boolean>
+
+    /**
+     * Add admin privileges to a user
+     */
+    suspend fun addAdmin(userId: String): Either<RedisError, Unit>
+
+    /**
+     * Remove admin privileges from a user
+     */
+    suspend fun removeAdmin(userId: String): Either<RedisError, Unit>
+
+    /**
+     * Get all admin user IDs
+     */
+    suspend fun getAllAdmins(): Either<RedisError, Set<String>>
+
+    /**
+     * Get all users in the system
+     */
+    suspend fun getAllUsers(): Either<RedisError, List<User>>
+
+    /**
+     * Deactivate a user account (set isActive to false)
+     */
+    suspend fun deactivateUser(userId: String): Either<RedisError, User>
+
+    /**
+     * Completely delete a user and all associated data (medicines, schedules, history)
+     */
+    suspend fun deleteUserCompletely(userId: String): Either<RedisError, Unit>
+
     // Medicine operations
 
     /**

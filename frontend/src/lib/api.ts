@@ -20,6 +20,7 @@ export interface User {
 	email?: string;
 	firstName?: string;
 	lastName?: string;
+	isAdmin?: boolean;
 }
 
 export interface AuthResponse {
@@ -521,4 +522,43 @@ export function getCurrentUser(): User | null {
 		console.error('Failed to parse user from localStorage', e);
 		return null;
 	}
+}
+
+export interface AdminUser {
+	id: string;
+	username: string;
+	email: string;
+	firstName: string;
+	lastName: string;
+	isActive: boolean;
+	isAdmin: boolean;
+	isSelf: boolean;
+}
+
+export interface AdminUsersListResponse {
+	users: AdminUser[];
+}
+
+export async function getAllUsers(): Promise<AdminUsersListResponse> {
+	return authenticatedFetch(`${API_BASE}/admin/users`, {
+		method: 'GET'
+	});
+}
+
+export async function activateUser(userId: string): Promise<User> {
+	return authenticatedFetch(`${API_BASE}/admin/users/${userId}/activate`, {
+		method: 'PUT'
+	});
+}
+
+export async function deactivateUser(userId: string): Promise<User> {
+	return authenticatedFetch(`${API_BASE}/admin/users/${userId}/deactivate`, {
+		method: 'PUT'
+	});
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+	await authenticatedFetch(`${API_BASE}/admin/users/${userId}`, {
+		method: 'DELETE'
+	});
 }

@@ -268,7 +268,8 @@ class AuthRoutesTest : FunSpec({
 
             every { mockJwtService.validateRefreshToken(refreshToken) } returns username
             coEvery { mockRedisService.getUser(username) } returns user.right()
-            every { mockJwtService.generateAccessToken(username, userId.toString()) } returns newAccessToken
+            coEvery { mockRedisService.isUserAdmin(userId.toString()) } returns false.right()
+            every { mockJwtService.generateAccessToken(username, userId.toString(), false) } returns newAccessToken
 
             testApplication {
                 environment {
@@ -291,7 +292,8 @@ class AuthRoutesTest : FunSpec({
 
                 verify { mockJwtService.validateRefreshToken(refreshToken) }
                 coVerify { mockRedisService.getUser(username) }
-                verify { mockJwtService.generateAccessToken(username, userId.toString()) }
+                coVerify { mockRedisService.isUserAdmin(userId.toString()) }
+                every { mockJwtService.generateAccessToken(username, userId.toString(), false) }
             }
         }
 
@@ -529,7 +531,8 @@ class AuthRoutesTest : FunSpec({
 
             coEvery { mockRedisService.verifyActivationToken(token) } returns userId.toString().right()
             coEvery { mockRedisService.activateUser(userId.toString()) } returns activatedUser.right()
-            every { mockJwtService.generateAccessToken(username, userId.toString()) } returns accessToken
+            coEvery { mockRedisService.isUserAdmin(userId.toString()) } returns false.right()
+            every { mockJwtService.generateAccessToken(username, userId.toString(), false) } returns accessToken
             every { mockJwtService.generateRefreshToken(username, userId.toString()) } returns refreshToken
 
             testApplication {
@@ -562,7 +565,8 @@ class AuthRoutesTest : FunSpec({
 
                 coVerify(exactly = 1) { mockRedisService.verifyActivationToken(token) }
                 coVerify(exactly = 1) { mockRedisService.activateUser(userId.toString()) }
-                verify(exactly = 1) { mockJwtService.generateAccessToken(username, userId.toString()) }
+                coVerify(exactly = 1) { mockRedisService.isUserAdmin(userId.toString()) }
+                verify(exactly = 1) { mockJwtService.generateAccessToken(username, userId.toString(), false) }
                 verify(exactly = 1) { mockJwtService.generateRefreshToken(username, userId.toString()) }
             }
         }

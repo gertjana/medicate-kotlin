@@ -20,12 +20,13 @@ class JwtService(
     /**
      * Generate an access token for a user (short-lived)
      */
-    fun generateAccessToken(username: String, userId: String): String {
+    fun generateAccessToken(username: String, userId: String, isAdmin: Boolean = false): String {
         return JWT.create()
             .withAudience(audience)
             .withIssuer(issuer)
             .withClaim("username", username)
             .withClaim("userId", userId)
+            .withClaim("isAdmin", isAdmin)
             .withClaim("type", "access")
             .withExpiresAt(Date(System.currentTimeMillis() + accessTokenExpirationMs))
             .sign(algorithm)
@@ -34,12 +35,13 @@ class JwtService(
     /**
      * Generate a refresh token for a user (long-lived)
      */
-    fun generateRefreshToken(username: String, userId: String): String {
+    fun generateRefreshToken(username: String, userId: String, isAdmin: Boolean = false): String {
         return JWT.create()
             .withAudience(audience)
             .withIssuer(issuer)
             .withClaim("username", username)
             .withClaim("userId", userId)
+            .withClaim("isAdmin", isAdmin)
             .withClaim("type", "refresh")
             .withExpiresAt(Date(System.currentTimeMillis() + refreshTokenExpirationMs))
             .sign(algorithm)

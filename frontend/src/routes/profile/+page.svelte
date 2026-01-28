@@ -13,7 +13,6 @@
 	let saving = false;
 	let error = '';
 
-	// Toast notification state - support multiple stacked toasts
 	interface Toast {
 		id: number;
 		message: string;
@@ -65,7 +64,6 @@
 			return;
 		}
 
-		// Robust email validation regex
 		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		if (!emailRegex.test(email)) {
 			error = $_('profile.validEmailRequired');
@@ -77,10 +75,8 @@
 		try {
 			const updatedUser = await updateProfile(email, firstName, lastName);
 			user = updatedUser;
-			// Update user store
 			userStore.set(updatedUser);
 			showToastNotification($_('profile.updateSuccess'));
-			// Redirect to main page after a short delay
 			setTimeout(() => {
 				goto('/');
 			}, 1500);
@@ -195,7 +191,6 @@
 	{/if}
 </div>
 
-<!-- Toast Notifications - stacked -->
 <div class="fixed top-[5.4rem] right-4 z-50 flex flex-col gap-2">
 	{#each toasts as toast (toast.id)}
 		<div class="animate-slide-up">

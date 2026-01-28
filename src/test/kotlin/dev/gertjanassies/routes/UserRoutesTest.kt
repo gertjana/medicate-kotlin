@@ -39,8 +39,8 @@ class UserRoutesTest : FunSpec({
         mockJwtService = mockk()
         mockEmailService = mockk()
 
-        // Mock JWT token generation with any username and userId
-        every { mockJwtService.generateAccessToken(any(), any()) } returns "test-access-token-123"
+        // Mock JWT token generation with any username, userId, and isAdmin flag
+        every { mockJwtService.generateAccessToken(any(), any(), any()) } returns "test-access-token-123"
         every { mockJwtService.generateRefreshToken(any(), any()) } returns "test-refresh-token-456"
     }
 
@@ -181,6 +181,7 @@ class UserRoutesTest : FunSpec({
             val request = UserRequest(username, "", password)
             val user = User(id = userId, username = username, email = "", passwordHash = "hashedpassword", isActive = true)
             coEvery { mockRedisService.loginUser(username, password) } returns user.right()
+            coEvery { mockRedisService.isUserAdmin(userId.toString()) } returns false.right()
 
             testApplication {
                 environment {
@@ -210,7 +211,8 @@ class UserRoutesTest : FunSpec({
                 refreshCookie?.httpOnly shouldBe true
 
                 coVerify { mockRedisService.loginUser(username, password) }
-                verify { mockJwtService.generateAccessToken(username, userId.toString()) }
+                coVerify { mockRedisService.isUserAdmin(userId.toString()) }
+                verify { mockJwtService.generateAccessToken(username, userId.toString(), false) }
                 verify { mockJwtService.generateRefreshToken(username, userId.toString()) }
             }
         }
@@ -465,8 +467,10 @@ class UserRoutesTest : FunSpec({
 
         test("POST /user/login should NOT require authentication (public endpoint)") {
             val request = UserRequest("testuser", "", "password123")
-            val user = User(id = java.util.UUID.randomUUID(), username = "testuser", email = "", passwordHash = "hashedpassword", isActive = true)
+            val userId = java.util.UUID.randomUUID()
+            val user = User(id = userId, username = "testuser", email = "", passwordHash = "hashedpassword", isActive = true)
             coEvery { mockRedisService.loginUser(any(), any()) } returns user.right()
+            coEvery { mockRedisService.isUserAdmin(userId.toString()) } returns false.right()
 
             testApplication {
                 environment {
@@ -527,6 +531,7 @@ class UserRoutesTest : FunSpec({
             )
 
             coEvery { mockRedisService.getUserById(userId.toString()) } returns user.right()
+            coEvery { mockRedisService.isUserAdmin(userId.toString()) } returns false.right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -555,6 +560,7 @@ class UserRoutesTest : FunSpec({
                 body.lastName shouldBe "User"
 
                 coVerify { mockRedisService.getUserById(userId.toString()) }
+                coVerify { mockRedisService.isUserAdmin(userId.toString()) }
             }
         }
 
@@ -657,6 +663,7 @@ class UserRoutesTest : FunSpec({
             coEvery {
                 mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName)
             } returns updatedUser.right()
+            coEvery { mockRedisService.isUserAdmin(userId.toString()) } returns false.right()
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -688,6 +695,7 @@ class UserRoutesTest : FunSpec({
 
                 coVerify { mockRedisService.getUserById(userId.toString()) }
                 coVerify { mockRedisService.updateProfile(username, updateRequest.email, updateRequest.firstName, updateRequest.lastName) }
+                coVerify { mockRedisService.isUserAdmin(userId.toString()) }
             }
         }
 
