@@ -37,7 +37,7 @@ class AdherenceServiceTest : FunSpec({
     beforeEach {
         mockConnection = mockk()
         mockAsyncCommands = mockk()
-        redisService = RedisService(host = "localhost", port = 6379, environment = environment)
+        redisService = RedisService(host = "localhost", port = 6379, token ="", environment = environment)
 
         val connectionField = RedisService::class.java.getDeclaredField("connection")
         connectionField.isAccessible = true

@@ -83,8 +83,10 @@ fun Application.module() {
         ?: System.getenv("REDIS_PORT")?.toIntOrNull() ?: 6379
     val appEnvironment = environment.config.propertyOrNull("app.environment")?.getString()
         ?: System.getenv("APP_ENV") ?: "test"
+    val redisToken = environment.config.propertyOrNull("REDIS_TOKEN")?.getString()
+        ?: System.getenv("REDIS_TOKEN") ?: ""
 
-    val redisService: StorageService = RedisService(redisHost, redisPort, appEnvironment)
+    val redisService: StorageService = RedisService(redisHost, redisPort, redisToken, appEnvironment)
 
     // Attempt to connect to Redis (using functional error handling)
     (redisService as RedisService).connect().fold(

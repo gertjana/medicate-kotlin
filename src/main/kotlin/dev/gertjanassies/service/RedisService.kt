@@ -7,6 +7,7 @@ import arrow.core.raise.either
 import dev.gertjanassies.model.*
 import dev.gertjanassies.model.request.*
 import io.lettuce.core.RedisClient
+import io.lettuce.core.RedisURI
 import io.lettuce.core.ScanArgs
 import io.lettuce.core.api.StatefulRedisConnection
 import io.lettuce.core.api.async.RedisAsyncCommands
@@ -14,13 +15,9 @@ import kotlinx.coroutines.future.await
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.Serializable
 import org.mindrot.jbcrypt.BCrypt
 import org.slf4j.LoggerFactory
 import java.util.*
-import java.security.SecureRandom
-import java.time.LocalDateTime
-
 
 /**
  * Redis service using functional programming patterns with Arrow and async coroutines
@@ -29,6 +26,7 @@ import java.time.LocalDateTime
 class RedisService private constructor(
     private val host: String?,
     private val port: Int?,
+    private val token: String = "",
     private val environment: String,
     private var connection: StatefulRedisConnection<String, String>?,
     private val isConnectionOwner: Boolean
@@ -43,12 +41,12 @@ class RedisService private constructor(
     /**
      * Primary constructor for production use
      */
-    constructor(host: String, port: Int, environment: String = "test") : this(host, port, environment, null, true)
+    constructor(host: String, port: Int, token: String, environment: String = "test") : this(host, port, token, environment, null, true)
 
     /**
      * Constructor for testing that accepts a connection
      */
-    constructor(environment: String, connection: StatefulRedisConnection<String, String>) : this(null, null, environment, connection, false)
+    constructor(environment: String, connection: StatefulRedisConnection<String, String>) : this(null, null, "", environment, connection, false)
 
     /**
      * Get the environment name (for key prefixing)
@@ -67,7 +65,11 @@ class RedisService private constructor(
              // Connect to Redis (production mode)
              requireNotNull(host) { "Host must be provided for production mode" }
              requireNotNull(port) { "Port must be provided for production mode" }
-             val redisClient = RedisClient.create("redis://$host:$port")
+             val redisURI = RedisURI.Builder
+                 .redis(host, port)
+                 .withPassword(token.toCharArray())
+                 .build()
+             val redisClient = RedisClient.create(redisURI)
              val conn = redisClient.connect()
              client = redisClient
              connection = conn
@@ -88,18 +90,6 @@ class RedisService private constructor(
     suspend fun set(key: String, value: String): Either<RedisError, String> = Either.catch {
         connection?.async()?.set(key, value)?.await() ?: throw IllegalStateException("Not connected")
     }.mapLeft { RedisError.OperationError(it.message ?: "Unknown error") }
-
-    /**
-     * Helper function to get userId from username
-     *
-     * WARNING: If multiple users have the same username, this returns the ID of the first one.
-     * For authenticated operations, extract userId directly from the JWT token instead.
-     *
-     * @deprecated For authenticated operations, extract userId from JWT token
-     */
-    private suspend fun getUserId(username: String): Either<RedisError, UUID> {
-        return getUser(username).map { it.id }
-    }
 
     /**
      * Helper to validate a userId string and convert to UUID
@@ -148,7 +138,7 @@ class RedisService private constructor(
 
     /**
      * Create a new Medicine in Redis asynchronously
-     * @param username Actually receives userId from routes (for backward compatibility, parameter name not changed)
+     * @param userId Actually receives userId from routes (for backward compatibility, parameter name not changed)
      */
     override suspend fun createMedicine(userId: String, request: MedicineRequest): Either<RedisError, Medicine> {
         // Treat username parameter as userId directly (routes now pass userId)
@@ -238,7 +228,7 @@ class RedisService private constructor(
 
     /**
      * Get all Medicines from Redis asynchronously for a specific user
-     * @param username Actually receives userId from routes (for backward compatibility, parameter name not changed)
+     * @param userId Actually receives userId from routes (for backward compatibility, parameter name not changed)
      */
     override suspend fun getAllMedicines(userId: String): Either<RedisError, List<Medicine>> {
         // userId parameter is already the userId (routes now pass userId)
@@ -703,7 +693,7 @@ class RedisService private constructor(
                                 null
                             } else {
                                 // Success
-                                return@either Unit
+                                return@either
                             }
                         }.mapLeft { e ->
                             runCatching { asyncCommands.unwatch().await() }
@@ -923,7 +913,7 @@ class RedisService private constructor(
         return Either.catch {
             val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
 
-            // Get existing username index (may be null or contain comma-separated user IDs)
+            // Get existing username index (maybe null or contain comma-separated user IDs)
             val existingUserIds = asyncCommands.get(usernameIndexKey).await()
 
             // Generate new user ID
@@ -976,9 +966,7 @@ class RedisService private constructor(
 
         // Get username index (may contain single ID or comma-separated list)
         val nullableUserIdsString = get(usernameIndexKey).bind()
-        if (nullableUserIdsString == null) {
-            raise(RedisError.NotFound("User not found"))
-        }
+            ?: raise(RedisError.NotFound("User not found"))
         val userIdsString: String = nullableUserIdsString
 
         // Split into list of user IDs
@@ -988,7 +976,7 @@ class RedisService private constructor(
         for (userIdStr in userIds) {
             val userId = try {
                 UUID.fromString(userIdStr)
-            } catch (e: IllegalArgumentException) {
+            } catch (_: IllegalArgumentException) {
                 continue // Skip invalid UUIDs
             }
 
@@ -1116,37 +1104,6 @@ class RedisService private constructor(
         )
     }
 
-    suspend fun validateToken(username: String, token: String): Either<RedisError, Boolean> {
-        val key = "$keyPrefix:user:$username:token:$token"
-
-        return get(key).fold(
-            { error -> error.left() },
-            { value ->
-                when (value) {
-                    null -> RedisError.NotFound("Token not found or expired").left()
-                    "valid" -> true.right()
-                    else -> false.right()
-                }
-            }
-        )
-    }
-
-
-    suspend fun generateTokenAndStore(username: String, tokenExpirySeconds: Long = 3600): Either<RedisError, String> {
-        val secureRandom = SecureRandom()
-        val code = secureRandom.nextInt(900000) + 100000 // Range: 100000-999999
-        val token = code.toString()
-
-        val key = "$keyPrefix:user:$username:token:$token"
-
-        return Either.catch {
-            connection?.async()?.setex(key, tokenExpirySeconds, "valid")?.await() ?: throw IllegalStateException("Not connected")
-            token
-        }.mapLeft { e ->
-            RedisError.OperationError("Failed to generate and store token: ${e.message}")
-        }
-    }
-
     /**
      * Close the connection
      * Only closes the connection if it was created by this service (not injected for testing)
@@ -1229,7 +1186,7 @@ class RedisService private constructor(
             }.bind()
         }
 
-        logger.debug("Found ${keys.size} matching keys: $keys")
+        logger.debug("Found {} matching keys: {}", keys.size, keys)
 
         // Should find exactly one matching key (if token exists and hasn't expired via TTL)
         val matchingKey = when (keys.size) {
