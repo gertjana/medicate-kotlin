@@ -160,12 +160,12 @@ fun Application.module() {
             healthRoutes()
             authRoutes(redisService, emailService, jwtService)
             userRoutes(redisService, jwtService, emailService)  // Login/register are public
-            medicineSearchRoutes()  // Medicine database search (public - used in add/edit forms)
 
             // Protected routes (require JWT authentication)
             authenticate("auth-jwt") {
                 protectedUserRoutes(redisService)
                 medicineRoutes(redisService)
+                medicineSearchRoutes()
                 scheduleRoutes(redisService)
                 dailyRoutes(redisService)
                 dosageHistoryRoutes(redisService)
