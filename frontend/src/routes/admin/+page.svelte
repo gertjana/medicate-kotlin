@@ -56,9 +56,7 @@
 		adminError = '';
 		try {
 			const response = await getAllUsers();
-			console.log('Admin users response:', response);
 			adminUsers = response.users;
-			console.log('Admin users array:', adminUsers);
 		} catch (e) {
 			console.error('Failed to load users:', e);
 			adminError = e instanceof Error ? e.message : $_('admin.loadFailed');
