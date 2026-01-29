@@ -25,7 +25,6 @@ import io.ktor.server.config.*
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 import io.ktor.server.testing.*
 import io.ktor.utils.io.*
-import io.lettuce.core.TransactionResult
 import io.lettuce.core.api.StatefulRedisConnection
 import io.lettuce.core.api.async.RedisAsyncCommands
 import io.mockk.*
