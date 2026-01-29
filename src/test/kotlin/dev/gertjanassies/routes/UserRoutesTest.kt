@@ -213,7 +213,7 @@ class UserRoutesTest : FunSpec({
                 coVerify { mockRedisService.loginUser(username, password) }
                 coVerify { mockRedisService.isUserAdmin(userId.toString()) }
                 verify { mockJwtService.generateAccessToken(username, userId.toString(), false) }
-                verify { mockJwtService.generateRefreshToken(username, userId.toString()) }
+                verify { mockJwtService.generateRefreshToken(username, userId.toString(), false) }
             }
         }
 
