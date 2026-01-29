@@ -41,7 +41,7 @@ class UserRoutesTest : FunSpec({
 
         // Mock JWT token generation with any username, userId, and isAdmin flag
         every { mockJwtService.generateAccessToken(any(), any(), any()) } returns "test-access-token-123"
-        every { mockJwtService.generateRefreshToken(any(), any()) } returns "test-refresh-token-456"
+        every { mockJwtService.generateRefreshToken(any(), any(), any()) } returns "test-refresh-token-456"
     }
 
     afterEach {
