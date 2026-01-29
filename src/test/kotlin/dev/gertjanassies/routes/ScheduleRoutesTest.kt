@@ -1,14 +1,13 @@
 package dev.gertjanassies.routes
 
-import arrow.core.left
-import arrow.core.right
 import dev.gertjanassies.model.Schedule
 import dev.gertjanassies.model.User
 import dev.gertjanassies.model.request.ScheduleRequest
-import dev.gertjanassies.service.RedisError
 import dev.gertjanassies.service.RedisService
 import dev.gertjanassies.test.TestJwtConfig
 import dev.gertjanassies.test.TestJwtConfig.installTestJwtAuth
+import dev.gertjanassies.util.createFailedRedisFutureMock
+import dev.gertjanassies.util.createRedisFutureMock
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.call.*
@@ -22,17 +21,28 @@ import io.ktor.server.config.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
+import io.lettuce.core.api.StatefulRedisConnection
+import io.lettuce.core.api.async.RedisAsyncCommands
 import io.mockk.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.*
 
 class ScheduleRoutesTest : FunSpec({
-    lateinit var mockRedisService: RedisService
+    lateinit var mockConnection: StatefulRedisConnection<String, String>
+    lateinit var mockAsyncCommands: RedisAsyncCommands<String, String>
+    lateinit var redisService: RedisService
+
+    val json = Json { ignoreUnknownKeys = true }
+    val environment = "test"
     val testUsername = "testuser"
     val testUserId = UUID.randomUUID()
     val jwtToken = TestJwtConfig.generateToken(testUsername, testUserId.toString())
 
     beforeEach {
-        mockRedisService = mockk()
+        mockConnection = mockk()
+        mockAsyncCommands = mockk()
+        redisService = RedisService(environment = environment, connection = mockConnection)
     }
 
     afterEach {
@@ -49,7 +59,11 @@ class ScheduleRoutesTest : FunSpec({
             lastName = "User",
             passwordHash = "hashedpassword"
         )
-        coEvery { mockRedisService.getUserById(testUserId.toString()) } returns testUser.right()
+        val userJson = json.encodeToString(testUser)
+        val userKey = "medicate:$environment:user:id:$testUserId"
+
+        every { mockConnection.async() } returns mockAsyncCommands
+        every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
     }
 
     context("GET /schedule") {
@@ -60,7 +74,20 @@ class ScheduleRoutesTest : FunSpec({
                 Schedule(UUID.randomUUID(), medicineId, "08:00", 1.0),
                 Schedule(UUID.randomUUID(), medicineId, "20:00", 2.0)
             )
-            coEvery { mockRedisService.getAllSchedules(any()) } returns schedules.right()
+
+            // Mock scan for schedules
+            every { mockConnection.async() } returns mockAsyncCommands
+            val scheduleKeys = schedules.map { "medicate:$environment:user:$testUserId:schedule:${it.id}" }
+            val mockCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
+            every { mockCursor.keys } returns scheduleKeys
+            every { mockCursor.isFinished } returns true
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockCursor)
+
+            schedules.forEach { schedule ->
+                val key = "medicate:$environment:user:$testUserId:schedule:${schedule.id}"
+                val scheduleJson = json.encodeToString(schedule)
+                every { mockAsyncCommands.get(key) } returns createRedisFutureMock(scheduleJson)
+            }
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -70,7 +97,7 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 routing {
                     authenticate("auth-jwt") {
-                        scheduleRoutes(mockRedisService)
+                        scheduleRoutes(redisService)
                     }
                 }
 
@@ -79,13 +106,16 @@ class ScheduleRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.OK
-                coVerify { mockRedisService.getAllSchedules(any()) }
             }
         }
 
         test("should return 500 on error") {
             mockGetUser()
-            coEvery { mockRedisService.getAllSchedules(any()) } returns RedisError.OperationError("Error").left()
+
+            // Mock scan to fail
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns
+                createFailedRedisFutureMock(RuntimeException("Error"))
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -95,7 +125,7 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 routing {
                     authenticate("auth-jwt") {
-                        scheduleRoutes(mockRedisService)
+                        scheduleRoutes(redisService)
                     }
                 }
 
@@ -114,7 +144,11 @@ class ScheduleRoutesTest : FunSpec({
             val scheduleId = UUID.randomUUID()
             val medicineId = UUID.randomUUID()
             val schedule = Schedule(scheduleId, medicineId, "08:00", 1.0)
-            coEvery { mockRedisService.getSchedule(testUserId.toString(), scheduleId.toString()) } returns schedule.right()
+            val scheduleJson = json.encodeToString(schedule)
+            val scheduleKey = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(scheduleKey) } returns createRedisFutureMock(scheduleJson)
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -124,7 +158,7 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 routing {
                     authenticate("auth-jwt") {
-                        scheduleRoutes(mockRedisService)
+                        scheduleRoutes(redisService)
                     }
                 }
 
@@ -136,15 +170,16 @@ class ScheduleRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.OK
                 val body = response.body<Schedule>()
                 body.id shouldBe scheduleId
-                coVerify { mockRedisService.getSchedule(any(), scheduleId.toString()) }
             }
         }
 
         test("should return 404 when schedule not found") {
             mockGetUser()
             val scheduleId = UUID.randomUUID()
-            coEvery { mockRedisService.getSchedule(testUserId.toString(), scheduleId.toString()) } returns
-                RedisError.NotFound("Schedule not found").left()
+            val scheduleKey = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(scheduleKey) } returns createRedisFutureMock(null as String?)
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -154,7 +189,7 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 routing {
                     authenticate("auth-jwt") {
-                        scheduleRoutes(mockRedisService)
+                        scheduleRoutes(redisService)
                     }
                 }
 
@@ -171,9 +206,10 @@ class ScheduleRoutesTest : FunSpec({
         test("should create schedule") {
             mockGetUser()
             val medicineId = UUID.randomUUID()
-            val createdSchedule = Schedule(UUID.randomUUID(), medicineId, "08:00", 1.0)
             val request = ScheduleRequest(medicineId, "08:00", 1.0)
-            coEvery { mockRedisService.createSchedule(testUserId.toString(), any()) } returns createdSchedule.right()
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.set(any(), any()) } returns createRedisFutureMock("OK")
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -183,7 +219,7 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 routing {
                     authenticate("auth-jwt") {
-                        scheduleRoutes(mockRedisService)
+                        scheduleRoutes(redisService)
                     }
                 }
 
@@ -197,15 +233,15 @@ class ScheduleRoutesTest : FunSpec({
                 response.status shouldBe HttpStatusCode.Created
                 val body = response.body<Schedule>()
                 body.time shouldBe "08:00"
-                coVerify { mockRedisService.createSchedule(testUserId.toString(), any()) }
             }
         }
 
         test("should return 500 on create error") {
             mockGetUser()
             val request = ScheduleRequest(UUID.randomUUID(), "12:00", 1.5)
-            coEvery { mockRedisService.createSchedule(any(), any<ScheduleRequest>()) } returns
-                RedisError.OperationError("Failed to create").left()
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.set(any(), any()) } returns createFailedRedisFutureMock(RuntimeException("Failed to create"))
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -215,7 +251,7 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 routing {
                     authenticate("auth-jwt") {
-                        scheduleRoutes(mockRedisService)
+                        scheduleRoutes(redisService)
                     }
                 }
 
@@ -236,7 +272,14 @@ class ScheduleRoutesTest : FunSpec({
             mockGetUser()
             val scheduleId = UUID.randomUUID()
             val schedule = Schedule(scheduleId, UUID.randomUUID(), "14:00", 2.0)
-            coEvery { mockRedisService.updateSchedule(any(), scheduleId.toString(), any<Schedule>()) } returns schedule.right()
+            val scheduleKey = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
+            val existingSchedule = Schedule(scheduleId, schedule.medicineId, "08:00", 1.0)
+            val existingJson = json.encodeToString(existingSchedule)
+            val updatedJson = json.encodeToString(schedule)
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(scheduleKey) } returns createRedisFutureMock(existingJson)
+            every { mockAsyncCommands.set(scheduleKey, updatedJson) } returns createRedisFutureMock("OK")
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -246,7 +289,7 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 routing {
                     authenticate("auth-jwt") {
-                        scheduleRoutes(mockRedisService)
+                        scheduleRoutes(redisService)
                     }
                 }
 
@@ -258,7 +301,6 @@ class ScheduleRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.OK
-                coVerify { mockRedisService.updateSchedule(any(), scheduleId.toString(), any<Schedule>()) }
             }
         }
 
@@ -266,8 +308,10 @@ class ScheduleRoutesTest : FunSpec({
             mockGetUser()
             val scheduleId = UUID.randomUUID()
             val schedule = Schedule(scheduleId, UUID.randomUUID(), "14:00", 2.0)
-            coEvery { mockRedisService.updateSchedule(any(), scheduleId.toString(), any<Schedule>()) } returns
-                RedisError.NotFound("Schedule not found").left()
+            val scheduleKey = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.get(scheduleKey) } returns createRedisFutureMock(null as String?)
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -277,7 +321,7 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 routing {
                     authenticate("auth-jwt") {
-                        scheduleRoutes(mockRedisService)
+                        scheduleRoutes(redisService)
                     }
                 }
 
@@ -297,7 +341,10 @@ class ScheduleRoutesTest : FunSpec({
         test("should delete schedule") {
             mockGetUser()
             val scheduleId = UUID.randomUUID()
-            coEvery { mockRedisService.deleteSchedule(any(), scheduleId.toString()) } returns Unit.right()
+            val scheduleKey = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.del(scheduleKey) } returns createRedisFutureMock(1L)
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -307,7 +354,7 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 routing {
                     authenticate("auth-jwt") {
-                        scheduleRoutes(mockRedisService)
+                        scheduleRoutes(redisService)
                     }
                 }
 
@@ -316,15 +363,16 @@ class ScheduleRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.NoContent
-                coVerify { mockRedisService.deleteSchedule(any(), scheduleId.toString()) }
             }
         }
 
         test("should return 404 when schedule not found") {
             mockGetUser()
             val scheduleId = UUID.randomUUID()
-            coEvery { mockRedisService.deleteSchedule(any(), scheduleId.toString()) } returns
-                RedisError.NotFound("Schedule not found").left()
+            val scheduleKey = "medicate:$environment:user:$testUserId:schedule:$scheduleId"
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            every { mockAsyncCommands.del(scheduleKey) } returns createRedisFutureMock(0L)
 
             testApplication {
                 environment { config = MapApplicationConfig() }
@@ -334,7 +382,7 @@ class ScheduleRoutesTest : FunSpec({
                 }
                 routing {
                     authenticate("auth-jwt") {
-                        scheduleRoutes(mockRedisService)
+                        scheduleRoutes(redisService)
                     }
                 }
 
