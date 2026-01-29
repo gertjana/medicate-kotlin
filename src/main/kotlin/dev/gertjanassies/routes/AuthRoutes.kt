@@ -51,8 +51,11 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
 
             val user = userResult.getOrNull()!!
 
+            // Check if user is admin
+            val isAdmin = storageService.isUserAdmin(user.id.toString()).getOrNull() ?: false
+
             // Generate new access token with userId
-            val newAccessToken = jwtService.generateAccessToken(user.username, user.id.toString())
+            val newAccessToken = jwtService.generateAccessToken(user.username, user.id.toString(), isAdmin)
 
             logger.debug("Successfully refreshed access token for user '$username'")
             call.respond(
@@ -210,9 +213,12 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
 
             val user = activationResult.getOrNull()!!
 
+            // Check if user is admin
+            val isAdmin = storageService.isUserAdmin(user.id.toString()).getOrNull() ?: false
+
             // Generate access and refresh tokens for the newly activated user
-            val accessToken = jwtService.generateAccessToken(user.username, user.id.toString())
-            val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString())
+            val accessToken = jwtService.generateAccessToken(user.username, user.id.toString(), isAdmin)
+            val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString(), isAdmin)
 
             // Set refresh token as HttpOnly cookie
             call.response.cookies.append(
@@ -231,7 +237,7 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                 HttpStatusCode.OK,
                 dev.gertjanassies.model.response.ActivationResponse(
                     message = "Account activated successfully",
-                    user = user.toResponse(),
+                    user = user.toResponse(isAdmin),
                     token = accessToken
                 )
             )

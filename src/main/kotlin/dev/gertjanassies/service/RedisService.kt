@@ -1293,6 +1293,164 @@ class RedisService private constructor(
         activatedUser
     }
 
+    override suspend fun isUserAdmin(userId: String): Either<RedisError, Boolean> = either {
+        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+        val key = "$keyPrefix:admins"
+
+        Either.catch {
+            asyncCommands.sismember(key, userId).await()
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to check admin status: ${e.message}")
+        }.bind()
+    }
+
+    override suspend fun addAdmin(userId: String): Either<RedisError, Unit> = either {
+        logger.debug("Adding admin privileges to user ID: $userId")
+        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+        val key = "$keyPrefix:admins"
+
+        Either.catch {
+            asyncCommands.sadd(key, userId).await()
+            Unit
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to add admin: ${e.message}")
+        }.bind()
+
+        logger.debug("Successfully added admin privileges to user ID: $userId")
+    }
+
+    override suspend fun removeAdmin(userId: String): Either<RedisError, Unit> = either {
+        logger.debug("Removing admin privileges from user ID: $userId")
+        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+        val key = "$keyPrefix:admins"
+
+        Either.catch {
+            asyncCommands.srem(key, userId).await()
+            Unit
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to remove admin: ${e.message}")
+        }.bind()
+
+        logger.debug("Successfully removed admin privileges from user ID: $userId")
+    }
+
+    override suspend fun getAllAdmins(): Either<RedisError, Set<String>> = either {
+        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+        val key = "$keyPrefix:admins"
+
+        Either.catch {
+            asyncCommands.smembers(key).await().toSet()
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to get all admins: ${e.message}")
+        }.bind()
+    }
+
+    override suspend fun getAllUsers(): Either<RedisError, List<User>> = either {
+        logger.info("Fetching all users")
+        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+
+        val pattern = "$keyPrefix:user:id:*"
+        logger.info("Scanning for user keys with pattern: $pattern")
+
+        val keys = Either.catch {
+            val allKeys = mutableListOf<String>()
+            var cursor: io.lettuce.core.ScanCursor = io.lettuce.core.ScanCursor.INITIAL
+            val scanArgs = ScanArgs.Builder.matches(pattern)
+
+            do {
+                val scanCursor = if (cursor.cursor == "0") {
+                    asyncCommands.scan(scanArgs).await()
+                } else {
+                    asyncCommands.scan(cursor, scanArgs).await()
+                }
+                allKeys.addAll(scanCursor.keys)
+                cursor = scanCursor
+            } while (!cursor.isFinished)
+
+            allKeys.toList()
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to scan user keys: ${e.message}")
+        }.bind()
+
+        logger.info("Found ${keys.size} user keys")
+        logger.debug("User keys: $keys")
+
+        val users = keys.mapNotNull { key ->
+            Either.catch {
+                val userJson = asyncCommands.get(key).await()
+                userJson?.let { json.decodeFromString<User>(it) }
+            }.getOrNull()
+        }
+
+        logger.info("Successfully fetched ${users.size} users")
+        users
+    }
+
+    override suspend fun deactivateUser(userId: String): Either<RedisError, User> = either {
+        logger.debug("Deactivating user account for user ID: $userId")
+
+        val user = getUserById(userId).bind()
+
+        val deactivatedUser = user.copy(isActive = false)
+        val userJson = json.encodeToString(deactivatedUser)
+
+        val key = "$keyPrefix:user:id:$userId"
+        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+
+        Either.catch {
+            asyncCommands.set(key, userJson).await()
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to deactivate user: ${e.message}")
+        }.bind()
+
+        logger.debug("Successfully deactivated user account for user ID: $userId")
+
+        deactivatedUser
+    }
+
+    override suspend fun deleteUserCompletely(userId: String): Either<RedisError, Unit> = either {
+        logger.debug("Completely deleting user and all data for user ID: $userId")
+        val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+
+        val user = getUserById(userId).bind()
+
+        val keysToDelete = mutableListOf<String>()
+        keysToDelete.add("$keyPrefix:user:id:$userId")
+        keysToDelete.add("$keyPrefix:user:username:${user.username}")
+        keysToDelete.add("$keyPrefix:user:email:${user.email}")
+
+        val medicinePattern = "$keyPrefix:medicine:$userId:*"
+        val schedulePattern = "$keyPrefix:schedule:$userId:*"
+        val historyPattern = "$keyPrefix:dosageHistory:$userId:*"
+
+        for (pattern in listOf(medicinePattern, schedulePattern, historyPattern)) {
+            val keys = Either.catch {
+                val scanArgs = ScanArgs.Builder.matches(pattern)
+                val cursor = asyncCommands.scan(scanArgs).await()
+                cursor.keys.toList()
+            }.mapLeft { e ->
+                RedisError.OperationError("Failed to scan keys for pattern $pattern: ${e.message}")
+            }.bind()
+            keysToDelete.addAll(keys)
+        }
+
+        if (keysToDelete.isNotEmpty()) {
+            Either.catch {
+                asyncCommands.del(*keysToDelete.toTypedArray()).await()
+            }.mapLeft { e ->
+                RedisError.OperationError("Failed to delete user data: ${e.message}")
+            }.bind()
+        }
+
+        Either.catch {
+            asyncCommands.srem("$keyPrefix:admins", userId).await()
+        }.mapLeft { e ->
+            logger.warn("Failed to remove admin privileges during user deletion: ${e.message}")
+        }
+
+        logger.debug("Successfully deleted user and all associated data for user ID: $userId")
+    }
+
     // end of RedisService class
 }
 

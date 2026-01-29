@@ -8,12 +8,14 @@ data class UserResponse(
     val username: String,
     val email: String,
     val firstName: String,
-    val lastName: String
+    val lastName: String,
+    val isAdmin: Boolean = false
 )
 
-fun User.toResponse() = UserResponse(
+fun User.toResponse(isAdmin: Boolean = false) = UserResponse(
     username = username,
     email = email,
     firstName = firstName,
-    lastName = lastName
+    lastName = lastName,
+    isAdmin = isAdmin
 )

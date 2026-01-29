@@ -5,6 +5,7 @@ import com.auth0.jwt.algorithms.Algorithm
 import dev.gertjanassies.model.serializer.LocalDateTimeSerializer
 import dev.gertjanassies.model.serializer.UUIDSerializer
 import dev.gertjanassies.routes.adherenceRoutes
+import dev.gertjanassies.routes.adminRoutes
 import dev.gertjanassies.routes.authRoutes
 import dev.gertjanassies.routes.dailyRoutes
 import dev.gertjanassies.routes.dosageHistoryRoutes
@@ -88,6 +89,8 @@ fun Application.module() {
 
     val redisService: StorageService = RedisService(redisHost, redisPort, redisToken, appEnvironment)
 
+    this@module.log.info("Initializing Redis connection: host=$redisHost, port=$redisPort, environment=$appEnvironment")
+
     // Attempt to connect to Redis (using functional error handling)
     (redisService as RedisService).connect().fold(
         ifLeft = { error ->
@@ -170,6 +173,7 @@ fun Application.module() {
                 dailyRoutes(redisService)
                 dosageHistoryRoutes(redisService)
                 adherenceRoutes(redisService)
+                adminRoutes(redisService)
             }
         }
 
