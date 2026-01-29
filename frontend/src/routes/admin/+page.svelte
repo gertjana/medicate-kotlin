@@ -15,6 +15,11 @@
 		username: ''
 	};
 
+	// Map action to localized label
+	$: localizedAction = confirmDialog.action
+		? $_(`admin.${confirmDialog.action}`)
+		: '';
+
 	interface Toast {
 		id: number;
 		message: string;
@@ -200,9 +205,9 @@
 {#if confirmDialog.show}
 	<div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
 		<div class="bg-white border border-black p-6 max-w-md w-full rounded-tr-lg rounded-bl-lg">
-			<h3 class="text-xl font-bold mb-4">{$_('admin.confirmTitle', { values: { action: confirmDialog.action } })}</h3>
+			<h3 class="text-xl font-bold mb-4">{$_('admin.confirmTitle', { values: { action: localizedAction } })}</h3>
 			<p class="mb-6">
-				{$_('admin.confirmMessage', { values: { action: confirmDialog.action } })} <strong>{confirmDialog.username}</strong>?
+				{$_('admin.confirmMessage', { values: { action: localizedAction } })} <strong>{confirmDialog.username}</strong>?
 				{#if confirmDialog.action === 'delete'}
 					<span class="block mt-2 text-red-600 font-semibold">
 						{$_('admin.deleteWarning')}
