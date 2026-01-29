@@ -533,7 +533,7 @@ class AuthRoutesTest : FunSpec({
             coEvery { mockRedisService.activateUser(userId.toString()) } returns activatedUser.right()
             coEvery { mockRedisService.isUserAdmin(userId.toString()) } returns false.right()
             every { mockJwtService.generateAccessToken(username, userId.toString(), false) } returns accessToken
-            every { mockJwtService.generateRefreshToken(username, userId.toString()) } returns refreshToken
+            every { mockJwtService.generateRefreshToken(username, userId.toString(), false) } returns refreshToken
 
             testApplication {
                 environment {
@@ -567,7 +567,7 @@ class AuthRoutesTest : FunSpec({
                 coVerify(exactly = 1) { mockRedisService.activateUser(userId.toString()) }
                 coVerify(exactly = 1) { mockRedisService.isUserAdmin(userId.toString()) }
                 verify(exactly = 1) { mockJwtService.generateAccessToken(username, userId.toString(), false) }
-                verify(exactly = 1) { mockJwtService.generateRefreshToken(username, userId.toString()) }
+                verify(exactly = 1) { mockJwtService.generateRefreshToken(username, userId.toString(), false) }
             }
         }
 
