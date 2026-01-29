@@ -83,30 +83,31 @@ class AuthRoutesTest : FunSpec({
                     headers = headersOf(HttpHeaders.ContentType, "application/json")
                 )
             }
-            val httpClient = HttpClient(mockEngine) {
+            HttpClient(mockEngine) {
                 install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json(json) }
-            }
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            }.use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/resetPassword") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.OK
+                    val body = response.body<Map<String, String>>()
+                    body shouldContainKey "message"
+                    body shouldContainKey "emailId"
+                    body["emailId"] shouldBe emailId
+                    body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/resetPassword") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<Map<String, String>>()
-                body shouldContainKey "message"
-                body shouldContainKey "emailId"
-                body["emailId"] shouldBe emailId
-                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
             }
         }
 
@@ -115,25 +116,26 @@ class AuthRoutesTest : FunSpec({
 
             // Create a mock HTTP client (won't be used)
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/resetPassword") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.BadRequest
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Email cannot be empty"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/resetPassword") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.BadRequest
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Email cannot be empty"
             }
         }
 
@@ -148,27 +150,28 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/resetPassword") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    // Should return OK to avoid leaking information about user existence
+                    response.status shouldBe HttpStatusCode.OK
+                    val body = response.body<Map<String, String>>()
+                    body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
+                    body["emailId"] shouldBe "no-email-sent"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/resetPassword") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                // Should return OK to avoid leaking information about user existence
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<Map<String, String>>()
-                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
-                body["emailId"] shouldBe "no-email-sent"
             }
         }
 
@@ -183,27 +186,28 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/resetPassword") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    // Should return OK to avoid leaking internal errors
+                    response.status shouldBe HttpStatusCode.OK
+                    val body = response.body<Map<String, String>>()
+                    body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
+                    body["emailId"] shouldBe "no-email-sent"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/resetPassword") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                // Should return OK to avoid leaking internal errors
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<Map<String, String>>()
-                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
-                body["emailId"] shouldBe "no-email-sent"
             }
         }
 
@@ -224,26 +228,27 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client (won't be called due to invalid email)
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/resetPassword") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.OK
+                    val body = response.body<Map<String, String>>()
+                    body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
+                    body["emailId"] shouldBe "email-send-failed"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/resetPassword") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<Map<String, String>>()
-                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
-                body["emailId"] shouldBe "email-send-failed"
             }
         }
 
@@ -267,28 +272,29 @@ class AuthRoutesTest : FunSpec({
             val mockEngine = MockEngine {
                 respond("SMTP error", HttpStatusCode.InternalServerError)
             }
-            val httpClient = HttpClient(mockEngine) {
+            HttpClient(mockEngine) {
                 install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json(json) }
-            }
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            }.use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/resetPassword") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.OK
+                    val body = response.body<Map<String, String>>()
+                    body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
+                    body["emailId"] shouldBe "email-send-failed"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/resetPassword") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<Map<String, String>>()
-                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
-                body["emailId"] shouldBe "email-send-failed"
             }
         }
 
@@ -310,26 +316,27 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/resetPassword") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.OK
+                    val body = response.body<Map<String, String>>()
+                    body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
+                    body["emailId"] shouldBe "email-send-failed"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/resetPassword") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<Map<String, String>>()
-                body["message"] shouldBe "If an account exists with that email, you will receive a password reset link."
-                body["emailId"] shouldBe "email-send-failed"
             }
         }
     }
@@ -351,26 +358,27 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/refresh") {
+                        cookie("refresh_token", refreshToken)
+                    }
+
+                    response.status shouldBe HttpStatusCode.OK
+                    val body = response.body<Map<String, String>>()
+                    body shouldContainKey "token"
+                    // Refresh token should not be in response (it's in HttpOnly cookie)
+                    (body.containsKey("refreshToken")) shouldBe false
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/refresh") {
-                    cookie("refresh_token", refreshToken)
-                }
-
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<Map<String, String>>()
-                body shouldContainKey "token"
-                // Refresh token should not be in response (it's in HttpOnly cookie)
-                (body.containsKey("refreshToken")) shouldBe false
             }
         }
 
@@ -379,72 +387,75 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/refresh") {
+                        cookie("refresh_token", invalidToken)
+                    }
+
+                    response.status shouldBe HttpStatusCode.Unauthorized
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Invalid or expired refresh token"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/refresh") {
-                    cookie("refresh_token", invalidToken)
-                }
-
-                response.status shouldBe HttpStatusCode.Unauthorized
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Invalid or expired refresh token"
             }
         }
 
         test("should return 400 when refresh token is missing") {
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/refresh") {
+                        // No cookie sent
+                    }
+
+                    response.status shouldBe HttpStatusCode.BadRequest
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Refresh token is required"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/refresh") {
-                    // No cookie sent
-                }
-
-                response.status shouldBe HttpStatusCode.BadRequest
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Refresh token is required"
             }
         }
 
         test("should return 400 when refresh token is blank") {
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/refresh") {
+                        cookie("refresh_token", "")
+                    }
+
+                    response.status shouldBe HttpStatusCode.BadRequest
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Refresh token is required"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/refresh") {
-                    cookie("refresh_token", "")
-                }
-
-                response.status shouldBe HttpStatusCode.BadRequest
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Refresh token is required"
             }
         }
     }
@@ -472,25 +483,26 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/verifyResetToken") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.OK
+                    val body = response.body<Map<String, String>>()
+                    body["username"] shouldBe username
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/verifyResetToken") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.OK
-                val body = response.body<Map<String, String>>()
-                body["username"] shouldBe username
             }
         }
 
@@ -499,25 +511,26 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/verifyResetToken") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.BadRequest
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Token cannot be empty"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/verifyResetToken") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.BadRequest
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Token cannot be empty"
             }
         }
 
@@ -532,25 +545,26 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/verifyResetToken") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.NotFound
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Invalid or expired"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/verifyResetToken") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.NotFound
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Invalid or expired"
             }
         }
 
@@ -564,25 +578,26 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/verifyResetToken") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.InternalServerError
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Redis connection failed"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/verifyResetToken") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.InternalServerError
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Redis connection failed"
             }
         }
 
@@ -606,26 +621,27 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/verifyResetToken") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.OK
+
+                    // Verify that del was called (token deletion happens in verifyPasswordResetToken)
+                    verify(exactly = 1) { mockAsyncCommands.del(tokenKey) }
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/verifyResetToken") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.OK
-
-                // Verify that del was called (token deletion happens in verifyPasswordResetToken)
-                verify(exactly = 1) { mockAsyncCommands.del(tokenKey) }
             }
         }
     }
@@ -663,35 +679,36 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/activateAccount") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.OK
+
+                    // Parse the JSON response using the ActivationResponse model
+                    val body = response.body<dev.gertjanassies.model.response.ActivationResponse>()
+                    body.message shouldBe "Account activated successfully"
+                    body.user.username shouldBe username
+                    body.user.email shouldBe email
+                    body.user.firstName shouldBe firstName
+                    body.user.lastName shouldBe lastName
+
+                    // Verify refresh token cookie was set
+                    val cookies = response.setCookie()
+                    cookies.any { it.name == "refresh_token" } shouldBe true
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/activateAccount") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.OK
-
-                // Parse the JSON response using the ActivationResponse model
-                val body = response.body<dev.gertjanassies.model.response.ActivationResponse>()
-                body.message shouldBe "Account activated successfully"
-                body.user.username shouldBe username
-                body.user.email shouldBe email
-                body.user.firstName shouldBe firstName
-                body.user.lastName shouldBe lastName
-
-                // Verify refresh token cookie was set
-                val cookies = response.setCookie()
-                cookies.any { it.name == "refresh_token" } shouldBe true
             }
         }
 
@@ -700,25 +717,26 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/activateAccount") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.BadRequest
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Token cannot be empty"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/activateAccount") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.BadRequest
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Token cannot be empty"
             }
         }
 
@@ -733,25 +751,26 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/activateAccount") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.NotFound
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Invalid or expired activation token"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/activateAccount") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.NotFound
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Invalid or expired activation token"
             }
         }
 
@@ -766,25 +785,26 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/activateAccount") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.InternalServerError
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Redis connection failed"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/activateAccount") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.InternalServerError
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Redis connection failed"
             }
         }
 
@@ -803,25 +823,26 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/activateAccount") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.InternalServerError
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Failed to activate account"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/activateAccount") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.InternalServerError
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Failed to activate account"
             }
         }
 
@@ -840,25 +861,26 @@ class AuthRoutesTest : FunSpec({
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            val httpClient = HttpClient(mockEngine)
-            emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
-            testApplication {
-                environment {
-                    config = MapApplicationConfig()
+                testApplication {
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.post("/auth/activateAccount") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.InternalServerError
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "Failed to activate account"
                 }
-                install(ServerContentNegotiation) { json() }
-                routing { authRoutes(redisService, emailService, jwtService) }
-
-                val client = createClient { install(ClientContentNegotiation) { json() } }
-                val response = client.post("/auth/activateAccount") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-
-                response.status shouldBe HttpStatusCode.InternalServerError
-                val body = response.body<Map<String, String>>()
-                body["error"] shouldContain "Failed to activate account"
             }
         }
     }
