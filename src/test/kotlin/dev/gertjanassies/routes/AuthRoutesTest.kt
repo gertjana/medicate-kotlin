@@ -293,7 +293,7 @@ class AuthRoutesTest : FunSpec({
                 verify { mockJwtService.validateRefreshToken(refreshToken) }
                 coVerify { mockRedisService.getUser(username) }
                 coVerify { mockRedisService.isUserAdmin(userId.toString()) }
-                every { mockJwtService.generateAccessToken(username, userId.toString(), false) }
+                verify(exactly = 1) { mockJwtService.generateAccessToken(username, userId.toString(), false) }
             }
         }
 
