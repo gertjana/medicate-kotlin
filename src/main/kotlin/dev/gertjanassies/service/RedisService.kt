@@ -1372,7 +1372,8 @@ class RedisService private constructor(
             RedisError.OperationError("Failed to scan user keys: ${e.message}")
         }.bind()
 
-        logger.info("Found ${keys.size} user keys: $keys")
+        logger.info("Found ${keys.size} user keys")
+        logger.debug("User keys: $keys")
 
         val users = keys.mapNotNull { key ->
             Either.catch {
