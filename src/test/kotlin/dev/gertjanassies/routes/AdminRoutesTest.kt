@@ -225,6 +225,7 @@ class AdminRoutesTest : FunSpec({
 
             coEvery { mockStorageService.isUserAdmin(adminUserId.toString()) } returns true.right()
             coEvery { mockStorageService.activateUser(targetUserId) } returns targetUser.right()
+            coEvery { mockStorageService.getAllAdmins() } returns emptySet<String>().right()
 
             testApplication {
                 environment {
@@ -246,11 +247,12 @@ class AdminRoutesTest : FunSpec({
                 }
 
                 response.status shouldBe HttpStatusCode.OK
-                val body = response.body<UserResponse>()
+                val body = response.body<AdminUserResponse>()
                 body.username shouldBe "targetuser"
 
                 coVerify { mockStorageService.isUserAdmin(adminUserId.toString()) }
                 coVerify { mockStorageService.activateUser(targetUserId) }
+                coVerify { mockStorageService.getAllAdmins() }
             }
         }
 
@@ -285,6 +287,49 @@ class AdminRoutesTest : FunSpec({
 
                 coVerify { mockStorageService.isUserAdmin(adminUserId.toString()) }
                 coVerify { mockStorageService.activateUser(targetUserId) }
+            }
+        }
+
+        test("should return 500 when getAllAdmins fails during activate") {
+            val targetUserId = UUID.randomUUID().toString()
+            val targetUser = User(
+                id = UUID.fromString(targetUserId),
+                username = "targetuser",
+                email = "target@example.com",
+                passwordHash = "hash",
+                isActive = true
+            )
+
+            coEvery { mockStorageService.isUserAdmin(adminUserId.toString()) } returns true.right()
+            coEvery { mockStorageService.activateUser(targetUserId) } returns targetUser.right()
+            coEvery { mockStorageService.getAllAdmins() } returns RedisError.OperationError("Database error").left()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        adminRoutes(mockStorageService)
+                    }
+                }
+
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.put("/admin/users/$targetUserId/activate") {
+                    header("Authorization", "Bearer $adminToken")
+                }
+
+                response.status shouldBe HttpStatusCode.InternalServerError
+                val body = response.body<Map<String, String>>()
+                body["error"] shouldBe "Failed to retrieve admin status"
+
+                coVerify { mockStorageService.isUserAdmin(adminUserId.toString()) }
+                coVerify { mockStorageService.activateUser(targetUserId) }
+                coVerify { mockStorageService.getAllAdmins() }
             }
         }
     }
@@ -395,6 +440,49 @@ class AdminRoutesTest : FunSpec({
 
                 coVerify { mockStorageService.isUserAdmin(adminUserId.toString()) }
                 coVerify { mockStorageService.deactivateUser(targetUserId) }
+            }
+        }
+
+        test("should return 500 when getAllAdmins fails during deactivate") {
+            val targetUserId = UUID.randomUUID().toString()
+            val targetUser = User(
+                id = UUID.fromString(targetUserId),
+                username = "targetuser",
+                email = "target@example.com",
+                passwordHash = "hash",
+                isActive = false
+            )
+
+            coEvery { mockStorageService.isUserAdmin(adminUserId.toString()) } returns true.right()
+            coEvery { mockStorageService.deactivateUser(targetUserId) } returns targetUser.right()
+            coEvery { mockStorageService.getAllAdmins() } returns RedisError.OperationError("Database error").left()
+
+            testApplication {
+                environment {
+                    config = MapApplicationConfig()
+                }
+                application {
+                    install(ContentNegotiation) { json() }
+                    installTestJwtAuth()
+                }
+                routing {
+                    authenticate("auth-jwt") {
+                        adminRoutes(mockStorageService)
+                    }
+                }
+
+                val client = createClient { install(io.ktor.client.plugins.contentnegotiation.ContentNegotiation) { json() } }
+                val response = client.put("/admin/users/$targetUserId/deactivate") {
+                    header("Authorization", "Bearer $adminToken")
+                }
+
+                response.status shouldBe HttpStatusCode.InternalServerError
+                val body = response.body<Map<String, String>>()
+                body["error"] shouldBe "Failed to retrieve admin status"
+
+                coVerify { mockStorageService.isUserAdmin(adminUserId.toString()) }
+                coVerify { mockStorageService.deactivateUser(targetUserId) }
+                coVerify { mockStorageService.getAllAdmins() }
             }
         }
     }
