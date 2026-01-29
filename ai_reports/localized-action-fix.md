@@ -28,7 +28,7 @@ Then updated the dialog template to use `localizedAction` instead of `confirmDia
     {$_('admin.confirmTitle', { values: { action: localizedAction } })}
 </h3>
 <p class="mb-6">
-    {$_('admin.confirmMessage', { values: { action: localizedAction } })} 
+    {$_('admin.confirmMessage', { values: { action: localizedAction } })}
     <strong>{confirmDialog.username}</strong>?
 ```
 

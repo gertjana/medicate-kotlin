@@ -76,7 +76,7 @@ class AuthRoutesTest : FunSpec({
             every { mockAsyncCommands.setex(any(), any(), any()) } returns createRedisFutureMock("OK")
 
             // Mock HTTP client for email sending
-            val mockEngine = MockEngine { request ->
+            val mockEngine = MockEngine { _ ->
                 respond(
                     content = ByteReadChannel("""{"id":"$emailId"}"""),
                     status = HttpStatusCode.OK,

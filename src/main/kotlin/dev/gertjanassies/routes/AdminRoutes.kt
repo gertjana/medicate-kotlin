@@ -95,7 +95,7 @@ fun Route.adminRoutes(storageService: StorageService) {
                 { user ->
                     logger.debug("Admin activated user $targetUserId")
                     val adminIdsResult = storageService.getAllAdmins()
-                    
+
                     adminIdsResult.fold(
                         { error ->
                             logger.error("Failed to retrieve admin status for user $targetUserId: ${error.message}")
@@ -143,7 +143,7 @@ fun Route.adminRoutes(storageService: StorageService) {
                 { user ->
                     logger.debug("Admin deactivated user $targetUserId")
                     val adminIdsResult = storageService.getAllAdmins()
-                    
+
                     adminIdsResult.fold(
                         { error ->
                             logger.error("Failed to retrieve admin status for user $targetUserId: ${error.message}")

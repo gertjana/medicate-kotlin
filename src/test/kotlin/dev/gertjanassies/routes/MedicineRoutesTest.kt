@@ -642,8 +642,6 @@ class MedicineRoutesTest : FunSpec({
             val medicineKey = "medicate:$environment:user:$testUserId:medicine:$medicineId"
             val medicine = Medicine(medicineId, "Test Medicine", 500.0, "mg", 100.0)
             val medicineJson = json.encodeToString(medicine)
-            val updatedMedicine = medicine.copy(stock = 99.0)
-            val updatedJson = json.encodeToString(updatedMedicine)
 
             every { mockConnection.async() } returns mockAsyncCommands
             every { mockAsyncCommands.watch(medicineKey) } returns createRedisFutureMock("OK")

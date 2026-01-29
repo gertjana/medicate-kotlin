@@ -31,7 +31,7 @@ class AdminRoutesTest : FunSpec({
     val adminUsername = "adminuser"
     val adminUserId = UUID.randomUUID()
     val adminToken = TestJwtConfig.generateToken(adminUsername, adminUserId.toString(), isAdmin = true)
-    
+
     val regularUsername = "regularuser"
     val regularUserId = UUID.randomUUID()
     val regularToken = TestJwtConfig.generateToken(regularUsername, regularUserId.toString(), isAdmin = false)
