@@ -121,7 +121,8 @@ fun Route.adminRoutes(storageService: StorageService) {
                 },
                 { user ->
                     logger.debug("Admin deactivated user $targetUserId")
-                    call.respond(HttpStatusCode.OK, user.toResponse())
+                    val isAdmin = storageService.isAdmin(targetUserId)
+                    call.respond(HttpStatusCode.OK, AdminUserResponse(user.toResponse(), isAdmin))
                 }
             )
         }
