@@ -22,14 +22,28 @@ fun Route.adminRoutes(storageService: StorageService) {
                 return@intercept finish()
             }
 
-            val isAdminJwt = call.isAdmin()
-            val isAdminRedis = storageService.isUserAdmin(userId).getOrNull() ?: false
+            val isAdminResult = storageService.isUserAdmin(userId)
 
-            if (!isAdminJwt || !isAdminRedis) {
-                logger.warn("Non-admin user $userId attempted to access admin endpoint")
-                call.respond(HttpStatusCode.Forbidden, mapOf("error" to "Admin privileges required"))
-                return@intercept finish()
-            }
+            isAdminResult.fold(
+                { error ->
+                    logger.error("Failed to verify admin status for user $userId", error)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        mapOf("error" to "Failed to verify admin privileges")
+                    )
+                    return@intercept finish()
+                },
+                { isAdmin ->
+                    if (!isAdmin) {
+                        logger.warn("Non-admin user $userId attempted to access admin endpoint")
+                        call.respond(
+                            HttpStatusCode.Forbidden,
+                            mapOf("error" to "Admin privileges required")
+                        )
+                        return@intercept finish()
+                    }
+                }
+            )
         }
 
         get("/users") {
