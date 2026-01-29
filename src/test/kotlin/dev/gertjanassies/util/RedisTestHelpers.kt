@@ -2,7 +2,6 @@ package dev.gertjanassies.util
 
 import io.lettuce.core.KeyScanCursor
 import io.lettuce.core.RedisFuture
-import io.lettuce.core.ScanCursor
 import java.util.concurrent.CompletableFuture
 
 /**
