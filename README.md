@@ -1,6 +1,6 @@
 # Medicate - Medicine Tracking Application
 
-A functional Kotlin REST API service built with Ktor framework, Arrow for functional programming, and Redis for backend storage. Features multi-user support with JWT authentication and complete data isolation per user.
+A functional Kotlin REST API service built with Ktor framework, Arrow for functional programming, and Redis for backend storage. Features multi-user support with JWT authentication, admin user management, and complete data isolation per user.
 
 ## Quick Start
 
@@ -49,6 +49,24 @@ The application can be configured via `src/main/resources/application.conf` or e
 - `APP_ENV` - Environment name for Redis keys (default: test)
 - `RESEND_API_KEY` - API key for Resend email service (for password reset)
 - `APP_URL` - Application URL for password reset emails (default: http://localhost:5173)
+
+## Features
+
+- User Registration & Authentication (JWT-based)
+- Email verification for new accounts
+- Password reset via email
+- Medicine inventory management
+- Dosage schedules with weekly patterns
+- Dosage history tracking
+- Adherence monitoring
+- SQLite medicine database search
+- Admin user management:
+  - View all users
+  - Activate/deactivate accounts
+  - Delete users and all associated data
+  - Role-based access control
+
+For admin setup instructions, see [Admin Setup Guide](ai_reports/admin-setup.md).
 
 ## Technology Stack
 

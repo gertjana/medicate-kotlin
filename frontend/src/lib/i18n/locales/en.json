@@ -7,7 +7,8 @@
     "profile": "Profile",
     "logout": "Logout",
     "login": "Login",
-    "register": "Register"
+    "register": "Register",
+    "adminPanel": "Admin Panel"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -218,5 +219,39 @@
     "addStock": "Add Stock",
     "save": "Save",
     "cancel": "Cancel"
+  },
+  "admin": {
+    "title": "Admin - User Management",
+    "backToHome": "Back to Home",
+    "loadingUsers": "Loading users...",
+    "username": "Username",
+    "email": "Email",
+    "name": "Name",
+    "status": "Status",
+    "role": "Role",
+    "actions": "Actions",
+    "active": "Active",
+    "inactive": "Inactive",
+    "admin": "Admin",
+    "you": "You",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "delete": "Delete",
+    "confirmTitle": "Confirm {action}",
+    "confirmMessage": "Are you sure you want to {action} user",
+    "deleteWarning": "This will permanently delete all user data including medicines, schedules, and history.",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "cannotDeactivateSelf": "Cannot deactivate yourself",
+    "cannotDeleteSelf": "Cannot delete yourself",
+    "activateUser": "Activate user",
+    "deactivateUser": "Deactivate user",
+    "deleteUser": "Delete user and all data",
+    "userActivated": "User {username} activated successfully",
+    "userDeactivated": "User {username} deactivated successfully",
+    "userDeleted": "User {username} deleted successfully",
+    "loadFailed": "Failed to load users",
+    "actionFailed": "Failed to {action} user",
+    "user": "User"
   }
 }

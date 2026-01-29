@@ -328,6 +328,11 @@
 												<button on:click={handleChangePassword} class="text-sm text-blue-600 hover:text-blue-800 hover:underline text-left">
 													{$_('profile.changePassword')}
 												</button>
+												{#if $userStore.isAdmin}
+													<a href="/admin" on:click={() => showProfile = false} class="text-sm text-purple-600 hover:text-purple-800 hover:underline font-semibold">
+														{$_('nav.adminPanel')}
+													</a>
+												{/if}
 											</div>
 										{/if}
 										<button on:click={handleLogout} class="btn btn-nav text-xs">{$_('nav.logout')}</button>

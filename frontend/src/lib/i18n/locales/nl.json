@@ -7,7 +7,8 @@
     "profile": "Profiel",
     "logout": "Uitloggen",
     "login": "Inloggen",
-    "register": "Registreren"
+    "register": "Registreren",
+    "adminPanel": "Beheer Paneel"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -220,5 +221,39 @@
     "addStock": "Voorraad Toevoegen",
     "save": "Opslaan",
     "cancel": "Annuleren"
+  },
+  "admin": {
+    "title": "Admin - Gebruikersbeheer",
+    "backToHome": "Terug naar Home",
+    "loadingUsers": "Gebruikers laden...",
+    "username": "Gebruikersnaam",
+    "email": "E-mail",
+    "name": "Naam",
+    "status": "Status",
+    "role": "Rol",
+    "actions": "Acties",
+    "active": "Actief",
+    "inactive": "Inactief",
+    "admin": "Admin",
+    "you": "Jij",
+    "activate": "Activeren",
+    "deactivate": "Deactiveren",
+    "delete": "Verwijderen",
+    "confirmTitle": "Bevestig {action}",
+    "confirmMessage": "Weet je zeker dat je gebruiker wilt {action}",
+    "deleteWarning": "Dit verwijdert permanent alle gebruikersgegevens inclusief medicijnen, schema's en geschiedenis.",
+    "confirm": "Bevestigen",
+    "cancel": "Annuleren",
+    "cannotDeactivateSelf": "Je kunt jezelf niet deactiveren",
+    "cannotDeleteSelf": "Je kunt jezelf niet verwijderen",
+    "activateUser": "Gebruiker activeren",
+    "deactivateUser": "Gebruiker deactiveren",
+    "deleteUser": "Gebruiker en alle gegevens verwijderen",
+    "userActivated": "Gebruiker {username} succesvol geactiveerd",
+    "userDeactivated": "Gebruiker {username} succesvol gedeactiveerd",
+    "userDeleted": "Gebruiker {username} succesvol verwijderd",
+    "loadFailed": "Gebruikers laden mislukt",
+    "actionFailed": "Kan gebruiker niet {action}",
+    "user": "Gebruiker"
   }
 }

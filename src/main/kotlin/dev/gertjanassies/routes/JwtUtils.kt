@@ -23,3 +23,11 @@ fun ApplicationCall.getUserId(): String? {
     val principal = principal<JWTPrincipal>()
     return principal?.payload?.getClaim("userId")?.asString()
 }
+
+/**
+ * Check if the current user is an admin
+ */
+fun ApplicationCall.isAdmin(): Boolean {
+    val principal = principal<JWTPrincipal>()
+    return principal?.payload?.getClaim("isAdmin")?.asBoolean() ?: false
+}

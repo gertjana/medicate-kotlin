@@ -114,9 +114,12 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
 
             val user = loginResult.getOrNull()!!
 
+            // Check if user is admin
+            val isAdmin = storageService.isUserAdmin(user.id.toString()).getOrNull() ?: false
+
             // Generate JWT tokens for logged in user
-            val accessToken = jwtService.generateAccessToken(user.username, user.id.toString())
-            val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString())
+            val accessToken = jwtService.generateAccessToken(user.username, user.id.toString(), isAdmin)
+            val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString(), isAdmin)
 
             // Set refresh token as HttpOnly cookie
             call.response.cookies.append(
@@ -134,7 +137,7 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
             logger.debug("Successfully logged in user '${request.username}' and generated JWT tokens")
             call.respond(
                 HttpStatusCode.OK,
-                AuthResponse(user = user.toResponse(), token = accessToken, refreshToken = "") // Don't send refresh token in response
+                AuthResponse(user = user.toResponse(isAdmin), token = accessToken, refreshToken = "")
             )
         }
 
@@ -201,8 +204,9 @@ fun Route.protectedUserRoutes(storageService: StorageService) {
                     call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Failed to retrieve profile"))
                 },
                 { user ->
+                    val isAdmin = storageService.isUserAdmin(userId).getOrNull() ?: false
                     logger.debug("Successfully retrieved profile for user ID '$userId' (username: '${user.username}')")
-                    call.respond(HttpStatusCode.OK, user.toResponse())
+                    call.respond(HttpStatusCode.OK, user.toResponse(isAdmin))
                 }
             )
         }
@@ -252,8 +256,9 @@ fun Route.protectedUserRoutes(storageService: StorageService) {
                     call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Failed to update profile. Email may already be in use."))
                 },
                 { user ->
+                    val isAdmin = storageService.isUserAdmin(user.id.toString()).getOrNull() ?: false
                     logger.debug("Successfully updated profile for user '$username'")
-                    call.respond(HttpStatusCode.OK, user.toResponse())
+                    call.respond(HttpStatusCode.OK, user.toResponse(isAdmin))
                 }
             )
         }
