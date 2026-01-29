@@ -67,7 +67,7 @@
        - Accepted risk: Users with same username must have different passwords
        - See: `ai_reports/MULTIPLE_USERS_SAME_USERNAME.md`
 
- - [ ] **Security**
+ - [x] **Security**
    - [x] Don't give away information about whether username/email exists on login/register/reset password
    - [x] **Add rate limiting to register/login to prevent brute-force attacks**
          - Implemented in nginx reverse proxy (most efficient)

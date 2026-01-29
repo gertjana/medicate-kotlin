@@ -254,6 +254,12 @@ User data is stored in Redis as JSON strings with the following key patterns:
 5. Write tests for both service and route layers
 6. Update this documentation if adding significant functionality
 
+### Testing
+1. Write unit tests for new services
+2. Write route tests for new endpoints
+3. Only mock external dependencies (Redis, SQLite), never mock internal services
+4. Validate if tests are adding value, not just coverage
+
 ### Security Considerations
 
 - Never log sensitive data (passwords, tokens)
