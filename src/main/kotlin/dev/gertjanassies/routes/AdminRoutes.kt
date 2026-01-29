@@ -84,6 +84,7 @@ fun Route.adminRoutes(storageService: StorageService) {
                 return@put
             }
 
+            val currentUserId = call.getUserId()
             val result = storageService.activateUser(targetUserId)
 
             result.fold(
@@ -93,18 +94,27 @@ fun Route.adminRoutes(storageService: StorageService) {
                 },
                 { user ->
                     logger.debug("Admin activated user $targetUserId")
-                    val currentUserId = call.getUserId()
-                    val adminIds = storageService.getAllAdmins().getOrNull() ?: emptySet()
-                    call.respond(HttpStatusCode.OK, AdminUserResponse(
-                        id = user.id.toString(),
-                        username = user.username,
-                        email = user.email,
-                        firstName = user.firstName,
-                        lastName = user.lastName,
-                        isActive = user.isActive,
-                        isAdmin = adminIds.contains(user.id.toString()),
-                        isSelf = user.id.toString() == currentUserId
-                    ))
+                    val adminIdsResult = storageService.getAllAdmins()
+                    
+                    adminIdsResult.fold(
+                        { error ->
+                            logger.error("Failed to retrieve admin status for user $targetUserId: ${error.message}")
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Failed to retrieve admin status"))
+                        },
+                        { adminIds ->
+                            val response = AdminUserResponse(
+                                id = user.id.toString(),
+                                username = user.username,
+                                email = user.email,
+                                firstName = user.firstName,
+                                lastName = user.lastName,
+                                isActive = user.isActive,
+                                isAdmin = adminIds.contains(targetUserId),
+                                isSelf = targetUserId == currentUserId
+                            )
+                            call.respond(HttpStatusCode.OK, response)
+                        }
+                    )
                 }
             )
         }
@@ -132,17 +142,27 @@ fun Route.adminRoutes(storageService: StorageService) {
                 },
                 { user ->
                     logger.debug("Admin deactivated user $targetUserId")
-                    val adminIds = storageService.getAllAdmins().getOrNull() ?: emptySet()
-                    call.respond(HttpStatusCode.OK, AdminUserResponse(
-                        id = user.id.toString(),
-                        username = user.username,
-                        email = user.email,
-                        firstName = user.firstName,
-                        lastName = user.lastName,
-                        isActive = user.isActive,
-                        isAdmin = adminIds.contains(user.id.toString()),
-                        isSelf = user.id.toString() == currentUserId
-                    ))
+                    val adminIdsResult = storageService.getAllAdmins()
+                    
+                    adminIdsResult.fold(
+                        { error ->
+                            logger.error("Failed to retrieve admin status for user $targetUserId: ${error.message}")
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "Failed to retrieve admin status"))
+                        },
+                        { adminIds ->
+                            val response = AdminUserResponse(
+                                id = user.id.toString(),
+                                username = user.username,
+                                email = user.email,
+                                firstName = user.firstName,
+                                lastName = user.lastName,
+                                isActive = user.isActive,
+                                isAdmin = adminIds.contains(targetUserId),
+                                isSelf = targetUserId == currentUserId
+                            )
+                            call.respond(HttpStatusCode.OK, response)
+                        }
+                    )
                 }
             )
         }
