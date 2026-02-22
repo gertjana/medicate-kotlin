@@ -231,11 +231,9 @@ export async function searchMedicines(query: string): Promise<MedicineSearchResu
 	if (query.length < 2) {
 		return [];
 	}
-	const response = await fetch(`${API_BASE}/medicines/search?q=${encodeURIComponent(query)}`);
-	if (!response.ok) {
-		return [];
-	}
-	return response.json();
+	return authenticatedFetch(`${API_BASE}/medicines/search?q=${encodeURIComponent(query)}`, {
+		cache: 'no-store'
+	});
 }
 
 export async function getMedicine(id: string): Promise<Medicine> {
