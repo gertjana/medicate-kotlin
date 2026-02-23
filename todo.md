@@ -157,7 +157,7 @@ Full report: `ai_reports/SECURITY_AUDIT.md`
 - [x] **F-LOW-3** Google Fonts loaded with no SRI — self-hosted Roboto Mono (`frontend/static/fonts/`, `app.html`)
 - [x] **F-LOW-4** Frontend minimum password length is 6 characters — increased to 8 (`+layout.svelte`)
 - [x] **I-LOW-1** Docker container runs as root — added `appuser` + `su-exec` (`Dockerfile`, `deployment/start.sh`)
-- [x] **I-LOW-2** No Gradle dependency checksum verification — generated `gradle/verification-metadata.xml`
+- [-] **I-LOW-2** No Gradle dependency checksum verification — N/A: too high maintenance cost for this project's threat model; dependency CVEs monitored via Dependabot
 - [x] **I-LOW-3** nginx debug logging in production — changed to `main` log format (`nginx.conf`)
 - [x] **I-LOW-4** `client_max_body_size 10M` too large for a JSON API — reduced to `1M` (`nginx.conf`)
 
