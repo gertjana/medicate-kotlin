@@ -120,7 +120,7 @@ Full report: `ai_reports/SECURITY_AUDIT.md`
 - [x] **B-HIGH-1** Refresh token cookie `secure=false` — set `secure` via `secureCookies` flag (configurable via `SECURE_COOKIES` env var; default `false`, must be set to `true` in production)
 - [x] **B-HIGH-2** Logout doesn't invalidate refresh token server-side — tokens stored in Redis (`$keyPrefix:refresh-token:<token>`), deleted on logout; per-user set for bulk invalidation
 - [-] **B-HIGH-3** No application-layer rate limiting on login/register/reset — N/A: already handled in `deployment/nginx.conf` (auth: 5 req/min, reset: 1 req/min, general: 60 req/min)
-- [x] **B-HIGH-4** Client controls dosage timestamps — use server-side `LocalDateTime.now()` (`DosageHistoryRequest.kt:16`)
+- [-] **B-HIGH-4** Client controls dosage timestamps — accepted risk: optional `datetime` field retained for "Take All missed doses" feature (records dose at scheduled past time); server falls back to `LocalDateTime.now()` when omitted
 - [x] **B-HIGH-5** `deleteUserCompletely` uses wrong Redis key patterns — fixed to `$keyPrefix:user:$userId:medicine:*` etc. (`RedisService.kt`)
 - [x] **B-HIGH-6** No token invalidation on password change — `resetPasswordWithToken` now calls `invalidateAllRefreshTokensForUser` (`RedisService.kt`)
 - [x] **F-HIGH-1** SvelteKit API proxy routes drop Authorization header — all protected proxy routes now forward `Authorization` from the incoming request
