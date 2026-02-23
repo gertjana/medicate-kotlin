@@ -94,6 +94,8 @@ fun Application.module() {
             }
         )
     }
+    fun configOrEnv(configKey: String, envKey: String): String? =
+        environment.config.propertyOrNull(configKey)?.getString() ?: System.getenv(envKey)
 
     // Initialize Redis service
     val redisHost = configOrEnv("redis.host", "REDIS_HOST") ?: "localhost"
@@ -102,8 +104,6 @@ fun Application.module() {
     val redisToken = configOrEnv("redis.token", "REDIS_TOKEN") ?: ""
     val redisTls = configOrEnv("redis.tls", "REDIS_TLS")?.lowercase() == "true"
 
-    fun configOrEnv(configKey: String, envKey: String): String? =
-        environment.config.propertyOrNull(configKey)?.getString() ?: System.getenv(envKey)
 
     val redisService: StorageService = RedisService(redisHost, redisPort, redisToken, appEnvironment, redisTls)
 
