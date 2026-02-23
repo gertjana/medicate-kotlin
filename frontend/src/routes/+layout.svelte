@@ -98,8 +98,8 @@
 				authError = 'A valid email is required';
 				return;
 			}
-			if (password.length < 6) {
-				authError = 'Password must be at least 6 characters';
+			if (password.length < 8) {
+				authError = 'Password must be at least 8 characters';
 				return;
 			}
 		}
@@ -388,7 +388,7 @@
 						class="input w-full"
 						placeholder={$_('auth.enterPassword')}
 						required
-						minlength="6"
+						minlength="8"
 					/>
 					{#if authMode === 'register'}
 						<p class="text-xs text-gray-600 mt-1">{$_('auth.minPasswordLength')}</p>

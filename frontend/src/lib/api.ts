@@ -186,8 +186,8 @@ async function handleApiResponse(response: Response, retryFn?: () => Promise<Res
 		if (browser) {
 			setAccessToken(null);
 			localStorage.removeItem('medicate_user');
-			// Reload to show login page
-			window.location.reload();
+			// Navigate to root to show login page (reload avoided to prevent looping)
+			window.location.href = '/';
 		}
 		throw new Error('Session expired. Please login again.');
 	}
