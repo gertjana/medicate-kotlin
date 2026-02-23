@@ -55,8 +55,10 @@ interface StorageService {
     suspend fun verifyPasswordResetToken(token: String): Either<RedisError, String>
 
     /**
-     * Verify a password reset token and update the password atomically.
-     * The token is consumed (deleted) on success.
+     * Verify a password reset token and update the password.
+     *
+     * The token is consumed (deleted) as part of the verification step before the password update,
+     * and the overall operation is not guaranteed to be atomic across all underlying Redis calls.
      */
     suspend fun resetPasswordWithToken(token: String, newPassword: String): Either<RedisError, Unit>
 
