@@ -1025,12 +1025,18 @@ class RedisService private constructor(
     }
 
     /**
-     * Verify a password reset token and update the password atomically.
-     * The token is consumed (deleted) on success, preventing reuse.
+     * Verify a password reset token and update the password.
+     * The token is consumed (deleted) only after a successful password update, so the
+     * user can retry if the update fails.
      */
     override suspend fun resetPasswordWithToken(token: String, newPassword: String): Either<RedisError, Unit> = either {
-        // Verify and consume the token — returns the userId
-        val userId = verifyPasswordResetToken(token).bind()
+        val tokenKey = "$keyPrefix:password_reset:token:$token"
+        val asyncCommands = connection?.async() ?: raise(RedisError.OperationError("Not connected"))
+
+        // Peek at the token to get userId without deleting it yet
+        val userId = get(tokenKey).bind() ?: raise(
+            RedisError.NotFound("Invalid or expired password reset token")
+        )
 
         // Look up the user by ID
         val user = getUserById(userId).bind()
@@ -1041,12 +1047,19 @@ class RedisService private constructor(
             val newPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt())
             val updatedUser = user.copy(passwordHash = newPasswordHash)
             val updatedJsonString = json.encodeToString(updatedUser)
-            connection?.async()?.set(userKey, updatedJsonString)?.await() ?: throw IllegalStateException("Not connected")
+            asyncCommands.set(userKey, updatedJsonString).await() ?: throw IllegalStateException("Failed to update user password in Redis")
         }.mapLeft { e ->
             when (e) {
                 is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
                 else -> RedisError.OperationError("Failed to update password: ${e.message}")
             }
+        }.bind()
+
+        // Only consume (delete) the token after the password update succeeds
+        Either.catch {
+            asyncCommands.del(tokenKey).await()
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to delete reset token: ${e.message}")
         }.bind()
 
         // Invalidate all active sessions — prevent stolen tokens from being used after password change
