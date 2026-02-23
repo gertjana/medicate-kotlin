@@ -123,11 +123,7 @@ fun Application.module() {
     // Initialize JWT Service
     val jwtSecret = environment.config.propertyOrNull("jwt.secret")?.getString()
         ?: System.getenv("JWT_SECRET")
-        ?: "default-secret-change-in-production"
-
-    if (jwtSecret.startsWith("default-secret")) {
-        log.warn("⚠️  Using default JWT secret! Set JWT_SECRET environment variable in production!")
-    }
+        ?: throw IllegalStateException("JWT_SECRET environment variable must be set")
 
     val jwtService = JwtService(jwtSecret)
 

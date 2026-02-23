@@ -14,6 +14,7 @@ class ApplicationTest {
         environment {
             config = MapApplicationConfig().apply {
                 put("app.serveStatic", "false")
+                put("jwt.secret", "test-secret-key-for-testing-only")
             }
         }
 
@@ -35,6 +36,7 @@ class ApplicationTest {
         environment {
             config = MapApplicationConfig().apply {
                 put("app.serveStatic", "true")
+                put("jwt.secret", "test-secret-key-for-testing-only")
             }
         }
 
@@ -53,6 +55,7 @@ class ApplicationTest {
         environment {
             config = MapApplicationConfig().apply {
                 put("app.serveStatic", "false")
+                put("jwt.secret", "test-secret-key-for-testing-only")
             }
         }
 
@@ -74,6 +77,7 @@ class ApplicationTest {
         environment {
             config = MapApplicationConfig().apply {
                 put("app.serveStatic", "false")
+                put("jwt.secret", "test-secret-key-for-testing-only")
             }
         }
 
@@ -91,6 +95,7 @@ class ApplicationTest {
         environment {
             config = MapApplicationConfig().apply {
                 put("app.serveStatic", "false")
+                put("jwt.secret", "test-secret-key-for-testing-only")
             }
         }
 
@@ -120,6 +125,7 @@ class ApplicationTest {
         environment {
             config = MapApplicationConfig().apply {
                 put("app.serveStatic", "false")
+                put("jwt.secret", "test-secret-key-for-testing-only")
             }
         }
 
