@@ -1026,14 +1026,14 @@ class RedisService private constructor(
 
     /**
      * Verify a password reset token and update the password.
-     * The token is consumed (deleted) only after a successful password update, so the
-     * user can retry if the update fails.
+     * The token is consumed (deleted) only after a successful password update,
+     * so the user can retry if the update fails.
      */
     override suspend fun resetPasswordWithToken(token: String, newPassword: String): Either<RedisError, Unit> = either {
         val tokenKey = "$keyPrefix:password_reset:token:$token"
         val asyncCommands = connection?.async() ?: raise(RedisError.OperationError("Not connected"))
 
-        // Peek at the token to get userId without deleting it yet
+        // Look up the userId without deleting the token yet
         val userId = get(tokenKey).bind() ?: raise(
             RedisError.NotFound("Invalid or expired password reset token")
         )
@@ -1055,12 +1055,13 @@ class RedisService private constructor(
             }
         }.bind()
 
-        // Only consume (delete) the token after the password update succeeds
+        // Only consume the token after the password update succeeded (one-time use)
         Either.catch {
             asyncCommands.del(tokenKey).await()
-        }.mapLeft { e ->
-            RedisError.OperationError("Failed to delete reset token: ${e.message}")
-        }.bind()
+        }.fold(
+            ifLeft = { e -> logger.error("SECURITY: Failed to delete reset token after successful password update. Token may be reused until expiry. Error: ${e.message}") },
+            ifRight = { logger.debug("Successfully consumed password reset token") }
+        )
 
         // Invalidate all active sessions — prevent stolen tokens from being used after password change
         invalidateAllRefreshTokensForUser(userId).fold(

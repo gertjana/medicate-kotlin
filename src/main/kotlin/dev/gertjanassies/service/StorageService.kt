@@ -56,8 +56,8 @@ interface StorageService {
 
     /**
      * Verify a password reset token and update the password.
-     * The token is consumed (deleted) only after a successful password update, so the
-     * user can retry if the update fails.
+     * The token is consumed (deleted) only after a successful password update,
+     * so the operation is not guaranteed to be atomic across all underlying Redis calls.
      */
     suspend fun resetPasswordWithToken(token: String, newPassword: String): Either<RedisError, Unit>
 
