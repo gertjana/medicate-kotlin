@@ -6,13 +6,17 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.routing.*
+import io.ktor.server.config.*
 import io.ktor.server.testing.*
 
 class HealthRoutesTest : FunSpec({
     context("GET /health") {
         test("should return 200 OK") {
             testApplication {
-                routing { healthRoutes() }
+                    environment {
+                        config = MapApplicationConfig()
+                    }
+                    routing { healthRoutes() }
 
                 val response = client.get("/health")
 
