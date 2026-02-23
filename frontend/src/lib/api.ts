@@ -105,6 +105,22 @@ export function setAccessToken(token: string | null): void {
 	accessToken = token;
 }
 
+// Parse isAdmin from a JWT access token without verifying the signature.
+// Server-side verification already happened; this is only for UI display.
+export function parseIsAdminFromToken(token: string): boolean {
+	try {
+		const payloadB64 = token.split('.')[1];
+		if (!payloadB64) return false;
+		// Replace URL-safe base64 chars and pad
+		const padded = payloadB64.replace(/-/g, '+').replace(/_/g, '/');
+		const json = atob(padded);
+		const payload = JSON.parse(json);
+		return payload.isAdmin === true;
+	} catch {
+		return false;
+	}
+}
+
 // Helper function to get headers with JWT token
 function getHeaders(includeContentType: boolean = false, locale?: string): HeadersInit {
 	const headers: HeadersInit = {};
@@ -385,12 +401,16 @@ export async function loginUser(username: string, password: string): Promise<Use
 
 	// Store user in localStorage and access token in memory
 	// Refresh token is in HttpOnly cookie (set by server)
+	// isAdmin is intentionally NOT persisted to localStorage — read from JWT claims instead
 	if (browser) {
-		localStorage.setItem('medicate_user', JSON.stringify(authResponse.user));
+		const { isAdmin: _stripped, ...userWithoutAdmin } = authResponse.user;
+		localStorage.setItem('medicate_user', JSON.stringify(userWithoutAdmin));
 		setAccessToken(authResponse.token);
 	}
 
-	return authResponse.user;
+	// Enrich user object with isAdmin from JWT (not from server response body, not from localStorage)
+	const isAdmin = parseIsAdminFromToken(authResponse.token);
+	return { ...authResponse.user, isAdmin };
 }
 
 export async function requestPasswordReset(email: string, locale: string = 'en'): Promise<{ message: string; emailId: string }> {
@@ -411,24 +431,11 @@ export async function requestPasswordReset(email: string, locale: string = 'en')
 	return response.json();
 }
 
-export async function verifyResetToken(token: string): Promise<{ username: string }> {
-	const response = await fetch(`${API_BASE}/auth/verifyResetToken`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ token })
-	});
-	if (!response.ok) {
-		const error = await response.json();
-		throw new Error(error.error || 'Invalid or expired token');
-	}
-	return response.json();
-}
-
-export async function updatePassword(username: string, newPassword: string): Promise<void> {
+export async function updatePassword(token: string, newPassword: string): Promise<void> {
 	const response = await fetch(`${API_BASE}/auth/updatePassword`, {
 		method: 'PUT',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ username, password: newPassword })
+		body: JSON.stringify({ token, password: newPassword })
 	});
 	if (!response.ok) {
 		const error = await response.json();
@@ -475,12 +482,15 @@ export async function updateProfile(email: string, firstName: string, lastName: 
 		body: JSON.stringify({ email, firstName, lastName })
 	});
 
-	// Update stored user in localStorage
+	// Update stored user in localStorage — strip isAdmin so it's never persisted
 	if (browser) {
-		localStorage.setItem('medicate_user', JSON.stringify(user));
+		const { isAdmin: _stripped, ...userWithoutAdmin } = user;
+		localStorage.setItem('medicate_user', JSON.stringify(userWithoutAdmin));
 	}
 
-	return user;
+	// Re-attach isAdmin from current in-memory token
+	const isAdmin = accessToken ? parseIsAdminFromToken(accessToken) : false;
+	return { ...user, isAdmin };
 }
 
 // Request password change (sends email with reset link)
@@ -506,7 +516,7 @@ export async function requestPasswordChange(email: string, locale: string = 'en'
 // Helper to check if user is logged in
 export function isLoggedIn(): boolean {
 	if (!browser) return false;
-	return localStorage.getItem('medicate_token') !== null;
+	return accessToken !== null || localStorage.getItem('medicate_user') !== null;
 }
 
 // Helper to get current user

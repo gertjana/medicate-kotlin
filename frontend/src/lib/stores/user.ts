@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import type { User } from '$lib/api';
-import { setAccessToken, getAccessToken } from '$lib/api';
+import { setAccessToken, getAccessToken, parseIsAdminFromToken } from '$lib/api';
 
 const STORAGE_KEY = 'medicate_user';
 
@@ -13,7 +13,9 @@ function createUserStore() {
 		set,
 		login: (user: User) => {
 			if (browser) {
-				localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+				// Strip isAdmin before persisting — it is derived from the JWT token at runtime
+				const { isAdmin: _stripped, ...userWithoutAdmin } = user;
+				localStorage.setItem(STORAGE_KEY, JSON.stringify(userWithoutAdmin));
 			}
 			set(user);
 		},
@@ -36,7 +38,6 @@ function createUserStore() {
 						// Access token is lost on page refresh (in memory)
 						// Try to refresh it using the HttpOnly cookie
 						if (!getAccessToken()) {
-							const { default: api } = await import('$lib/api');
 							// Try to refresh access token from cookie
 							try {
 								const response = await fetch('/api/auth/refresh', {
@@ -46,13 +47,20 @@ function createUserStore() {
 								if (response.ok) {
 									const data = await response.json();
 									setAccessToken(data.token);
+									// Derive isAdmin from the fresh token — do not trust localStorage
+									const isAdmin = parseIsAdminFromToken(data.token);
+									set({ ...user, isAdmin });
 								} else {
 									// Refresh token expired or invalid, logout
-									this.logout();
+									const { logout } = await import('$lib/api');
+									await logout();
+									set(null);
 								}
 							} catch (e) {
 								console.error('Failed to refresh token on init:', e);
-								this.logout();
+								const { logout } = await import('$lib/api');
+								await logout();
+								set(null);
 							}
 						}
 					} catch (e) {

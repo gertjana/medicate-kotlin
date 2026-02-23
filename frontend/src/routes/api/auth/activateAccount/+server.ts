@@ -10,5 +10,13 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
     body
   });
   const data = await res.text();
-  return new Response(data, { status: res.status, headers: { 'Content-Type': 'application/json' } });
+
+  // Forward Set-Cookie from backend so the HttpOnly refresh token cookie reaches the browser
+  const responseHeaders = new Headers({ 'Content-Type': 'application/json' });
+  const setCookie = res.headers.get('set-cookie');
+  if (setCookie) {
+    responseHeaders.set('set-cookie', setCookie);
+  }
+
+  return new Response(data, { status: res.status, headers: responseHeaders });
 };

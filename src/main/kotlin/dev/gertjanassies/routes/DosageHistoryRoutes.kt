@@ -32,7 +32,7 @@ fun Route.dosageHistoryRoutes(storageService: StorageService) {
             call.respond(HttpStatusCode.OK, histories)
         }.onLeft { error ->
             logger.error("Failed to get dosage histories for user ID '$userId': ${error.message}")
-            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
         }
     }
 
@@ -65,7 +65,7 @@ fun Route.dosageHistoryRoutes(storageService: StorageService) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
                 else ->
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
             }
         }
     }

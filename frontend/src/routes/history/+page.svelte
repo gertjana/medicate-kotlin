@@ -136,22 +136,17 @@
 
 	async function takeAllMissing(dateObj: Date, time: string, scheduledMedicines: { medicineId: string; amount: number }[]) {
 		try {
-			// Parse scheduled time to construct datetime
+			// Build a datetime representing the scheduled time on the missed day.
+			// Parse HH:mm from the scheduled time string and combine with the past date.
 			const [hours, minutes] = time.split(':').map(Number);
-			const doseDatetime = new Date(dateObj);
-			doseDatetime.setHours(hours, minutes, 0, 0);
-
-			// Format as ISO local datetime (without timezone): "2026-01-05T08:00:00"
-			const year = doseDatetime.getFullYear();
-			const month = String(doseDatetime.getMonth() + 1).padStart(2, '0');
-			const day = String(doseDatetime.getDate()).padStart(2, '0');
-			const hour = String(doseDatetime.getHours()).padStart(2, '0');
-			const minute = String(doseDatetime.getMinutes()).padStart(2, '0');
-			const second = String(doseDatetime.getSeconds()).padStart(2, '0');
-			const datetimeString = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+			const dt = new Date(dateObj);
+			dt.setHours(hours, minutes, 0, 0);
+			// Format as ISO local datetime (no timezone) matching backend LocalDateTimeSerializer
+			const pad = (n: number) => String(n).padStart(2, '0');
+			const datetime = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}:00`;
 
 			for (const med of scheduledMedicines) {
-				await takeDose(med.medicineId, med.amount, time, datetimeString);
+				await takeDose(med.medicineId, med.amount, time, datetime);
 			}
 			const medicineNames = scheduledMedicines.map(m => getMedicineName(m.medicineId)).join(', ');
 			showToastNotification($_('history.recorded', { values: { medicines: medicineNames } }));
@@ -218,7 +213,7 @@
 		<div class="card text-center py-12">
 			<h2 class="text-2xl font-bold mb-4">{$_('dashboard.welcomeTitle')}</h2>
 			<p class="text-gray-600 mb-6">
-				{@html $_('dashboard.pleaseLogin')}
+				{$_('dashboard.pleaseLogin')}
 			</p>
 		</div>
 	</div>

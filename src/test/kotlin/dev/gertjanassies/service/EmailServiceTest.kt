@@ -87,12 +87,12 @@ class EmailServiceTest : FunSpec({
             val emailId = result.getOrNull()!!
             emailId shouldBe "email_123456"
 
-            // Verify Redis setex was called with TTL and user ID (not username)
+            // Verify Redis setex was called with TTL and user ID as value, new key format
             verify(exactly = 1) {
                 mockAsyncCommands.setex(
-                    match { it.startsWith("medicate:test:password_reset:${user.id}:") },
+                    match { it.startsWith("medicate:test:password_reset:token:") },
                     3600L, // 1 hour TTL
-                    user.id.toString() // Store user ID as value (changed from username)
+                    user.id.toString() // Store user ID as value
                 )
             }
         }
@@ -358,7 +358,7 @@ class EmailServiceTest : FunSpec({
             capturedEmailBody shouldContain "test@example.com"
             capturedEmailBody shouldContain "Verify Your Medicate Account"
             capturedEmailBody shouldContain "John Doe"
-            capturedEmailBody shouldContain "activate-account?token="
+            capturedEmailBody shouldContain "activate-account#token="
         }
 
         test("should return InvalidEmail error for blank email") {

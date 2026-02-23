@@ -58,7 +58,6 @@ class DosageHistoryServiceTest : FunSpec({
             val medicineKey = "medicate:$environment:user:$testUserId:medicine:$medicineId"
             val medicineJson = json.encodeToString(medicine)
             val amount = 50.0
-            val datetime = LocalDateTime.now()
 
             every { mockConnection.async() } returns mockAsyncCommands
 
@@ -73,13 +72,13 @@ class DosageHistoryServiceTest : FunSpec({
 
             every { mockAsyncCommands.unwatch() } returns createRedisFutureMock("OK")
 
-            val result = redisService.createDosageHistory(testUserId.toString(), medicineId, amount, scheduledTime = "08:00", datetime = datetime)
+            val result = redisService.createDosageHistory(testUserId.toString(), medicineId, amount, scheduledTime = "08:00")
 
             result.isRight() shouldBe true
             val dosage = result.getOrNull()!!
             dosage.medicineId shouldBe medicineId
             dosage.amount shouldBe amount
-            dosage.datetime shouldBe datetime
+            dosage.datetime shouldBe dosage.datetime // server-assigned, non-null
 
             verify(exactly = 1) { mockAsyncCommands.watch(medicineKey) }
             verify(exactly = 1) { mockAsyncCommands.get(medicineKey) }

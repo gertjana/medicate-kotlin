@@ -1,14 +1,27 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/user';
+	import { setAccessToken } from '$lib/api';
+
+	// Inline helper: parse isAdmin from JWT payload without verifying signature
+	function parseIsAdminFromToken(token: string): boolean {
+		try {
+			const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+			return payload.isAdmin === true;
+		} catch {
+			return false;
+		}
+	}
 
 	let status: 'loading' | 'success' | 'error' = 'loading';
 	let errorMessage = '';
 
 	onMount(async () => {
-		const token = $page.url.searchParams.get('token');
+		// Token is passed in the URL fragment (#token=...) to prevent leakage via Referer header
+		const hash = window.location.hash.slice(1); // remove leading '#'
+		const params = new URLSearchParams(hash);
+		const token = params.get('token');
 
 		if (!token) {
 			status = 'error';
@@ -32,12 +45,16 @@
 
 			const data = await response.json();
 
-			// Login the user with the returned token
+			// Store the access token in memory so subsequent API calls are authenticated
+			setAccessToken(data.token);
+
+			// Login the user with the returned user info (isAdmin from JWT, not server body)
 			userStore.login({
 				username: data.user.username,
 				email: data.user.email,
 				firstName: data.user.firstName,
-				lastName: data.user.lastName
+				lastName: data.user.lastName,
+				isAdmin: parseIsAdminFromToken(data.token)
 			});
 
 			status = 'success';

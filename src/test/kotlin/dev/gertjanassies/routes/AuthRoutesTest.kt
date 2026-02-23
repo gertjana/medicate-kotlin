@@ -2,12 +2,12 @@ package dev.gertjanassies.routes
 
 import dev.gertjanassies.model.User
 import dev.gertjanassies.model.request.PasswordResetRequest
+import dev.gertjanassies.model.request.PasswordUpdateRequest
 import dev.gertjanassies.model.request.VerifyResetTokenRequest
 import dev.gertjanassies.service.EmailService
 import dev.gertjanassies.service.JwtService
 import dev.gertjanassies.service.RedisService
 import dev.gertjanassies.util.createFailedRedisFutureMock
-import dev.gertjanassies.util.createKeyScanCursorMock
 import dev.gertjanassies.util.createRedisFutureMock
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.maps.shouldContainKey
@@ -93,7 +93,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -124,7 +124,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -158,7 +158,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -194,7 +194,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -236,7 +236,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -282,7 +282,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -324,7 +324,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -349,12 +349,15 @@ class AuthRoutesTest : FunSpec({
             val userJson = json.encodeToString(user)
             val refreshToken = jwtService.generateRefreshToken(username, userId.toString())
 
-            // Mock Redis operations for getUser
+            // Mock Redis operations for getUser and isRefreshTokenValid
             every { mockConnection.async() } returns mockAsyncCommands
             val usernameIndexKey = "medicate:$environment:user:username:$username"
             every { mockAsyncCommands.get(usernameIndexKey) } returns createRedisFutureMock(userId.toString())
             val userKey = "medicate:$environment:user:id:$userId"
             every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+            // Simulate token present in store
+            val tokenStoreKey = "medicate:$environment:refresh-token:$refreshToken"
+            every { mockAsyncCommands.get(tokenStoreKey) } returns createRedisFutureMock(userId.toString())
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
@@ -366,7 +369,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/refresh") {
@@ -395,7 +398,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/refresh") {
@@ -420,7 +423,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/refresh") {
@@ -445,7 +448,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/refresh") {
@@ -460,69 +463,65 @@ class AuthRoutesTest : FunSpec({
         }
     }
 
-    context("POST /auth/verifyResetToken") {
-        test("should verify token and return username successfully") {
+    context("PUT /auth/updatePassword") {
+        test("should reset password successfully with valid token") {
             val token = "valid-token-123"
             val userId = java.util.UUID.randomUUID()
             val username = "testuser"
-            val request = VerifyResetTokenRequest(token)
-            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = "hash")
+            val newPassword = "newpassword123"
+            val request = PasswordUpdateRequest(token = token, password = newPassword)
+            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = "oldhash")
             val userJson = json.encodeToString(user)
 
-            // Mock Redis operations - use scan to find the key
+            // Mock Redis for resetPasswordWithToken:
+            // 1. GET password_reset:token:{token} -> userId (peek, no delete yet)
+            // 2. getUserById: GET user:id:{userId} -> user
+            // 3. updatePassword: SET user data
+            // 4. DEL password_reset:token:{token} (only after successful update)
             every { mockConnection.async() } returns mockAsyncCommands
-            val tokenKey = "medicate:$environment:password_reset:$userId:$token"
-            val scanCursor = createKeyScanCursorMock(listOf(tokenKey), isFinished = true)
-            every {
-                mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>())
-            } returns createRedisFutureMock(scanCursor)
+            val tokenKey = "medicate:$environment:password_reset:token:$token"
             every { mockAsyncCommands.get(tokenKey) } returns createRedisFutureMock(userId.toString())
+            every { mockAsyncCommands.del(tokenKey) } returns createRedisFutureMock(1L)
             val userKey = "medicate:$environment:user:id:$userId"
             every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
-            every { mockAsyncCommands.del(tokenKey) } returns createRedisFutureMock(1L)
+            every { mockAsyncCommands.set(userKey, any()) } returns createRedisFutureMock("OK")
 
-            // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
             HttpClient(mockEngine).use { httpClient ->
                 emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
                 testApplication {
-                    environment {
-                        config = MapApplicationConfig()
-                    }
+                    environment { config = MapApplicationConfig() }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
-                    val response = client.post("/auth/verifyResetToken") {
+                    val response = client.put("/auth/updatePassword") {
                         contentType(ContentType.Application.Json)
                         setBody(request)
                     }
 
                     response.status shouldBe HttpStatusCode.OK
                     val body = response.body<Map<String, String>>()
-                    body["username"] shouldBe username
+                    body["message"] shouldBe "Password updated successfully"
                 }
             }
         }
 
         test("should return 400 when token is blank") {
-            val request = VerifyResetTokenRequest("")
+            val request = PasswordUpdateRequest(token = "", password = "newpassword123")
 
-            // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
             HttpClient(mockEngine).use { httpClient ->
                 emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
                 testApplication {
-                    environment {
-                        config = MapApplicationConfig()
-                    }
+                    environment { config = MapApplicationConfig() }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
-                    val response = client.post("/auth/verifyResetToken") {
+                    val response = client.put("/auth/updatePassword") {
                         contentType(ContentType.Application.Json)
                         setBody(request)
                     }
@@ -534,113 +533,112 @@ class AuthRoutesTest : FunSpec({
             }
         }
 
-        test("should return 404 when token is not found or expired") {
-            val token = "invalid-or-expired-token"
-            val request = VerifyResetTokenRequest(token)
+        test("should return 400 when password is blank") {
+            val request = PasswordUpdateRequest(token = "some-token", password = "")
 
-            // Mock Redis scan to return no keys (token not found)
-            every { mockConnection.async() } returns mockAsyncCommands
-            val emptyScanCursor = createKeyScanCursorMock(emptyList(), isFinished = true)
-            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(emptyScanCursor)
-
-            // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
             HttpClient(mockEngine).use { httpClient ->
                 emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
                 testApplication {
-                    environment {
-                        config = MapApplicationConfig()
-                    }
+                    environment { config = MapApplicationConfig() }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
-                    val response = client.post("/auth/verifyResetToken") {
+                    val response = client.put("/auth/updatePassword") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.BadRequest
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "New password cannot be empty"
+                }
+            }
+        }
+
+        test("should return 400 when password is too short") {
+            val request = PasswordUpdateRequest(token = "some-token", password = "abc")
+
+            val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+
+                testApplication {
+                    environment { config = MapApplicationConfig() }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.put("/auth/updatePassword") {
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }
+
+                    response.status shouldBe HttpStatusCode.BadRequest
+                    val body = response.body<Map<String, String>>()
+                    body["error"] shouldContain "at least 8 characters"
+                }
+            }
+        }
+
+        test("should return 404 when token is invalid or expired") {
+            val token = "invalid-or-expired-token"
+            val request = PasswordUpdateRequest(token = token, password = "newpassword123")
+
+            every { mockConnection.async() } returns mockAsyncCommands
+            val tokenKey = "medicate:$environment:password_reset:token:$token"
+            every { mockAsyncCommands.get(tokenKey) } returns createRedisFutureMock(null as String?)
+
+            val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
+            HttpClient(mockEngine).use { httpClient ->
+                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
+
+                testApplication {
+                    environment { config = MapApplicationConfig() }
+                    install(ServerContentNegotiation) { json() }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
+
+                    val client = createClient { install(ClientContentNegotiation) { json() } }
+                    val response = client.put("/auth/updatePassword") {
                         contentType(ContentType.Application.Json)
                         setBody(request)
                     }
 
                     response.status shouldBe HttpStatusCode.NotFound
                     val body = response.body<Map<String, String>>()
-                    body["error"] shouldContain "Invalid or expired"
+                    body["error"] shouldContain "Invalid or expired reset token"
                 }
             }
         }
 
         test("should return 500 when Redis operation fails") {
-            val token = "valid-token-123"
-            val request = VerifyResetTokenRequest(token)
+            val token = "some-token"
+            val request = PasswordUpdateRequest(token = token, password = "newpassword123")
 
-            // Mock Redis scan to fail
             every { mockConnection.async() } returns mockAsyncCommands
-            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createFailedRedisFutureMock(RuntimeException("Redis connection failed"))
+            val tokenKey = "medicate:$environment:password_reset:token:$token"
+            every { mockAsyncCommands.get(tokenKey) } returns createFailedRedisFutureMock(RuntimeException("Redis connection failed"))
 
-            // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
             HttpClient(mockEngine).use { httpClient ->
                 emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
 
                 testApplication {
-                    environment {
-                        config = MapApplicationConfig()
-                    }
+                    environment { config = MapApplicationConfig() }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
-                    val response = client.post("/auth/verifyResetToken") {
+                    val response = client.put("/auth/updatePassword") {
                         contentType(ContentType.Application.Json)
                         setBody(request)
                     }
 
                     response.status shouldBe HttpStatusCode.InternalServerError
                     val body = response.body<Map<String, String>>()
-                    body["error"] shouldContain "Redis connection failed"
-                }
-            }
-        }
-
-        test("should delete token after successful verification") {
-            val token = "valid-token-123"
-            val userId = java.util.UUID.randomUUID()
-            val username = "testuser"
-            val request = VerifyResetTokenRequest(token)
-            val user = User(id = userId, username = username, email = "test@example.com", passwordHash = "hash")
-            val userJson = json.encodeToString(user)
-
-            // Mock Redis operations
-            every { mockConnection.async() } returns mockAsyncCommands
-            val tokenKey = "medicate:$environment:password_reset:$userId:$token"
-            val scanCursor = createKeyScanCursorMock(listOf(tokenKey), isFinished = true)
-            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(scanCursor)
-            every { mockAsyncCommands.get(tokenKey) } returns createRedisFutureMock(userId.toString())
-            val userKey = "medicate:$environment:user:id:$userId"
-            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
-            every { mockAsyncCommands.del(tokenKey) } returns createRedisFutureMock(1L)
-
-            // Create mock HTTP client
-            val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
-            HttpClient(mockEngine).use { httpClient ->
-                emailService = EmailService(httpClient, redisService, testApiKey, testAppUrl)
-
-                testApplication {
-                    environment {
-                        config = MapApplicationConfig()
-                    }
-                    install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
-
-                    val client = createClient { install(ClientContentNegotiation) { json() } }
-                    val response = client.post("/auth/verifyResetToken") {
-                        contentType(ContentType.Application.Json)
-                        setBody(request)
-                    }
-
-                    response.status shouldBe HttpStatusCode.OK
-
-                    // Verify that del was called (token deletion happens in verifyPasswordResetToken)
-                    verify(exactly = 1) { mockAsyncCommands.del(tokenKey) }
+                    body["error"] shouldContain "internal error"
                 }
             }
         }
@@ -687,7 +685,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {
@@ -725,7 +723,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {
@@ -759,7 +757,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {
@@ -793,7 +791,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {
@@ -803,7 +801,7 @@ class AuthRoutesTest : FunSpec({
 
                     response.status shouldBe HttpStatusCode.InternalServerError
                     val body = response.body<Map<String, String>>()
-                    body["error"] shouldContain "Redis connection failed"
+                    body["error"] shouldContain "An internal error occurred"
                 }
             }
         }
@@ -831,7 +829,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {
@@ -869,7 +867,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {

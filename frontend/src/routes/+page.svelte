@@ -257,7 +257,7 @@
 				{$_('dashboard.welcomeSubtitle')}
 			</p>
 			<p class="text-gray-700 mb-8">
-				{@html $_('dashboard.pleaseLogin')}
+				{$_('dashboard.pleaseLogin')}
 			</p>
 		</div>
 	</div>

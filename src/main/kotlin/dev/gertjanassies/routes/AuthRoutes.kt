@@ -1,7 +1,7 @@
 package dev.gertjanassies.routes
 
 import dev.gertjanassies.model.request.PasswordResetRequest
-import dev.gertjanassies.model.request.UserRequest
+import dev.gertjanassies.model.request.PasswordUpdateRequest
 import dev.gertjanassies.model.request.VerifyResetTokenRequest
 import dev.gertjanassies.model.response.toResponse
 import dev.gertjanassies.service.EmailError
@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("AuthRoutes")
 
-fun Route.authRoutes(storageService: StorageService, emailService: EmailService, jwtService: JwtService) {
+fun Route.authRoutes(storageService: StorageService, emailService: EmailService, jwtService: JwtService, secureCookies: Boolean = true) {
     route("/auth") {
         /**
          * POST /api/auth/refresh
@@ -33,10 +33,18 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                 return@post
             }
 
-            // Validate refresh token and extract username
+            // Validate refresh token signature and expiry
             val username = jwtService.validateRefreshToken(refreshToken)
             if (username == null) {
                 logger.debug("Invalid or expired refresh token")
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid or expired refresh token"))
+                return@post
+            }
+
+            // Check the token has not been logged out / invalidated server-side
+            val tokenValid = storageService.isRefreshTokenValid(refreshToken).getOrNull() ?: false
+            if (!tokenValid) {
+                logger.debug("Refresh token not found in store (logged out or invalidated)")
                 call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid or expired refresh token"))
                 return@post
             }
@@ -69,6 +77,13 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
          * Logout user by clearing the refresh token cookie
          */
         post("/logout") {
+            val refreshToken = call.request.cookies["refresh_token"]
+
+            // Invalidate the token server-side if present
+            if (!refreshToken.isNullOrBlank()) {
+                storageService.deleteRefreshToken(refreshToken)
+            }
+
             // Clear the refresh token cookie
             call.response.cookies.append(
                 io.ktor.http.Cookie(
@@ -76,12 +91,12 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                     value = "",
                     maxAge = 0, // Expire immediately
                     httpOnly = true,
-                    secure = false,
+                    secure = secureCookies,
                     path = "/"
                 )
             )
 
-            logger.debug("User logged out, refresh token cookie cleared")
+            logger.debug("User logged out, refresh token invalidated and cookie cleared")
             call.respond(HttpStatusCode.OK, mapOf("message" to "Logged out successfully"))
         }
 
@@ -115,8 +130,9 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
 
             val user = userResult.getOrNull()!!
 
-            // Get locale from request header (sent by frontend)
-            val locale = call.request.headers["Accept-Language"]?.take(2) ?: "en"
+            // Get locale from request header — allowlist to supported locales only
+            val rawLocale = call.request.headers["Accept-Language"]?.take(2)?.lowercase() ?: "en"
+            val locale = if (rawLocale in setOf("en", "nl")) rawLocale else "en"
 
             // Send reset password email
             val emailResult = emailService.resetPassword(user, locale)
@@ -140,35 +156,51 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
         }
 
         /**
-         * POST /api/auth/verifyResetToken
-         * Verify a password reset token and return the associated username
+         * PUT /api/auth/updatePassword
+         * Reset user password using a valid reset token.
+         * The token is verified and consumed atomically — no separate verify step needed.
+         * Body: { "token": "<reset-token>", "password": "<new-password>" }
          */
-        post("/verifyResetToken") {
-            val request = call.receive<VerifyResetTokenRequest>()
+        put("/updatePassword") {
+            val request = call.receive<PasswordUpdateRequest>()
 
             if (request.token.isBlank()) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Token cannot be empty"))
-                return@post
+                return@put
             }
 
-            val result = storageService.verifyPasswordResetToken(request.token)
-            val error = result.leftOrNull()
-            if (error != null) {
-                logger.error("Failed to verify password reset token: ${error.message}")
-                when (error) {
-                    is RedisError.NotFound -> {
-                        call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
+            if (request.password.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "New password cannot be empty"))
+                return@put
+            }
+
+            if (request.password.length < 8) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 8 characters"))
+                return@put
+            }
+
+            if (request.password.length > 128) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at most 128 characters"))
+                return@put
+            }
+
+            val result = storageService.resetPasswordWithToken(request.token, request.password)
+
+            result.fold(
+                { error ->
+                    logger.error("Failed to reset password: ${error.message}")
+                    when (error) {
+                        is RedisError.NotFound ->
+                            call.respond(HttpStatusCode.NotFound, mapOf("error" to "Invalid or expired reset token"))
+                        else ->
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
                     }
-                    else -> {
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
-                    }
+                },
+                {
+                    logger.debug("Successfully reset password via token")
+                    call.respond(HttpStatusCode.OK, mapOf("message" to "Password updated successfully"))
                 }
-                return@post
-            }
-
-            val username = result.getOrNull()!!
-            logger.debug("Successfully verified password reset token for user '$username'")
-            call.respond(HttpStatusCode.OK, mapOf("username" to username))
+            )
         }
 
         /**
@@ -194,7 +226,7 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                         call.respond(HttpStatusCode.NotFound, mapOf("error" to "Invalid or expired activation token"))
                     }
                     else -> {
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to tokenError.message))
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
                     }
                 }
                 return@post
@@ -220,6 +252,9 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
             val accessToken = jwtService.generateAccessToken(user.username, user.id.toString(), isAdmin)
             val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString(), isAdmin)
 
+            // Store refresh token server-side so it can be invalidated on logout
+            storageService.storeRefreshToken(refreshToken, user.id.toString(), 30L * 24 * 3600)
+
             // Set refresh token as HttpOnly cookie
             call.response.cookies.append(
                 io.ktor.http.Cookie(
@@ -227,7 +262,7 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                     value = refreshToken,
                     maxAge = 30 * 24 * 3600, // 30 days
                     httpOnly = true,
-                    secure = false,
+                    secure = secureCookies,
                     path = "/"
                 )
             )
@@ -240,47 +275,6 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                     user = user.toResponse(isAdmin),
                     token = accessToken
                 )
-            )
-        }
-
-        /**
-         * PUT /api/auth/updatePassword
-         * Update user password (public endpoint for password reset flow)
-         */
-        put("/updatePassword") {
-            val request = call.receive<UserRequest>()
-
-            if (request.username.isBlank()) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Username cannot be empty"))
-                return@put
-            }
-
-            if (request.password.isBlank()) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "New password cannot be empty"))
-                return@put
-            }
-
-            if (request.password.length < 6) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 6 characters"))
-                return@put
-            }
-
-            val result = storageService.updatePassword(request.username, request.password)
-
-            result.fold(
-                { error ->
-                    logger.error("Failed to update password for user '${request.username}': ${error.message}")
-                    when (error) {
-                        is RedisError.NotFound ->
-                            call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
-                        else ->
-                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
-                    }
-                },
-                {
-                    logger.debug("Successfully updated password for user '${request.username}'")
-                    call.respond(HttpStatusCode.OK, mapOf("message" to "Password updated successfully"))
-                }
             )
         }
     }

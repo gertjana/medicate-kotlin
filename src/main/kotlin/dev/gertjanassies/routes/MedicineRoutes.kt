@@ -39,7 +39,7 @@ fun Route.medicineRoutes(storageService: StorageService) {
             call.respond(HttpStatusCode.OK, medicines)
         }.onLeft { error ->
             logger.error("Failed to get all medicines for user ID '$userId': ${error.message}")
-            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
         }
     }
 
@@ -65,7 +65,7 @@ fun Route.medicineRoutes(storageService: StorageService) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
                 else ->
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
             }
         }
     }
@@ -78,6 +78,26 @@ fun Route.medicineRoutes(storageService: StorageService) {
         }
 
         val request = call.receive<MedicineRequest>()
+
+        if (request.name.isBlank()) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Medicine name cannot be empty"))
+            return@post
+        }
+
+        if (request.name.length > 200) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Medicine name must be at most 200 characters"))
+            return@post
+        }
+
+        if (request.unit.length > 20) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Unit must be at most 20 characters"))
+            return@post
+        }
+
+        if ((request.description?.length ?: 0) > 500) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Description must be at most 500 characters"))
+            return@post
+        }
 
         val validationError = ValidationUtils.validateBijsluiterUrl(request.bijsluiter)
         if (validationError != null) {
@@ -92,7 +112,7 @@ fun Route.medicineRoutes(storageService: StorageService) {
             call.respond(HttpStatusCode.Created, created)
         }.onLeft { error ->
             logger.error("Failed to create medicine for user ID '$userId': ${error.message}")
-            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
         }
     }
 
@@ -127,7 +147,7 @@ fun Route.medicineRoutes(storageService: StorageService) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
                 else ->
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
             }
         }
     }
@@ -154,7 +174,7 @@ fun Route.medicineRoutes(storageService: StorageService) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
                 else ->
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
             }
         }
     }
@@ -178,7 +198,7 @@ fun Route.medicineRoutes(storageService: StorageService) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
                 else ->
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
             }
         }
     }
@@ -202,7 +222,7 @@ fun Route.medicineRoutes(storageService: StorageService) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
                 else ->
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
             }
         }
     }
@@ -219,7 +239,7 @@ fun Route.medicineRoutes(storageService: StorageService) {
             call.respond(HttpStatusCode.OK, expiringMedicines)
         }.onLeft { error ->
             logger.error("Failed to get medicine expiry for user ID '$userId': ${error.message}")
-            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
         }
     }
 }

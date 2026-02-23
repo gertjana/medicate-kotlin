@@ -45,14 +45,21 @@ interface StorageService {
     suspend fun updateProfile(username: String, email: String, firstName: String, lastName: String): Either<RedisError, User>
 
     /**
-     * Update user password
+     * Update user password by username (used internally)
      */
     suspend fun updatePassword(username: String, newPassword: String): Either<RedisError, Unit>
 
     /**
-     * Verify password reset token
+     * Verify password reset token and return associated userId
      */
     suspend fun verifyPasswordResetToken(token: String): Either<RedisError, String>
+
+    /**
+     * Verify a password reset token and update the password.
+     * The token is consumed (deleted) only after a successful password update,
+     * so the operation is not guaranteed to be atomic across all underlying Redis calls.
+     */
+    suspend fun resetPasswordWithToken(token: String, newPassword: String): Either<RedisError, Unit>
 
     /**
      * Activate user account (set isActive to true)
@@ -63,6 +70,29 @@ interface StorageService {
      * Verify email activation token and return user ID
      */
     suspend fun verifyActivationToken(token: String): Either<RedisError, String>
+
+    /**
+     * Store a refresh token in the backing store so it can be invalidated on logout or password change.
+     * @param token the raw refresh token string
+     * @param userId the user the token belongs to
+     * @param ttlSeconds time-to-live in seconds (should match the JWT expiry)
+     */
+    suspend fun storeRefreshToken(token: String, userId: String, ttlSeconds: Long): Either<RedisError, Unit>
+
+    /**
+     * Delete a refresh token from the backing store (called on logout or password change).
+     */
+    suspend fun deleteRefreshToken(token: String): Either<RedisError, Unit>
+
+    /**
+     * Check whether a refresh token exists in the backing store (i.e. has not been logged out or invalidated).
+     */
+    suspend fun isRefreshTokenValid(token: String): Either<RedisError, Boolean>
+
+    /**
+     * Invalidate all active refresh tokens for a user (called on password change).
+     */
+    suspend fun invalidateAllRefreshTokensForUser(userId: String): Either<RedisError, Unit>
 
     // Admin operations
 
@@ -164,7 +194,8 @@ interface StorageService {
     // Dosage History operations
 
     /**
-     * Create a dosage history record and update medicine stock
+     * Create a dosage history record and update medicine stock.
+     * If datetime is provided it is used as the timestamp; otherwise defaults to LocalDateTime.now().
      */
     suspend fun createDosageHistory(
         userId: String,

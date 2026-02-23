@@ -89,18 +89,17 @@ class EmailService(
     /**
      * Store password reset token in Redis with TTL expiry
      * Redis will automatically delete the key after the specified time
-     * Key format: medicate:{environment}:password_reset:{userId}:{token}
+     * Key format: medicate:{environment}:password_reset:token:{token}
+     * Value: userId (allows O(1) direct GET lookup, same pattern as activation tokens)
      */
     private suspend fun storePasswordResetToken(
         userId: String,
         token: String,
         ttlSeconds: Long = 3600 // 1 hour default
     ): Either<RedisError, Unit> {
-        // Use the same key format as RedisService uses for all other keys
-        // This ensures verifyPasswordResetToken can find the token via SCAN
         val environment = redisService.getEnvironment()
-        val key = "medicate:$environment:password_reset:$userId:$token"
-        logger.debug("Storing password reset token for user ID: $userId in environment: $environment with TTL: $ttlSeconds seconds")
+        val key = "medicate:$environment:password_reset:token:$token"
+        logger.debug("Storing password reset token in environment: $environment with TTL: $ttlSeconds seconds")
         return redisService.setex(key, ttlSeconds, userId)
             .map { } // Convert Either<RedisError, String> to Either<RedisError, Unit>
     }
@@ -155,7 +154,7 @@ class EmailService(
             user.username
         }
 
-        val resetUrl = "$appUrl/reset-password?token=$token"
+        val resetUrl = "$appUrl/reset-password#token=$token"
 
         val template = loadTemplate("password-reset", locale)
         return replaceTemplateVars(template, mapOf(
@@ -269,7 +268,7 @@ class EmailService(
      * Generate HTML content for verification email
      */
     private fun generateVerificationEmailHtml(user: User, token: String, locale: String = "en"): String {
-        val verificationLink = "$appUrl/activate-account?token=$token"
+        val verificationLink = "$appUrl/activate-account#token=$token"
         val displayName = if (user.firstName.isNotBlank() && user.lastName.isNotBlank()) {
             "${user.firstName} ${user.lastName}"
         } else if (user.firstName.isNotBlank()) {

@@ -32,6 +32,7 @@ import io.ktor.server.http.content.staticFiles
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.plugins.defaultheaders.*
 import io.ktor.server.request.path
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -48,6 +49,23 @@ fun main() {
 fun Application.module() {
     val serveStatic = environment.config.propertyOrNull("app.serveStatic")?.getString()?.toBoolean()
         ?: System.getenv("SERVE_STATIC")?.toBoolean() ?: false
+
+    // Secure cookies require HTTPS — default false for local dev; set SECURE_COOKIES=true in production
+    val secureCookies = environment.config.propertyOrNull("app.secureCookies")?.getString()?.toBoolean()
+        ?: System.getenv("SECURE_COOKIES")?.toBoolean() ?: false
+
+    // Security headers on every API response
+    install(DefaultHeaders) {
+        header("X-Content-Type-Options", "nosniff")
+        header("X-Frame-Options", "DENY")
+        header("X-XSS-Protection", "1; mode=block")
+        header("Referrer-Policy", "strict-origin-when-cross-origin")
+        header("Cache-Control", "no-store")
+        header(
+            "Content-Security-Policy",
+            "default-src 'none'; frame-ancestors 'none'"
+        )
+    }
 
 
     // Configure CORS - only needed in development when frontend is served separately
@@ -86,8 +104,9 @@ fun Application.module() {
         ?: System.getenv("APP_ENV") ?: "test"
     val redisToken = environment.config.propertyOrNull("REDIS_TOKEN")?.getString()
         ?: System.getenv("REDIS_TOKEN") ?: ""
+    val redisTls = System.getenv("REDIS_TLS")?.lowercase() == "true"
 
-    val redisService: StorageService = RedisService(redisHost, redisPort, redisToken, appEnvironment)
+    val redisService: StorageService = RedisService(redisHost, redisPort, redisToken, appEnvironment, redisTls)
 
     this@module.log.info("Initializing Redis connection: host=$redisHost, port=$redisPort, environment=$appEnvironment")
 
@@ -123,11 +142,7 @@ fun Application.module() {
     // Initialize JWT Service
     val jwtSecret = environment.config.propertyOrNull("jwt.secret")?.getString()
         ?: System.getenv("JWT_SECRET")
-        ?: "default-secret-change-in-production"
-
-    if (jwtSecret.startsWith("default-secret")) {
-        log.warn("⚠️  Using default JWT secret! Set JWT_SECRET environment variable in production!")
-    }
+        ?: throw IllegalStateException("JWT secret must be configured via application config key 'jwt.secret' or JWT_SECRET environment variable")
 
     val jwtService = JwtService(jwtSecret)
 
@@ -161,8 +176,8 @@ fun Application.module() {
         route("/api") {
             // Public routes (no authentication required)
             healthRoutes()
-            authRoutes(redisService, emailService, jwtService)
-            userRoutes(redisService, jwtService, emailService)  // Login/register are public
+            authRoutes(redisService, emailService, jwtService, secureCookies)
+            userRoutes(redisService, jwtService, emailService, secureCookies)  // Login/register are public
 
             // Protected routes (require JWT authentication)
             authenticate("auth-jwt") {

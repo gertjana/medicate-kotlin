@@ -29,7 +29,8 @@ class RedisService private constructor(
     private val token: String = "",
     private val environment: String,
     private var connection: StatefulRedisConnection<String, String>?,
-    private val isConnectionOwner: Boolean
+    private val isConnectionOwner: Boolean,
+    private val tls: Boolean = false
 ) : StorageService {
     private var client: RedisClient? = null
     private val json = Json { ignoreUnknownKeys = true }
@@ -41,7 +42,7 @@ class RedisService private constructor(
     /**
      * Primary constructor for production use
      */
-    constructor(host: String, port: Int, token: String, environment: String = "test") : this(host, port, token, environment, null, true)
+    constructor(host: String, port: Int, token: String, environment: String = "test", tls: Boolean = false) : this(host, port, token, environment, null, true, tls)
 
     /**
      * Constructor for testing that accepts a connection
@@ -67,6 +68,7 @@ class RedisService private constructor(
              requireNotNull(port) { "Port must be provided for production mode" }
              val redisURI = RedisURI.Builder
                  .redis(host, port)
+                 .withSsl(tls)
                  .withPassword(token.toCharArray())
                  .build()
              val redisClient = RedisClient.create(redisURI)
@@ -487,7 +489,7 @@ class RedisService private constructor(
 
                             val medicine = json.decodeFromString<Medicine>(medicineJson)
 
-                            // Create dosage history
+                            // Create dosage history with provided or server-side timestamp
                             val dosageHistory = DosageHistory(
                                 id = UUID.randomUUID(),
                                 datetime = datetime ?: java.time.LocalDateTime.now(),
@@ -1025,6 +1027,54 @@ class RedisService private constructor(
     }
 
     /**
+     * Verify a password reset token and update the password.
+     * The token is consumed (deleted) only after a successful password update,
+     * so the user can retry if the update fails.
+     */
+    override suspend fun resetPasswordWithToken(token: String, newPassword: String): Either<RedisError, Unit> = either {
+        val tokenKey = "$keyPrefix:password_reset:token:$token"
+        val asyncCommands = connection?.async() ?: raise(RedisError.OperationError("Not connected"))
+
+        // Look up the userId without deleting the token yet
+        val userId = get(tokenKey).bind() ?: raise(
+            RedisError.NotFound("Invalid or expired password reset token")
+        )
+
+        // Look up the user by ID
+        val user = getUserById(userId).bind()
+
+        // Update the password
+        Either.catch {
+            val userKey = "$keyPrefix:user:id:${user.id}"
+            val newPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt())
+            val updatedUser = user.copy(passwordHash = newPasswordHash)
+            val updatedJsonString = json.encodeToString(updatedUser)
+            asyncCommands.set(userKey, updatedJsonString).await() ?: throw IllegalStateException("Failed to update user password in Redis")
+        }.mapLeft { e ->
+            when (e) {
+                is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
+                else -> RedisError.OperationError("Failed to update password: ${e.message}")
+            }
+        }.bind()
+
+        // Only consume the token after the password update succeeded (one-time use)
+        Either.catch {
+            asyncCommands.del(tokenKey).await()
+        }.fold(
+            ifLeft = { e -> logger.error("SECURITY: Failed to delete reset token after successful password update. Token may be reused until expiry. Error: ${e.message}") },
+            ifRight = { logger.debug("Successfully consumed password reset token") }
+        )
+
+        // Invalidate all active sessions — prevent stolen tokens from being used after password change
+        invalidateAllRefreshTokensForUser(userId).fold(
+            ifLeft = { e -> logger.warn("Failed to invalidate refresh tokens after password change: ${e.message}") },
+            ifRight = { logger.debug("Invalidated all refresh tokens for user: ${user.username}") }
+        )
+
+        logger.debug("Successfully reset password for user: ${user.username}")
+    }
+
+    /**
      * Check if an email is already in use by a different user
      */
     private suspend fun isEmailInUseByOtherUser(email: String, currentUserId: UUID): Either<RedisError, Boolean> {
@@ -1157,82 +1207,33 @@ class RedisService private constructor(
     }
 
     /**
-     * Verify password reset token and return associated username
+     * Verify password reset token and return associated userId
      * Token is single-use and will be deleted after successful verification
-     * Note: Token is now stored with user ID, so we need to look up the username
+     * Uses O(1) GET operation instead of O(N) SCAN for better performance and security
      */
     override suspend fun verifyPasswordResetToken(token: String): Either<RedisError, String> = either {
-        // Scan for keys matching: password_reset:*:token
-        // This will find the key password_reset:{userId}:token
-        val pattern = "$keyPrefix:password_reset:*:$token"
-        logger.debug("Verifying password reset token, scanning for password_reset keys")
-        val keys = mutableListOf<String>()
+        val key = "$keyPrefix:password_reset:token:$token"
+        logger.debug("Verifying password reset token with direct lookup")
 
         val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-        var scanCursor = Either.catch {
-            asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
-        }.mapLeft { e ->
-            RedisError.OperationError("Failed to scan for reset tokens: ${e.message}")
-        }.bind()
 
-        // Iterate through all cursor pages
-        while (true) {
-            keys.addAll(scanCursor.keys)
-            if (scanCursor.isFinished) break
-            scanCursor = Either.catch {
-                asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
-            }.mapLeft { e ->
-                RedisError.OperationError("Failed to scan for reset tokens: ${e.message}")
-            }.bind()
-        }
-
-        logger.debug("Found {} matching keys: {}", keys.size, keys)
-
-        // Should find exactly one matching key (if token exists and hasn't expired via TTL)
-        val matchingKey = when (keys.size) {
-            0 -> raise(
-                RedisError.NotFound("Invalid or expired password reset token")
-            )
-            1 -> keys[0]
-            else -> {
-                // Multiple matching keys indicate a potential attack or cleanup bug
-                logger.warn(
-                    "Multiple matching password reset keys found for token pattern {}: count={}, keys={}",
-                    pattern,
-                    keys.size,
-                    keys
-                )
-                raise(
-                    RedisError.OperationError(
-                        "Multiple password reset tokens found; possible attack or cleanup issue"
-                    )
-                )
-            }
-        }
-
-        logger.debug("Using matching key")
-
-        // Get the user ID from the value (token was stored with userId as value)
-        val userId = get(matchingKey).bind() ?: raise(
+        // Get the user ID directly with O(1) GET operation
+        val userId = get(key).bind() ?: raise(
             RedisError.NotFound("Invalid or expired password reset token")
         )
 
-        logger.debug("Found user ID: $userId for token")
-
-        // Get the user by ID to retrieve username
-        val user = getUserById(userId).bind()
-        val username = user.username
+        logger.debug("Found user ID for password reset token")
 
         // Delete the token after successful verification (one-time use)
         Either.catch {
-            asyncCommands.del(matchingKey).await()
+            asyncCommands.del(key).await()
         }.mapLeft { e ->
             RedisError.OperationError("Failed to delete reset token: ${e.message}")
         }.bind()
 
-        logger.debug("Successfully verified and deleted token for user: $username")
+        logger.debug("Successfully verified and deleted password reset token")
 
-        username
+        userId
     }
 
     /**
@@ -1292,6 +1293,63 @@ class RedisService private constructor(
 
         activatedUser
     }
+
+    /**
+     * Store a refresh token with a TTL so it can be invalidated on logout or password change.
+     * Key: $keyPrefix:refresh-token:<token>  Value: userId
+     * Also adds the token to a per-user set for bulk invalidation.
+     */
+    override suspend fun storeRefreshToken(token: String, userId: String, ttlSeconds: Long): Either<RedisError, Unit> =
+        Either.catch {
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            asyncCommands.setex("$keyPrefix:refresh-token:$token", ttlSeconds, userId).await()
+            asyncCommands.sadd("$keyPrefix:user-refresh-tokens:$userId", token).await()
+            // Keep the set from growing unboundedly — it auto-prunes via deleteRefreshToken/invalidateAll
+            Unit
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to store refresh token: ${e.message}")
+        }
+
+    /**
+     * Delete a refresh token (called on logout or password change).
+     */
+    override suspend fun deleteRefreshToken(token: String): Either<RedisError, Unit> =
+        Either.catch {
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            // Look up userId first so we can clean up the per-user set
+            val userId = asyncCommands.get("$keyPrefix:refresh-token:$token").await()
+            asyncCommands.del("$keyPrefix:refresh-token:$token").await()
+            if (userId != null) {
+                asyncCommands.srem("$keyPrefix:user-refresh-tokens:$userId", token).await()
+            }
+            Unit
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to delete refresh token: ${e.message}")
+        }
+
+    /**
+     * Check whether a refresh token exists in the backing store.
+     */
+    override suspend fun isRefreshTokenValid(token: String): Either<RedisError, Boolean> =
+        get("$keyPrefix:refresh-token:$token").map { value -> value != null }
+
+    /**
+     * Invalidate all active refresh tokens for a user (e.g. on password change).
+     */
+    override suspend fun invalidateAllRefreshTokensForUser(userId: String): Either<RedisError, Unit> =
+        Either.catch {
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            val setKey = "$keyPrefix:user-refresh-tokens:$userId"
+            val tokens = asyncCommands.smembers(setKey).await()
+            val keysToDelete = tokens.map { "$keyPrefix:refresh-token:$it" }.toMutableList()
+            keysToDelete.add(setKey)
+            if (keysToDelete.isNotEmpty()) {
+                asyncCommands.del(*keysToDelete.toTypedArray()).await()
+            }
+            Unit
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to invalidate refresh tokens: ${e.message}")
+        }
 
     override suspend fun isUserAdmin(userId: String): Either<RedisError, Boolean> = either {
         val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
@@ -1419,9 +1477,9 @@ class RedisService private constructor(
         keysToDelete.add("$keyPrefix:user:username:${user.username}")
         keysToDelete.add("$keyPrefix:user:email:${user.email}")
 
-        val medicinePattern = "$keyPrefix:medicine:$userId:*"
-        val schedulePattern = "$keyPrefix:schedule:$userId:*"
-        val historyPattern = "$keyPrefix:dosageHistory:$userId:*"
+        val medicinePattern = "$keyPrefix:user:$userId:medicine:*"
+        val schedulePattern = "$keyPrefix:user:$userId:schedule:*"
+        val historyPattern = "$keyPrefix:user:$userId:dosagehistory:*"
 
         for (pattern in listOf(medicinePattern, schedulePattern, historyPattern)) {
             val keys = Either.catch {
