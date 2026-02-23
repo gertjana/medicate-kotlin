@@ -1047,7 +1047,7 @@ class RedisService private constructor(
             val newPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt())
             val updatedUser = user.copy(passwordHash = newPasswordHash)
             val updatedJsonString = json.encodeToString(updatedUser)
-            connection?.async()?.set(userKey, updatedJsonString)?.await() ?: throw IllegalStateException("Not connected")
+            asyncCommands.set(userKey, updatedJsonString).await() ?: throw IllegalStateException("Failed to update user password in Redis")
         }.mapLeft { e ->
             when (e) {
                 is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
