@@ -127,7 +127,7 @@ fun Application.module() {
     // Initialize JWT Service
     val jwtSecret = environment.config.propertyOrNull("jwt.secret")?.getString()
         ?: System.getenv("JWT_SECRET")
-        ?: throw IllegalStateException("JWT_SECRET environment variable must be set")
+        ?: throw IllegalStateException("JWT secret must be configured via application config key 'jwt.secret' or JWT_SECRET environment variable")
 
     val jwtService = JwtService(jwtSecret)
 
