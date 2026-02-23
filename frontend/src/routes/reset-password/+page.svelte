@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { updatePassword } from '$lib/api';
+	import { userStore } from '$lib/stores/user';
 
 	let token = '';
 	let newPassword = '';
@@ -35,9 +36,10 @@
 		}
 
 		try {
-			await updatePassword(token, newPassword);
-			success = 'Password updated successfully! Redirecting to login...';
-			setTimeout(() => goto('/', { replaceState: true }), 2000);
+		await updatePassword(token, newPassword);
+		success = 'Password updated successfully! Redirecting to login...';
+		await userStore.logout();
+		setTimeout(() => goto('/', { replaceState: true }), 2000);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to update password';
 		}

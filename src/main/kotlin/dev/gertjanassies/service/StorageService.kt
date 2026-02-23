@@ -195,13 +195,14 @@ interface StorageService {
 
     /**
      * Create a dosage history record and update medicine stock.
-     * Timestamp is always set server-side to LocalDateTime.now().
+     * If datetime is provided it is used as the timestamp; otherwise defaults to LocalDateTime.now().
      */
     suspend fun createDosageHistory(
         userId: String,
         medicineId: UUID,
         amount: Double,
-        scheduledTime: String? = null
+        scheduledTime: String? = null,
+        datetime: LocalDateTime? = null
     ): Either<RedisError, DosageHistory>
 
     /**

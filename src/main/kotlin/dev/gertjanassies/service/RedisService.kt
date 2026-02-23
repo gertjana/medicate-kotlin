@@ -466,7 +466,7 @@ class RedisService private constructor(
      *       - [RedisError.OperationError] if persisting the dosage history or updating the medicine fails
      *         (e.g. connection issues or an invalid Redis state).
      */
-    override suspend fun createDosageHistory(userId: String, medicineId: UUID, amount: Double, scheduledTime: String?): Either<RedisError, DosageHistory> {
+    override suspend fun createDosageHistory(userId: String, medicineId: UUID, amount: Double, scheduledTime: String?, datetime: java.time.LocalDateTime?): Either<RedisError, DosageHistory> {
         return validateUserId(userId).fold(
             { error -> error.left() },
             { validatedUserId ->
@@ -489,10 +489,10 @@ class RedisService private constructor(
 
                             val medicine = json.decodeFromString<Medicine>(medicineJson)
 
-                            // Create dosage history with server-side timestamp
+                            // Create dosage history with provided or server-side timestamp
                             val dosageHistory = DosageHistory(
                                 id = UUID.randomUUID(),
-                                datetime = java.time.LocalDateTime.now(),
+                                datetime = datetime ?: java.time.LocalDateTime.now(),
                                 medicineId = medicineId,
                                 amount = amount,
                                 scheduledTime = scheduledTime

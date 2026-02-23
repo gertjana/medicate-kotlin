@@ -326,10 +326,10 @@ export async function getDailySchedule(): Promise<DailySchedule> {
 }
 
 // Dosage history
-export async function takeDose(medicineId: string, amount: number, scheduledTime?: string): Promise<DosageHistory> {
+export async function takeDose(medicineId: string, amount: number, scheduledTime?: string, datetime?: string): Promise<DosageHistory> {
 	return authenticatedFetch(`${API_BASE}/takedose`, {
 		method: 'POST',
-		body: JSON.stringify({ medicineId, amount, scheduledTime })
+		body: JSON.stringify({ medicineId, amount, scheduledTime, datetime })
 	});
 }
 

@@ -189,7 +189,7 @@ fun Route.medicineRoutes(storageService: StorageService) {
         val request = call.receive<DosageHistoryRequest>()
 
         either {
-            val dosageHistory = storageService.createDosageHistory(userId, request.medicineId, request.amount, request.scheduledTime).bind()
+            val dosageHistory = storageService.createDosageHistory(userId, request.medicineId, request.amount, request.scheduledTime, request.datetime).bind()
             logger.debug("Successfully recorded dose for medicine '${request.medicineId}' (amount: ${request.amount}) for user ID: $userId")
             call.respond(HttpStatusCode.Created, dosageHistory)
         }.onLeft { error ->

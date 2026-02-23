@@ -136,8 +136,17 @@
 
 	async function takeAllMissing(dateObj: Date, time: string, scheduledMedicines: { medicineId: string; amount: number }[]) {
 		try {
+			// Build a datetime representing the scheduled time on the missed day.
+			// Parse HH:mm from the scheduled time string and combine with the past date.
+			const [hours, minutes] = time.split(':').map(Number);
+			const dt = new Date(dateObj);
+			dt.setHours(hours, minutes, 0, 0);
+			// Format as ISO local datetime (no timezone) matching backend LocalDateTimeSerializer
+			const pad = (n: number) => String(n).padStart(2, '0');
+			const datetime = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}:00`;
+
 			for (const med of scheduledMedicines) {
-				await takeDose(med.medicineId, med.amount, time);
+				await takeDose(med.medicineId, med.amount, time, datetime);
 			}
 			const medicineNames = scheduledMedicines.map(m => getMedicineName(m.medicineId)).join(', ');
 			showToastNotification($_('history.recorded', { values: { medicines: medicineNames } }));
