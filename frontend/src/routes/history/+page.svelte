@@ -204,7 +204,7 @@
 		<div class="card text-center py-12">
 			<h2 class="text-2xl font-bold mb-4">{$_('dashboard.welcomeTitle')}</h2>
 			<p class="text-gray-600 mb-6">
-				{@html $_('dashboard.pleaseLogin')}
+				{$_('dashboard.pleaseLogin')}
 			</p>
 		</div>
 	</div>

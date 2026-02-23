@@ -20,6 +20,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
     implementation("io.ktor:ktor-server-cors:2.3.7")
     implementation("io.ktor:ktor-server-compression:2.3.7")
+    implementation("io.ktor:ktor-server-default-headers:2.3.7")
     implementation("io.ktor:ktor-server-auth:2.3.7")
     implementation("io.ktor:ktor-server-auth-jwt:2.3.7")
 

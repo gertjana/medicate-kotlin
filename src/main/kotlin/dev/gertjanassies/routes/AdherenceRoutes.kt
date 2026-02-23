@@ -29,7 +29,7 @@ fun Route.adherenceRoutes(storageService: StorageService) {
             call.respond(HttpStatusCode.OK, weeklyAdherence)
         }.onLeft { error ->
             logger.error("Failed to get weekly adherence for user ID '$userId': ${error.message}")
-            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
         }
     }
 }

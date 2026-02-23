@@ -15,7 +15,7 @@
     "welcome": "Welcome",
     "welcomeTitle": "Welcome to Medicate",
     "welcomeSubtitle": "Your personal medicine tracking assistant",
-    "pleaseLogin": "Please <strong>login</strong> or <strong>register</strong> to start tracking your medicines, schedules, and adherence.",
+    "pleaseLogin": "Please login or register to start tracking your medicines, schedules, and adherence.",
     "adherence": "Weekly Adherence",
     "dailySchedule": "Today's Schedule",
     "medicineExpiry": "Medicine Expiry",

@@ -32,6 +32,7 @@ import io.ktor.server.http.content.staticFiles
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.plugins.defaultheaders.*
 import io.ktor.server.request.path
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -49,9 +50,22 @@ fun Application.module() {
     val serveStatic = environment.config.propertyOrNull("app.serveStatic")?.getString()?.toBoolean()
         ?: System.getenv("SERVE_STATIC")?.toBoolean() ?: false
 
-    // Secure cookies require HTTPS — disable in local dev, enable in production behind TLS proxy
+    // Secure cookies require HTTPS — default false for local dev; set SECURE_COOKIES=true in production
     val secureCookies = environment.config.propertyOrNull("app.secureCookies")?.getString()?.toBoolean()
-        ?: System.getenv("SECURE_COOKIES")?.toBoolean() ?: true
+        ?: System.getenv("SECURE_COOKIES")?.toBoolean() ?: false
+
+    // Security headers on every API response
+    install(DefaultHeaders) {
+        header("X-Content-Type-Options", "nosniff")
+        header("X-Frame-Options", "DENY")
+        header("X-XSS-Protection", "1; mode=block")
+        header("Referrer-Policy", "strict-origin-when-cross-origin")
+        header("Cache-Control", "no-store")
+        header(
+            "Content-Security-Policy",
+            "default-src 'none'; frame-ancestors 'none'"
+        )
+    }
 
 
     // Configure CORS - only needed in development when frontend is served separately
@@ -90,8 +104,9 @@ fun Application.module() {
         ?: System.getenv("APP_ENV") ?: "test"
     val redisToken = environment.config.propertyOrNull("REDIS_TOKEN")?.getString()
         ?: System.getenv("REDIS_TOKEN") ?: ""
+    val redisTls = System.getenv("REDIS_TLS")?.lowercase() == "true"
 
-    val redisService: StorageService = RedisService(redisHost, redisPort, redisToken, appEnvironment)
+    val redisService: StorageService = RedisService(redisHost, redisPort, redisToken, appEnvironment, redisTls)
 
     this@module.log.info("Initializing Redis connection: host=$redisHost, port=$redisPort, environment=$appEnvironment")
 

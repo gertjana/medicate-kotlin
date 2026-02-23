@@ -578,7 +578,7 @@ class AuthRoutesTest : FunSpec({
 
                     response.status shouldBe HttpStatusCode.BadRequest
                     val body = response.body<Map<String, String>>()
-                    body["error"] shouldContain "at least 6 characters"
+                    body["error"] shouldContain "at least 8 characters"
                 }
             }
         }
@@ -801,7 +801,7 @@ class AuthRoutesTest : FunSpec({
 
                     response.status shouldBe HttpStatusCode.InternalServerError
                     val body = response.body<Map<String, String>>()
-                    body["error"] shouldContain "Redis connection failed"
+                    body["error"] shouldContain "An internal error occurred"
                 }
             }
         }

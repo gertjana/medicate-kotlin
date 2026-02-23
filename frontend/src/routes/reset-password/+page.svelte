@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { updatePassword } from '$lib/api';
 
@@ -12,7 +11,10 @@
 	let tokenMissing = false;
 
 	onMount(() => {
-		token = $page.url.searchParams.get('token') || '';
+		// Token is passed in the URL fragment (#token=...) to prevent leakage via Referer header
+		const hash = window.location.hash.slice(1); // remove leading '#'
+		const params = new URLSearchParams(hash);
+		token = params.get('token') || '';
 		if (!token) {
 			tokenMissing = true;
 		}
@@ -22,8 +24,8 @@
 		error = '';
 		success = '';
 
-		if (!newPassword || newPassword.length < 6) {
-			error = 'Password must be at least 6 characters';
+		if (!newPassword || newPassword.length < 8) {
+			error = 'Password must be at least 8 characters';
 			return;
 		}
 
@@ -72,9 +74,9 @@
 						class="input w-full"
 						placeholder="Enter new password"
 						required
-						minlength="6"
+						minlength="8"
 					/>
-					<p class="text-xs text-gray-600 mt-1">Minimum 6 characters</p>
+					<p class="text-xs text-gray-600 mt-1">Minimum 8 characters</p>
 				</div>
 
 				<div class="mb-4">
@@ -86,7 +88,7 @@
 						class="input w-full"
 						placeholder="Confirm new password"
 						required
-						minlength="6"
+						minlength="8"
 					/>
 				</div>
 

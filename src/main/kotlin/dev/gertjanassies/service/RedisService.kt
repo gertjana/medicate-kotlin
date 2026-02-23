@@ -29,7 +29,8 @@ class RedisService private constructor(
     private val token: String = "",
     private val environment: String,
     private var connection: StatefulRedisConnection<String, String>?,
-    private val isConnectionOwner: Boolean
+    private val isConnectionOwner: Boolean,
+    private val tls: Boolean = false
 ) : StorageService {
     private var client: RedisClient? = null
     private val json = Json { ignoreUnknownKeys = true }
@@ -41,7 +42,7 @@ class RedisService private constructor(
     /**
      * Primary constructor for production use
      */
-    constructor(host: String, port: Int, token: String, environment: String = "test") : this(host, port, token, environment, null, true)
+    constructor(host: String, port: Int, token: String, environment: String = "test", tls: Boolean = false) : this(host, port, token, environment, null, true, tls)
 
     /**
      * Constructor for testing that accepts a connection
@@ -67,6 +68,7 @@ class RedisService private constructor(
              requireNotNull(port) { "Port must be provided for production mode" }
              val redisURI = RedisURI.Builder
                  .redis(host, port)
+                 .withSsl(tls)
                  .withPassword(token.toCharArray())
                  .build()
              val redisClient = RedisClient.create(redisURI)

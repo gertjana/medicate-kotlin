@@ -32,7 +32,7 @@ fun Route.scheduleRoutes(storageService: StorageService) {
             call.respond(HttpStatusCode.OK, schedules)
         }.onLeft { error ->
             logger.error("Failed to get all schedules for user ID '$userId': ${error.message}")
-            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
         }
     }
 
@@ -58,7 +58,7 @@ fun Route.scheduleRoutes(storageService: StorageService) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
                 else ->
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
             }
         }
     }
@@ -78,7 +78,7 @@ fun Route.scheduleRoutes(storageService: StorageService) {
             call.respond(HttpStatusCode.Created, created)
         }.onLeft { error ->
             logger.error("Failed to create schedule for user ID '$userId': ${error.message}")
-            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
         }
     }
 
@@ -106,7 +106,7 @@ fun Route.scheduleRoutes(storageService: StorageService) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
                 else ->
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
             }
         }
     }
@@ -133,7 +133,7 @@ fun Route.scheduleRoutes(storageService: StorageService) {
                 is dev.gertjanassies.service.RedisError.NotFound ->
                     call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
                 else ->
-                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+                    call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
             }
         }
     }

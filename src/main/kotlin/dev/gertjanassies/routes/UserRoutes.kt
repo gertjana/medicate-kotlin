@@ -31,8 +31,18 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
                 return@post
             }
 
+            if (request.username.length > 50) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Username must be at most 50 characters"))
+                return@post
+            }
+
             if (request.email.isBlank()) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Email cannot be empty"))
+                return@post
+            }
+
+            if (request.email.length > 254) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Email must be at most 254 characters"))
                 return@post
             }
 
@@ -41,8 +51,13 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
                 return@post
             }
 
-            if (request.password.length < 6) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 6 characters"))
+            if (request.password.length < 8) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 8 characters"))
+                return@post
+            }
+
+            if (request.password.length > 128) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at most 128 characters"))
                 return@post
             }
 
@@ -58,8 +73,9 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
 
             val user = result.getOrNull()!!
 
-            // Get locale from request header (sent by frontend)
-            val locale = call.request.headers["Accept-Language"]?.take(2) ?: "en"
+            // Get locale from request header — allowlist to supported locales only
+            val rawLocale = call.request.headers["Accept-Language"]?.take(2)?.lowercase() ?: "en"
+            val locale = if (rawLocale in setOf("en", "nl")) rawLocale else "en"
 
             // Send verification email (user is created but inactive)
             val emailResult = emailService.sendVerificationEmail(user, locale)
@@ -100,6 +116,16 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
 
             if (request.password.isBlank()) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password cannot be empty"))
+                return@post
+            }
+
+            if (request.username.length > 50) {
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid credentials"))
+                return@post
+            }
+
+            if (request.password.length > 128) {
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid credentials"))
                 return@post
             }
 
@@ -195,13 +221,28 @@ fun Route.protectedUserRoutes(storageService: StorageService) {
                 return@put
             }
 
+            if (request.email.length > 254) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Email must be at most 254 characters"))
+                return@put
+            }
+
             if (request.firstName.isBlank()) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "First name cannot be empty"))
                 return@put
             }
 
+            if (request.firstName.length > 100) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "First name must be at most 100 characters"))
+                return@put
+            }
+
             if (request.lastName.isBlank()) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Last name cannot be empty"))
+                return@put
+            }
+
+            if (request.lastName.length > 100) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Last name must be at most 100 characters"))
                 return@put
             }
 

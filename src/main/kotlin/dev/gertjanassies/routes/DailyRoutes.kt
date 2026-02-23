@@ -31,7 +31,7 @@ fun Route.dailyRoutes(storageService: StorageService) {
             call.respond(HttpStatusCode.OK, dailySchedule)
         }.onLeft { error ->
             logger.error("Failed to get daily schedule for user ID '$userId': ${error.message}")
-            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
+            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
         }
     }
 }

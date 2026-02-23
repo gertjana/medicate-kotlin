@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   update-medicines:
@@ -62,15 +63,16 @@ jobs:
           data/medicines.db
         retention-days: 90
 
-    - name: Commit updated medicines database
-      run: |
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
-        git add data/medicines.json data/medicines.db
-        git diff --staged --quiet || git commit -m "Update medicines database - $(date +'%Y-%m-%d')"
-
-    - name: Push changes
-      uses: ad-m/github-push-action@57116acb309081ee57864270b0e3c4cedbe45452 # master as of 2026-02-23
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@271a8d0340265f705b14b6d32b9829c1cb33d45e # v7.0.8
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        branch: ${{ github.ref }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: Update medicines database - ${{ github.run_id }}
+        branch: chore/update-medicines-${{ github.run_id }}
+        delete-branch: true
+        title: 'chore: update medicines database (${{ github.run_id }})'
+        body: |
+          Automated monthly update of the medicines database from the Dutch medicines information bank.
+
+          Please verify the database record count looks reasonable before merging.
+        labels: automated

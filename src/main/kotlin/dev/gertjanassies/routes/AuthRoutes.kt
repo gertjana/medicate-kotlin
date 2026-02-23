@@ -130,8 +130,9 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
 
             val user = userResult.getOrNull()!!
 
-            // Get locale from request header (sent by frontend)
-            val locale = call.request.headers["Accept-Language"]?.take(2) ?: "en"
+            // Get locale from request header — allowlist to supported locales only
+            val rawLocale = call.request.headers["Accept-Language"]?.take(2)?.lowercase() ?: "en"
+            val locale = if (rawLocale in setOf("en", "nl")) rawLocale else "en"
 
             // Send reset password email
             val emailResult = emailService.resetPassword(user, locale)
@@ -173,8 +174,13 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                 return@put
             }
 
-            if (request.password.length < 6) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 6 characters"))
+            if (request.password.length < 8) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 8 characters"))
+                return@put
+            }
+
+            if (request.password.length > 128) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at most 128 characters"))
                 return@put
             }
 
@@ -220,7 +226,7 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                         call.respond(HttpStatusCode.NotFound, mapOf("error" to "Invalid or expired activation token"))
                     }
                     else -> {
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to tokenError.message))
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
                     }
                 }
                 return@post
