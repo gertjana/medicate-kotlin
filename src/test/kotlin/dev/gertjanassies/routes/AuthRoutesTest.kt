@@ -474,9 +474,10 @@ class AuthRoutesTest : FunSpec({
             val userJson = json.encodeToString(user)
 
             // Mock Redis for resetPasswordWithToken:
-            // 1. verifyPasswordResetToken: GET password_reset:token:{token} -> userId, DEL token
+            // 1. GET password_reset:token:{token} -> userId (peek, no delete yet)
             // 2. getUserById: GET user:id:{userId} -> user
             // 3. updatePassword: SET user data
+            // 4. DEL password_reset:token:{token} (only after successful update)
             every { mockConnection.async() } returns mockAsyncCommands
             val tokenKey = "medicate:$environment:password_reset:token:$token"
             every { mockAsyncCommands.get(tokenKey) } returns createRedisFutureMock(userId.toString())
