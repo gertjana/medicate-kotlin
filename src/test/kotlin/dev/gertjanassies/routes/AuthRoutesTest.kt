@@ -93,7 +93,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -124,7 +124,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -158,7 +158,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -194,7 +194,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -236,7 +236,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -282,7 +282,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -324,7 +324,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/resetPassword") {
@@ -349,12 +349,15 @@ class AuthRoutesTest : FunSpec({
             val userJson = json.encodeToString(user)
             val refreshToken = jwtService.generateRefreshToken(username, userId.toString())
 
-            // Mock Redis operations for getUser
+            // Mock Redis operations for getUser and isRefreshTokenValid
             every { mockConnection.async() } returns mockAsyncCommands
             val usernameIndexKey = "medicate:$environment:user:username:$username"
             every { mockAsyncCommands.get(usernameIndexKey) } returns createRedisFutureMock(userId.toString())
             val userKey = "medicate:$environment:user:id:$userId"
             every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
+            // Simulate token present in store
+            val tokenStoreKey = "medicate:$environment:refresh-token:$refreshToken"
+            every { mockAsyncCommands.get(tokenStoreKey) } returns createRedisFutureMock(userId.toString())
 
             // Create mock HTTP client
             val mockEngine = MockEngine { respond("", HttpStatusCode.OK) }
@@ -366,7 +369,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/refresh") {
@@ -395,7 +398,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/refresh") {
@@ -420,7 +423,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/refresh") {
@@ -445,7 +448,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/refresh") {
@@ -489,7 +492,7 @@ class AuthRoutesTest : FunSpec({
                 testApplication {
                     environment { config = MapApplicationConfig() }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.put("/auth/updatePassword") {
@@ -514,7 +517,7 @@ class AuthRoutesTest : FunSpec({
                 testApplication {
                     environment { config = MapApplicationConfig() }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.put("/auth/updatePassword") {
@@ -539,7 +542,7 @@ class AuthRoutesTest : FunSpec({
                 testApplication {
                     environment { config = MapApplicationConfig() }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.put("/auth/updatePassword") {
@@ -564,7 +567,7 @@ class AuthRoutesTest : FunSpec({
                 testApplication {
                     environment { config = MapApplicationConfig() }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.put("/auth/updatePassword") {
@@ -594,7 +597,7 @@ class AuthRoutesTest : FunSpec({
                 testApplication {
                     environment { config = MapApplicationConfig() }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.put("/auth/updatePassword") {
@@ -624,7 +627,7 @@ class AuthRoutesTest : FunSpec({
                 testApplication {
                     environment { config = MapApplicationConfig() }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.put("/auth/updatePassword") {
@@ -681,7 +684,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {
@@ -719,7 +722,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {
@@ -753,7 +756,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {
@@ -787,7 +790,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {
@@ -825,7 +828,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {
@@ -863,7 +866,7 @@ class AuthRoutesTest : FunSpec({
                         config = MapApplicationConfig()
                     }
                     install(ServerContentNegotiation) { json() }
-                    routing { authRoutes(redisService, emailService, jwtService) }
+                    routing { authRoutes(redisService, emailService, jwtService, secureCookies = false) }
 
                     val client = createClient { install(ClientContentNegotiation) { json() } }
                     val response = client.post("/auth/activateAccount") {

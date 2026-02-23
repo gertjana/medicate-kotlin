@@ -464,7 +464,7 @@ class RedisService private constructor(
      *       - [RedisError.OperationError] if persisting the dosage history or updating the medicine fails
      *         (e.g. connection issues or an invalid Redis state).
      */
-    override suspend fun createDosageHistory(userId: String, medicineId: UUID, amount: Double, scheduledTime: String?, datetime: java.time.LocalDateTime?): Either<RedisError, DosageHistory> {
+    override suspend fun createDosageHistory(userId: String, medicineId: UUID, amount: Double, scheduledTime: String?): Either<RedisError, DosageHistory> {
         return validateUserId(userId).fold(
             { error -> error.left() },
             { validatedUserId ->
@@ -487,10 +487,10 @@ class RedisService private constructor(
 
                             val medicine = json.decodeFromString<Medicine>(medicineJson)
 
-                            // Create dosage history
+                            // Create dosage history with server-side timestamp
                             val dosageHistory = DosageHistory(
                                 id = UUID.randomUUID(),
-                                datetime = datetime ?: java.time.LocalDateTime.now(),
+                                datetime = java.time.LocalDateTime.now(),
                                 medicineId = medicineId,
                                 amount = amount,
                                 scheduledTime = scheduledTime
@@ -1049,6 +1049,12 @@ class RedisService private constructor(
             }
         }.bind()
 
+        // Invalidate all active sessions — prevent stolen tokens from being used after password change
+        invalidateAllRefreshTokensForUser(userId).fold(
+            ifLeft = { e -> logger.warn("Failed to invalidate refresh tokens after password change: ${e.message}") },
+            ifRight = { logger.debug("Invalidated all refresh tokens for user: ${user.username}") }
+        )
+
         logger.debug("Successfully reset password for user: ${user.username}")
     }
 
@@ -1272,6 +1278,63 @@ class RedisService private constructor(
         activatedUser
     }
 
+    /**
+     * Store a refresh token with a TTL so it can be invalidated on logout or password change.
+     * Key: $keyPrefix:refresh-token:<token>  Value: userId
+     * Also adds the token to a per-user set for bulk invalidation.
+     */
+    override suspend fun storeRefreshToken(token: String, userId: String, ttlSeconds: Long): Either<RedisError, Unit> =
+        Either.catch {
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            asyncCommands.setex("$keyPrefix:refresh-token:$token", ttlSeconds, userId).await()
+            asyncCommands.sadd("$keyPrefix:user-refresh-tokens:$userId", token).await()
+            // Keep the set from growing unboundedly — it auto-prunes via deleteRefreshToken/invalidateAll
+            Unit
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to store refresh token: ${e.message}")
+        }
+
+    /**
+     * Delete a refresh token (called on logout or password change).
+     */
+    override suspend fun deleteRefreshToken(token: String): Either<RedisError, Unit> =
+        Either.catch {
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            // Look up userId first so we can clean up the per-user set
+            val userId = asyncCommands.get("$keyPrefix:refresh-token:$token").await()
+            asyncCommands.del("$keyPrefix:refresh-token:$token").await()
+            if (userId != null) {
+                asyncCommands.srem("$keyPrefix:user-refresh-tokens:$userId", token).await()
+            }
+            Unit
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to delete refresh token: ${e.message}")
+        }
+
+    /**
+     * Check whether a refresh token exists in the backing store.
+     */
+    override suspend fun isRefreshTokenValid(token: String): Either<RedisError, Boolean> =
+        get("$keyPrefix:refresh-token:$token").map { value -> value != null }
+
+    /**
+     * Invalidate all active refresh tokens for a user (e.g. on password change).
+     */
+    override suspend fun invalidateAllRefreshTokensForUser(userId: String): Either<RedisError, Unit> =
+        Either.catch {
+            val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
+            val setKey = "$keyPrefix:user-refresh-tokens:$userId"
+            val tokens = asyncCommands.smembers(setKey).await()
+            val keysToDelete = tokens.map { "$keyPrefix:refresh-token:$it" }.toMutableList()
+            keysToDelete.add(setKey)
+            if (keysToDelete.isNotEmpty()) {
+                asyncCommands.del(*keysToDelete.toTypedArray()).await()
+            }
+            Unit
+        }.mapLeft { e ->
+            RedisError.OperationError("Failed to invalidate refresh tokens: ${e.message}")
+        }
+
     override suspend fun isUserAdmin(userId: String): Either<RedisError, Boolean> = either {
         val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
         val key = "$keyPrefix:admins"
@@ -1398,9 +1461,9 @@ class RedisService private constructor(
         keysToDelete.add("$keyPrefix:user:username:${user.username}")
         keysToDelete.add("$keyPrefix:user:email:${user.email}")
 
-        val medicinePattern = "$keyPrefix:medicine:$userId:*"
-        val schedulePattern = "$keyPrefix:schedule:$userId:*"
-        val historyPattern = "$keyPrefix:dosageHistory:$userId:*"
+        val medicinePattern = "$keyPrefix:user:$userId:medicine:*"
+        val schedulePattern = "$keyPrefix:user:$userId:schedule:*"
+        val historyPattern = "$keyPrefix:user:$userId:dosagehistory:*"
 
         for (pattern in listOf(medicinePattern, schedulePattern, historyPattern)) {
             val keys = Either.catch {

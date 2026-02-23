@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("AuthRoutes")
 
-fun Route.authRoutes(storageService: StorageService, emailService: EmailService, jwtService: JwtService) {
+fun Route.authRoutes(storageService: StorageService, emailService: EmailService, jwtService: JwtService, secureCookies: Boolean = true) {
     route("/auth") {
         /**
          * POST /api/auth/refresh
@@ -33,10 +33,18 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                 return@post
             }
 
-            // Validate refresh token and extract username
+            // Validate refresh token signature and expiry
             val username = jwtService.validateRefreshToken(refreshToken)
             if (username == null) {
                 logger.debug("Invalid or expired refresh token")
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid or expired refresh token"))
+                return@post
+            }
+
+            // Check the token has not been logged out / invalidated server-side
+            val tokenValid = storageService.isRefreshTokenValid(refreshToken).getOrNull() ?: false
+            if (!tokenValid) {
+                logger.debug("Refresh token not found in store (logged out or invalidated)")
                 call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid or expired refresh token"))
                 return@post
             }
@@ -69,6 +77,13 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
          * Logout user by clearing the refresh token cookie
          */
         post("/logout") {
+            val refreshToken = call.request.cookies["refresh_token"]
+
+            // Invalidate the token server-side if present
+            if (!refreshToken.isNullOrBlank()) {
+                storageService.deleteRefreshToken(refreshToken)
+            }
+
             // Clear the refresh token cookie
             call.response.cookies.append(
                 io.ktor.http.Cookie(
@@ -76,12 +91,12 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                     value = "",
                     maxAge = 0, // Expire immediately
                     httpOnly = true,
-                    secure = false,
+                    secure = secureCookies,
                     path = "/"
                 )
             )
 
-            logger.debug("User logged out, refresh token cookie cleared")
+            logger.debug("User logged out, refresh token invalidated and cookie cleared")
             call.respond(HttpStatusCode.OK, mapOf("message" to "Logged out successfully"))
         }
 
@@ -231,6 +246,9 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
             val accessToken = jwtService.generateAccessToken(user.username, user.id.toString(), isAdmin)
             val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString(), isAdmin)
 
+            // Store refresh token server-side so it can be invalidated on logout
+            storageService.storeRefreshToken(refreshToken, user.id.toString(), 30L * 24 * 3600)
+
             // Set refresh token as HttpOnly cookie
             call.response.cookies.append(
                 io.ktor.http.Cookie(
@@ -238,7 +256,7 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                     value = refreshToken,
                     maxAge = 30 * 24 * 3600, // 30 days
                     httpOnly = true,
-                    secure = false,
+                    secure = secureCookies,
                     path = "/"
                 )
             )

@@ -49,6 +49,10 @@ fun Application.module() {
     val serveStatic = environment.config.propertyOrNull("app.serveStatic")?.getString()?.toBoolean()
         ?: System.getenv("SERVE_STATIC")?.toBoolean() ?: false
 
+    // Secure cookies require HTTPS — disable in local dev, enable in production behind TLS proxy
+    val secureCookies = environment.config.propertyOrNull("app.secureCookies")?.getString()?.toBoolean()
+        ?: System.getenv("SECURE_COOKIES")?.toBoolean() ?: true
+
 
     // Configure CORS - only needed in development when frontend is served separately
     if (!serveStatic) {
@@ -157,8 +161,8 @@ fun Application.module() {
         route("/api") {
             // Public routes (no authentication required)
             healthRoutes()
-            authRoutes(redisService, emailService, jwtService)
-            userRoutes(redisService, jwtService, emailService)  // Login/register are public
+            authRoutes(redisService, emailService, jwtService, secureCookies)
+            userRoutes(redisService, jwtService, emailService, secureCookies)  // Login/register are public
 
             // Protected routes (require JWT authentication)
             authenticate("auth-jwt") {

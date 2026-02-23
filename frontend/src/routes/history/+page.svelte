@@ -136,22 +136,8 @@
 
 	async function takeAllMissing(dateObj: Date, time: string, scheduledMedicines: { medicineId: string; amount: number }[]) {
 		try {
-			// Parse scheduled time to construct datetime
-			const [hours, minutes] = time.split(':').map(Number);
-			const doseDatetime = new Date(dateObj);
-			doseDatetime.setHours(hours, minutes, 0, 0);
-
-			// Format as ISO local datetime (without timezone): "2026-01-05T08:00:00"
-			const year = doseDatetime.getFullYear();
-			const month = String(doseDatetime.getMonth() + 1).padStart(2, '0');
-			const day = String(doseDatetime.getDate()).padStart(2, '0');
-			const hour = String(doseDatetime.getHours()).padStart(2, '0');
-			const minute = String(doseDatetime.getMinutes()).padStart(2, '0');
-			const second = String(doseDatetime.getSeconds()).padStart(2, '0');
-			const datetimeString = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-
 			for (const med of scheduledMedicines) {
-				await takeDose(med.medicineId, med.amount, time, datetimeString);
+				await takeDose(med.medicineId, med.amount, time);
 			}
 			const medicineNames = scheduledMedicines.map(m => getMedicineName(m.medicineId)).join(', ');
 			showToastNotification($_('history.recorded', { values: { medicines: medicineNames } }));

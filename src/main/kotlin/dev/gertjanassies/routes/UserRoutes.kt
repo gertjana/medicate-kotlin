@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("UserRoutes")
 
-fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, emailService: EmailService) {
+fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, emailService: EmailService, secureCookies: Boolean = true) {
     route("/user") {
         /**
          * POST /api/user/register
@@ -121,6 +121,9 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
             val accessToken = jwtService.generateAccessToken(user.username, user.id.toString(), isAdmin)
             val refreshToken = jwtService.generateRefreshToken(user.username, user.id.toString(), isAdmin)
 
+            // Store refresh token server-side so it can be invalidated on logout
+            storageService.storeRefreshToken(refreshToken, user.id.toString(), 30L * 24 * 60 * 60)
+
             // Set refresh token as HttpOnly cookie
             call.response.cookies.append(
                 io.ktor.http.Cookie(
@@ -128,7 +131,7 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
                     value = refreshToken,
                     maxAge = 30 * 24 * 60 * 60, // 30 days in seconds
                     httpOnly = true,
-                    secure = false, // Set to true in production with HTTPS
+                    secure = secureCookies,
                     path = "/",
                     extensions = mapOf("SameSite" to "Strict")
                 )

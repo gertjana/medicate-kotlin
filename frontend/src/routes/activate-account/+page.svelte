@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { userStore } from '$lib/stores/user';
+	import { setAccessToken } from '$lib/api';
 
 	let status: 'loading' | 'success' | 'error' = 'loading';
 	let errorMessage = '';
@@ -32,7 +33,10 @@
 
 			const data = await response.json();
 
-			// Login the user with the returned token
+			// Store the access token in memory so subsequent API calls are authenticated
+			setAccessToken(data.token);
+
+			// Login the user with the returned user info
 			userStore.login({
 				username: data.user.username,
 				email: data.user.email,

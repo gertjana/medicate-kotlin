@@ -70,6 +70,29 @@ interface StorageService {
      */
     suspend fun verifyActivationToken(token: String): Either<RedisError, String>
 
+    /**
+     * Store a refresh token in the backing store so it can be invalidated on logout or password change.
+     * @param token the raw refresh token string
+     * @param userId the user the token belongs to
+     * @param ttlSeconds time-to-live in seconds (should match the JWT expiry)
+     */
+    suspend fun storeRefreshToken(token: String, userId: String, ttlSeconds: Long): Either<RedisError, Unit>
+
+    /**
+     * Delete a refresh token from the backing store (called on logout or password change).
+     */
+    suspend fun deleteRefreshToken(token: String): Either<RedisError, Unit>
+
+    /**
+     * Check whether a refresh token exists in the backing store (i.e. has not been logged out or invalidated).
+     */
+    suspend fun isRefreshTokenValid(token: String): Either<RedisError, Boolean>
+
+    /**
+     * Invalidate all active refresh tokens for a user (called on password change).
+     */
+    suspend fun invalidateAllRefreshTokensForUser(userId: String): Either<RedisError, Unit>
+
     // Admin operations
 
     /**
@@ -170,14 +193,14 @@ interface StorageService {
     // Dosage History operations
 
     /**
-     * Create a dosage history record and update medicine stock
+     * Create a dosage history record and update medicine stock.
+     * Timestamp is always set server-side to LocalDateTime.now().
      */
     suspend fun createDosageHistory(
         userId: String,
         medicineId: UUID,
         amount: Double,
-        scheduledTime: String? = null,
-        datetime: LocalDateTime? = null
+        scheduledTime: String? = null
     ): Either<RedisError, DosageHistory>
 
     /**

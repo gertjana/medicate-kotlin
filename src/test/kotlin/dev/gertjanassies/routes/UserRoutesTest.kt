@@ -128,7 +128,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(redisService, jwtService, emailService) }
+                routing { userRoutes(redisService, jwtService, emailService, secureCookies = false) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -151,7 +151,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(redisService, jwtService, emailService) }
+                routing { userRoutes(redisService, jwtService, emailService, secureCookies = false) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -171,7 +171,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(redisService, jwtService, emailService) }
+                routing { userRoutes(redisService, jwtService, emailService, secureCookies = false) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -191,7 +191,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(redisService, jwtService, emailService) }
+                routing { userRoutes(redisService, jwtService, emailService, secureCookies = false) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -221,7 +221,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(redisService, jwtService, emailService) }
+                routing { userRoutes(redisService, jwtService, emailService, secureCookies = false) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/register") {
@@ -261,7 +261,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(redisService, jwtService, emailService) }
+                routing { userRoutes(redisService, jwtService, emailService, secureCookies = false) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -292,7 +292,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(redisService, jwtService, emailService) }
+                routing { userRoutes(redisService, jwtService, emailService, secureCookies = false) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -312,7 +312,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(redisService, jwtService, emailService) }
+                routing { userRoutes(redisService, jwtService, emailService, secureCookies = false) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -340,7 +340,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(redisService, jwtService, emailService) }
+                routing { userRoutes(redisService, jwtService, emailService, secureCookies = false) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 val response = client.post("/user/login") {
@@ -384,7 +384,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(redisService, jwtService, emailService) }
+                routing { userRoutes(redisService, jwtService, emailService, secureCookies = false) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 // Should succeed WITHOUT authentication header
@@ -421,7 +421,7 @@ class UserRoutesTest : FunSpec({
                     config = MapApplicationConfig()
                 }
                 install(ContentNegotiation) { json() }
-                routing { userRoutes(redisService, jwtService, emailService) }
+                routing { userRoutes(redisService, jwtService, emailService, secureCookies = false) }
 
                 val client = createClient { install(ClientContentNegotiation) { json() } }
                 // Should succeed WITHOUT authentication header
