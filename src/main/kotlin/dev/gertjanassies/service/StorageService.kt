@@ -45,14 +45,20 @@ interface StorageService {
     suspend fun updateProfile(username: String, email: String, firstName: String, lastName: String): Either<RedisError, User>
 
     /**
-     * Update user password
+     * Update user password by username (used internally)
      */
     suspend fun updatePassword(username: String, newPassword: String): Either<RedisError, Unit>
 
     /**
-     * Verify password reset token
+     * Verify password reset token and return associated userId
      */
     suspend fun verifyPasswordResetToken(token: String): Either<RedisError, String>
+
+    /**
+     * Verify a password reset token and update the password atomically.
+     * The token is consumed (deleted) on success.
+     */
+    suspend fun resetPasswordWithToken(token: String, newPassword: String): Either<RedisError, Unit>
 
     /**
      * Activate user account (set isActive to true)

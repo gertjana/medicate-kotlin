@@ -706,57 +706,33 @@ class UserServiceTest : FunSpec({
     }
 
     context("verifyPasswordResetToken") {
-        test("should verify valid token and return username") {
+        test("should verify valid token and return userId") {
             val token = "valid-reset-token-123"
             val userId = java.util.UUID.randomUUID()
-            val username = "testuser"
-            val email = "test@example.com"
-            val user = User(
-                id = userId,
-                username = username,
-                email = email,
-                firstName = "",
-                lastName = "",
-                passwordHash = "hashedpass",
-                isActive = true
-            )
-            val resetTokenKey = "medicate:$environment:password_reset:$userId:$token"
-            val userKey = "medicate:$environment:user:id:$userId"
-            val userJson = json.encodeToString(user)
+            val resetTokenKey = "medicate:$environment:password_reset:token:$token"
 
             every { mockConnection.async() } returns mockAsyncCommands
-            // Mock SCAN to find the reset token key
-            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
-            every { mockScanCursor.keys } returns listOf(resetTokenKey)
-            every { mockScanCursor.isFinished } returns true
-            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(mockScanCursor)
-            // Mock GET to retrieve userId from token value
+            // Mock direct GET to retrieve userId from token key (O(1) lookup)
             every { mockAsyncCommands.get(resetTokenKey) } returns createRedisFutureMock(userId.toString())
-            // Mock GET to retrieve user by ID
-            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(userJson)
             // Mock DEL to delete the token
             every { mockAsyncCommands.del(resetTokenKey) } returns createRedisFutureMock(1L)
 
             val result = redisService.verifyPasswordResetToken(token)
 
             result.isRight() shouldBe true
-            result.getOrNull() shouldBe username
+            result.getOrNull() shouldBe userId.toString()
 
-            verify(exactly = 1) { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) }
             verify(exactly = 1) { mockAsyncCommands.get(resetTokenKey) }
-            verify(exactly = 1) { mockAsyncCommands.get(userKey) }
             verify(exactly = 1) { mockAsyncCommands.del(resetTokenKey) }
         }
 
         test("should return NotFound when token doesn't exist") {
             val token = "non-existent-token"
+            val resetTokenKey = "medicate:$environment:password_reset:token:$token"
 
             every { mockConnection.async() } returns mockAsyncCommands
-            // Mock SCAN returns no keys (empty list - token not found)
-            val scanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
-            every { scanCursor.keys } returns emptyList()
-            every { scanCursor.isFinished } returns true
-            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createRedisFutureMock(scanCursor)
+            // Mock GET returns null (token not found)
+            every { mockAsyncCommands.get(resetTokenKey) } returns createRedisFutureMock(null as String?)
 
             val result = redisService.verifyPasswordResetToken(token)
 
@@ -765,17 +741,17 @@ class UserServiceTest : FunSpec({
             error.shouldBeInstanceOf<RedisError.NotFound>()
             error.message shouldContain "Invalid or expired password reset token"
 
-            verify(exactly = 1) { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) }
-            verify(exactly = 0) { mockAsyncCommands.get(any()) }
+            verify(exactly = 1) { mockAsyncCommands.get(resetTokenKey) }
             verify(exactly = 0) { mockAsyncCommands.del(any()) }
         }
 
-        test("should return OperationError when SCAN fails") {
+        test("should return OperationError when GET fails") {
             val token = "valid-token"
+            val resetTokenKey = "medicate:$environment:password_reset:token:$token"
 
             every { mockConnection.async() } returns mockAsyncCommands
-            every { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) } returns createFailedRedisFutureMock(
-                RuntimeException("SCAN failed")
+            every { mockAsyncCommands.get(resetTokenKey) } returns createFailedRedisFutureMock(
+                RuntimeException("GET failed")
             )
 
             val result = redisService.verifyPasswordResetToken(token)
@@ -783,36 +759,24 @@ class UserServiceTest : FunSpec({
             result.isLeft() shouldBe true
             val error = result.leftOrNull()
             error.shouldBeInstanceOf<RedisError.OperationError>()
-            error.message shouldContain "Failed to scan for reset tokens"
 
-            verify(exactly = 1) { mockAsyncCommands.scan(any<io.lettuce.core.ScanArgs>()) }
+            verify(exactly = 1) { mockAsyncCommands.get(resetTokenKey) }
         }
 
-        test("should return NotFound when user doesn't exist") {
-            val token = "valid-token-but-no-user"
+        test("should delete token after successful verification") {
+            val token = "valid-token-to-delete"
             val userId = java.util.UUID.randomUUID()
-            val resetTokenKey = "medicate:$environment:password_reset:$userId:$token"
-            val userKey = "medicate:$environment:user:id:$userId"
+            val resetTokenKey = "medicate:$environment:password_reset:token:$token"
 
             every { mockConnection.async() } returns mockAsyncCommands
-            // Mock SCAN finds the token
-            val mockScanCursor = mockk<io.lettuce.core.KeyScanCursor<String>>()
-            every { mockScanCursor.keys } returns listOf(resetTokenKey)
-            every { mockScanCursor.isFinished } returns true
-            every { mockAsyncCommands.scan(any() as io.lettuce.core.ScanArgs) } returns createRedisFutureMock(mockScanCursor)
-            // Mock GET returns userId
             every { mockAsyncCommands.get(resetTokenKey) } returns createRedisFutureMock(userId.toString())
-            // Mock GET for user returns null (user doesn't exist)
-            every { mockAsyncCommands.get(userKey) } returns createRedisFutureMock(null as String?)
+            every { mockAsyncCommands.del(resetTokenKey) } returns createRedisFutureMock(1L)
 
             val result = redisService.verifyPasswordResetToken(token)
 
-            result.isLeft() shouldBe true
-            val error = result.leftOrNull()
-            error.shouldBeInstanceOf<RedisError.NotFound>()
-            error.message shouldContain "User not found"
+            result.isRight() shouldBe true
 
-            verify(exactly = 1) { mockAsyncCommands.get(userKey) }
+            verify(exactly = 1) { mockAsyncCommands.del(resetTokenKey) }
         }
     }
 

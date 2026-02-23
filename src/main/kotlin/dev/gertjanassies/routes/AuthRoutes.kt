@@ -1,7 +1,7 @@
 package dev.gertjanassies.routes
 
 import dev.gertjanassies.model.request.PasswordResetRequest
-import dev.gertjanassies.model.request.UserRequest
+import dev.gertjanassies.model.request.PasswordUpdateRequest
 import dev.gertjanassies.model.request.VerifyResetTokenRequest
 import dev.gertjanassies.model.response.toResponse
 import dev.gertjanassies.service.EmailError
@@ -140,35 +140,46 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
         }
 
         /**
-         * POST /api/auth/verifyResetToken
-         * Verify a password reset token and return the associated username
+         * PUT /api/auth/updatePassword
+         * Reset user password using a valid reset token.
+         * The token is verified and consumed atomically — no separate verify step needed.
+         * Body: { "token": "<reset-token>", "password": "<new-password>" }
          */
-        post("/verifyResetToken") {
-            val request = call.receive<VerifyResetTokenRequest>()
+        put("/updatePassword") {
+            val request = call.receive<PasswordUpdateRequest>()
 
             if (request.token.isBlank()) {
                 call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Token cannot be empty"))
-                return@post
+                return@put
             }
 
-            val result = storageService.verifyPasswordResetToken(request.token)
-            val error = result.leftOrNull()
-            if (error != null) {
-                logger.error("Failed to verify password reset token: ${error.message}")
-                when (error) {
-                    is RedisError.NotFound -> {
-                        call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
+            if (request.password.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "New password cannot be empty"))
+                return@put
+            }
+
+            if (request.password.length < 6) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 6 characters"))
+                return@put
+            }
+
+            val result = storageService.resetPasswordWithToken(request.token, request.password)
+
+            result.fold(
+                { error ->
+                    logger.error("Failed to reset password: ${error.message}")
+                    when (error) {
+                        is RedisError.NotFound ->
+                            call.respond(HttpStatusCode.NotFound, mapOf("error" to "Invalid or expired reset token"))
+                        else ->
+                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "An internal error occurred"))
                     }
-                    else -> {
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
-                    }
+                },
+                {
+                    logger.debug("Successfully reset password via token")
+                    call.respond(HttpStatusCode.OK, mapOf("message" to "Password updated successfully"))
                 }
-                return@post
-            }
-
-            val username = result.getOrNull()!!
-            logger.debug("Successfully verified password reset token for user '$username'")
-            call.respond(HttpStatusCode.OK, mapOf("username" to username))
+            )
         }
 
         /**
@@ -240,47 +251,6 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                     user = user.toResponse(isAdmin),
                     token = accessToken
                 )
-            )
-        }
-
-        /**
-         * PUT /api/auth/updatePassword
-         * Update user password (public endpoint for password reset flow)
-         */
-        put("/updatePassword") {
-            val request = call.receive<UserRequest>()
-
-            if (request.username.isBlank()) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Username cannot be empty"))
-                return@put
-            }
-
-            if (request.password.isBlank()) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "New password cannot be empty"))
-                return@put
-            }
-
-            if (request.password.length < 6) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 6 characters"))
-                return@put
-            }
-
-            val result = storageService.updatePassword(request.username, request.password)
-
-            result.fold(
-                { error ->
-                    logger.error("Failed to update password for user '${request.username}': ${error.message}")
-                    when (error) {
-                        is RedisError.NotFound ->
-                            call.respond(HttpStatusCode.NotFound, mapOf("error" to error.message))
-                        else ->
-                            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to error.message))
-                    }
-                },
-                {
-                    logger.debug("Successfully updated password for user '${request.username}'")
-                    call.respond(HttpStatusCode.OK, mapOf("message" to "Password updated successfully"))
-                }
             )
         }
     }

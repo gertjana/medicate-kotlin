@@ -1025,6 +1025,34 @@ class RedisService private constructor(
     }
 
     /**
+     * Verify a password reset token and update the password atomically.
+     * The token is consumed (deleted) on success, preventing reuse.
+     */
+    override suspend fun resetPasswordWithToken(token: String, newPassword: String): Either<RedisError, Unit> = either {
+        // Verify and consume the token — returns the userId
+        val userId = verifyPasswordResetToken(token).bind()
+
+        // Look up the user by ID
+        val user = getUserById(userId).bind()
+
+        // Update the password
+        Either.catch {
+            val userKey = "$keyPrefix:user:id:${user.id}"
+            val newPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt())
+            val updatedUser = user.copy(passwordHash = newPasswordHash)
+            val updatedJsonString = json.encodeToString(updatedUser)
+            connection?.async()?.set(userKey, updatedJsonString)?.await() ?: throw IllegalStateException("Not connected")
+        }.mapLeft { e ->
+            when (e) {
+                is SerializationException -> RedisError.SerializationError("Failed to serialize user: ${e.message}")
+                else -> RedisError.OperationError("Failed to update password: ${e.message}")
+            }
+        }.bind()
+
+        logger.debug("Successfully reset password for user: ${user.username}")
+    }
+
+    /**
      * Check if an email is already in use by a different user
      */
     private suspend fun isEmailInUseByOtherUser(email: String, currentUserId: UUID): Either<RedisError, Boolean> {
@@ -1157,82 +1185,33 @@ class RedisService private constructor(
     }
 
     /**
-     * Verify password reset token and return associated username
+     * Verify password reset token and return associated userId
      * Token is single-use and will be deleted after successful verification
-     * Note: Token is now stored with user ID, so we need to look up the username
+     * Uses O(1) GET operation instead of O(N) SCAN for better performance and security
      */
     override suspend fun verifyPasswordResetToken(token: String): Either<RedisError, String> = either {
-        // Scan for keys matching: password_reset:*:token
-        // This will find the key password_reset:{userId}:token
-        val pattern = "$keyPrefix:password_reset:*:$token"
-        logger.debug("Verifying password reset token, scanning for password_reset keys")
-        val keys = mutableListOf<String>()
+        val key = "$keyPrefix:password_reset:token:$token"
+        logger.debug("Verifying password reset token with direct lookup")
 
         val asyncCommands = connection?.async() ?: throw IllegalStateException("Not connected")
-        var scanCursor = Either.catch {
-            asyncCommands.scan(ScanArgs.Builder.matches(pattern)).await()
-        }.mapLeft { e ->
-            RedisError.OperationError("Failed to scan for reset tokens: ${e.message}")
-        }.bind()
 
-        // Iterate through all cursor pages
-        while (true) {
-            keys.addAll(scanCursor.keys)
-            if (scanCursor.isFinished) break
-            scanCursor = Either.catch {
-                asyncCommands.scan(io.lettuce.core.ScanCursor.of(scanCursor.cursor), ScanArgs.Builder.matches(pattern)).await()
-            }.mapLeft { e ->
-                RedisError.OperationError("Failed to scan for reset tokens: ${e.message}")
-            }.bind()
-        }
-
-        logger.debug("Found {} matching keys: {}", keys.size, keys)
-
-        // Should find exactly one matching key (if token exists and hasn't expired via TTL)
-        val matchingKey = when (keys.size) {
-            0 -> raise(
-                RedisError.NotFound("Invalid or expired password reset token")
-            )
-            1 -> keys[0]
-            else -> {
-                // Multiple matching keys indicate a potential attack or cleanup bug
-                logger.warn(
-                    "Multiple matching password reset keys found for token pattern {}: count={}, keys={}",
-                    pattern,
-                    keys.size,
-                    keys
-                )
-                raise(
-                    RedisError.OperationError(
-                        "Multiple password reset tokens found; possible attack or cleanup issue"
-                    )
-                )
-            }
-        }
-
-        logger.debug("Using matching key")
-
-        // Get the user ID from the value (token was stored with userId as value)
-        val userId = get(matchingKey).bind() ?: raise(
+        // Get the user ID directly with O(1) GET operation
+        val userId = get(key).bind() ?: raise(
             RedisError.NotFound("Invalid or expired password reset token")
         )
 
-        logger.debug("Found user ID: $userId for token")
-
-        // Get the user by ID to retrieve username
-        val user = getUserById(userId).bind()
-        val username = user.username
+        logger.debug("Found user ID for password reset token")
 
         // Delete the token after successful verification (one-time use)
         Either.catch {
-            asyncCommands.del(matchingKey).await()
+            asyncCommands.del(key).await()
         }.mapLeft { e ->
             RedisError.OperationError("Failed to delete reset token: ${e.message}")
         }.bind()
 
-        logger.debug("Successfully verified and deleted token for user: $username")
+        logger.debug("Successfully verified and deleted password reset token")
 
-        username
+        userId
     }
 
     /**

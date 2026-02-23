@@ -141,42 +141,6 @@ fun Route.userRoutes(storageService: StorageService, jwtService: JwtService, ema
             )
         }
 
-        /**
-         * PUT /api/user/password
-         * Update user password
-         */
-        put("/password") {
-            val request = call.receive<UserRequest>()
-
-            if (request.username.isBlank()) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Username cannot be empty"))
-                return@put
-            }
-
-            if (request.password.isBlank()) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "New password cannot be empty"))
-                return@put
-            }
-
-            if (request.password.length < 6) {
-                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Password must be at least 6 characters"))
-                return@put
-            }
-
-            val result = storageService.updatePassword(request.username, request.password)
-
-            result.fold(
-                { error ->
-                    logger.error("Failed to update password for user '${request.username}': ${error.message}")
-                    // Don't reveal whether user exists or not
-                    call.respond(HttpStatusCode.OK, mapOf("message" to "Password updated successfully"))
-                },
-                {
-                    logger.debug("Successfully updated password for user '${request.username}'")
-                    call.respond(HttpStatusCode.OK, mapOf("message" to "Password updated successfully"))
-                }
-            )
-        }
     }
 }
 
