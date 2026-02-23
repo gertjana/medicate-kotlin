@@ -148,17 +148,17 @@ Full report: `ai_reports/SECURITY_AUDIT.md`
 
 ### Low
 
-- [ ] **B-LOW-1** BCrypt work factor 10 — use `gensalt(12)` (`RedisService.kt:924`)
-- [ ] **B-LOW-2** `User.isActive` defaults to `true` — change default to `false` (`User.kt:16`)
-- [ ] **B-LOW-3** Missing `SameSite` on activation-flow cookie (`AuthRoutes.kt:224`)
-- [ ] **B-LOW-4** Password reset token uses Redis SCAN with token in glob — use direct GET (`RedisService.kt:1167`)
-- [ ] **F-LOW-1** `window.location.reload()` on session expiry — use `goto()` instead (`api.ts:174`)
-- [ ] **F-LOW-2** `userStore.init()` `this.logout()` silently fails (`user.ts:56`)
-- [ ] **F-LOW-3** Google Fonts loaded with no SRI — self-host the font (`app.html:9`)
-- [ ] **F-LOW-4** Frontend minimum password length is 6 characters (`+layout.svelte:101`)
-- [ ] **I-LOW-1** Docker container runs as root — add non-root `USER` directive (`Dockerfile`)
-- [ ] **I-LOW-2** No Gradle dependency checksum verification (`build.gradle.kts`)
-- [ ] **I-LOW-3** nginx debug logging in production (`nginx.conf:48`)
-- [ ] **I-LOW-4** `client_max_body_size 10M` too large for a JSON API (`nginx.conf:36`)
+- [x] **B-LOW-1** BCrypt work factor 10 — use `gensalt(12)` (`RedisService.kt`)
+- [x] **B-LOW-2** `User.isActive` defaults to `true` — change default to `false` (`User.kt`)
+- [x] **B-LOW-3** Missing `SameSite` on activation-flow cookie (`AuthRoutes.kt`)
+- [-] **B-LOW-4** Password reset token uses Redis SCAN with token in glob — N/A: already uses direct GET
+- [x] **F-LOW-1** `window.location.reload()` on session expiry — use `window.location.href='/'` (`api.ts`)
+- [-] **F-LOW-2** `userStore.init()` `this.logout()` silently fails — N/A: already fixed during F-MED-1 work
+- [x] **F-LOW-3** Google Fonts loaded with no SRI — self-hosted Roboto Mono (`frontend/static/fonts/`, `app.html`)
+- [x] **F-LOW-4** Frontend minimum password length is 6 characters — increased to 8 (`+layout.svelte`)
+- [x] **I-LOW-1** Docker container runs as root — added `appuser` + `su-exec` (`Dockerfile`, `deployment/start.sh`)
+- [-] **I-LOW-2** No Gradle dependency checksum verification — N/A: too high maintenance cost for this project's threat model; dependency CVEs monitored via Dependabot
+- [x] **I-LOW-3** nginx debug logging in production — changed to `main` log format (`nginx.conf`)
+- [x] **I-LOW-4** `client_max_body_size 10M` too large for a JSON API — reduced to `1M` (`nginx.conf`)
 
 ---

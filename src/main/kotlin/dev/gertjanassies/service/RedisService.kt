@@ -923,7 +923,7 @@ class RedisService private constructor(
             val userKey = "$keyPrefix:user:id:$userId"
 
             // Hash the password using BCrypt
-            val passwordHash = BCrypt.hashpw(password, BCrypt.gensalt())
+            val passwordHash = BCrypt.hashpw(password, BCrypt.gensalt(12))
 
             // Create new user with UUID - inactive by default, requires email verification
             val user = User(id = userId, username = username, email = email, passwordHash = passwordHash, isActive = false)
@@ -1011,7 +1011,7 @@ class RedisService private constructor(
             { user ->
                 Either.catch {
                     val userKey = "$keyPrefix:user:id:${user.id}"
-                    val newPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt())
+                    val newPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt(12))
                     val updatedUser = user.copy(passwordHash = newPasswordHash)
                     val updatedJsonString = json.encodeToString(updatedUser)
                     connection?.async()?.set(userKey, updatedJsonString)?.await() ?: throw IllegalStateException("Not connected")
@@ -1046,7 +1046,7 @@ class RedisService private constructor(
         // Update the password
         Either.catch {
             val userKey = "$keyPrefix:user:id:${user.id}"
-            val newPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt())
+            val newPasswordHash = BCrypt.hashpw(newPassword, BCrypt.gensalt(12))
             val updatedUser = user.copy(passwordHash = newPasswordHash)
             val updatedJsonString = json.encodeToString(updatedUser)
             asyncCommands.set(userKey, updatedJsonString).await() ?: throw IllegalStateException("Failed to update user password in Redis")

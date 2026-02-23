@@ -9,18 +9,18 @@ if [ -z "$RESEND_API_KEY" ]; then
   echo "⚠ Set the RESEND_API_KEY environment variable to enable password reset and account activation emails"
 fi
 
-# Start backend in background with logs to stdout (unbuffered)
+# Start backend in background with logs to stdout (unbuffered), running as appuser
 echo "Starting backend (Ktor)..."
-stdbuf -oL -eL java -jar /app/app.jar 2>&1 | stdbuf -oL -eL sed 's/^/[BACKEND] /' &
+su-exec appuser stdbuf -oL -eL java -jar /app/app.jar 2>&1 | stdbuf -oL -eL sed 's/^/[BACKEND] /' &
 BACKEND_PID=$!
 echo "Backend PID: $BACKEND_PID"
 
-# Start SvelteKit SSR frontend in background with logs to stdout (unbuffered)
+# Start SvelteKit SSR frontend in background with logs to stdout (unbuffered), running as appuser
 echo "Starting frontend (SvelteKit SSR)..."
 cd /app/frontend
 # Set NODE_ENV to production for better performance
 export NODE_ENV=production
-PORT=3000 stdbuf -oL -eL node build/index.js 2>&1 | stdbuf -oL -eL sed 's/^/[FRONTEND] /' &
+su-exec appuser sh -c 'PORT=3000 stdbuf -oL -eL node build/index.js 2>&1 | stdbuf -oL -eL sed "s/^/[FRONTEND] /"' &
 FRONTEND_PID=$!
 echo "Frontend PID: $FRONTEND_PID"
 cd /

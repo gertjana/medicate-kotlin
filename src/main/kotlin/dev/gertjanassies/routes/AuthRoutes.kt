@@ -92,7 +92,8 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                     maxAge = 0, // Expire immediately
                     httpOnly = true,
                     secure = secureCookies,
-                    path = "/"
+                    path = "/",
+                    extensions = mapOf("SameSite" to "Strict")
                 )
             )
 
@@ -263,7 +264,8 @@ fun Route.authRoutes(storageService: StorageService, emailService: EmailService,
                     maxAge = 30 * 24 * 3600, // 30 days
                     httpOnly = true,
                     secure = secureCookies,
-                    path = "/"
+                    path = "/",
+                    extensions = mapOf("SameSite" to "Strict")
                 )
             )
 

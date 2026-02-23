@@ -33,8 +33,11 @@ RUN ./gradlew assemble --no-daemon -x test
 # Stage 3: Final runtime image - JRE base, Node, and nginx
 FROM eclipse-temurin:21-jre-alpine
 
-# Install nginx, nodejs, curl, net-tools (for netstat debugging), and coreutils (for stdbuf unbuffered logging)
-RUN apk add --no-cache nginx nodejs npm curl net-tools coreutils
+# Install nginx, nodejs, curl, net-tools (for netstat debugging), coreutils (for stdbuf unbuffered logging), and su-exec (privilege drop)
+RUN apk add --no-cache nginx nodejs npm curl net-tools coreutils su-exec
+
+# Create non-root user for JVM and Node processes
+RUN addgroup -S appgroup && adduser -S -G appgroup -u 1001 appuser
 
 # Create directories
 RUN mkdir -p /usr/share/nginx/html /var/run/nginx /app /app/frontend /app/data
@@ -59,6 +62,9 @@ ENV MEDICINES_DATA_DIR=/app/data
 # Copy entrypoint script
 COPY deployment/start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
+
+# Grant appuser ownership of application files (nginx runs as root, drops to worker internally)
+RUN chown -R appuser:appgroup /app
 
 EXPOSE 80
 
