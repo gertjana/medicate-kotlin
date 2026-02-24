@@ -14,10 +14,6 @@
 		type Medicine
 	} from '$lib/api';
 
-	// SvelteKit props - using const since they're not used internally
-	export const data = {};
-	export const params = {};
-
 	let schedules: Schedule[] = [];
 	let medicines: Medicine[] = [];
 	let loading = true;

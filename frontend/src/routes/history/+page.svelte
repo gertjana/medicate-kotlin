@@ -7,10 +7,6 @@
 	import { page } from '$app/stores';
 	import { tick } from 'svelte';
 
-	// SvelteKit props - using const since they're not used internally
-	export const data = {};
-	export const params = {};
-
 	let histories: DosageHistory[] = [];
 	let medicines: Medicine[] = [];
 	let schedules: Schedule[] = [];

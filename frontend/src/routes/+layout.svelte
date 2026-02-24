@@ -9,10 +9,6 @@
 	import { setLocale } from '$lib/i18n/i18n';
 	import '$lib/i18n/i18n';
 
-	// SvelteKit props - using const since they're not used internally
-	export const data = {};
-	export const params = {};
-
 	const navItems = [
 		{ path: '/', label: 'nav.dashboard' },
 		{ path: '/medicines', label: 'nav.medicines' },

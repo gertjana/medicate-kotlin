@@ -5,10 +5,6 @@
 	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, takeDose, deleteDosageHistory, getMedicineExpiry, getMedicines, getSchedules, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine, type MedicineExpiry, type Schedule } from '$lib/api';
 	import { _ } from 'svelte-i18n';
 
-	// SvelteKit props - using const since they're not used internally
-	export const data = {};
-	export const params = {};
-
 	let dailySchedule: DailySchedule | null = null;
 	let dosageHistories: DosageHistory[] = [];
 	let weeklyAdherence: WeeklyAdherence | null = null;
