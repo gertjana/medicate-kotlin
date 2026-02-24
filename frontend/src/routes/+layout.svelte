@@ -72,8 +72,14 @@
 		? `position:fixed; right:${profileRight}px; top:${profileTop}px; min-width:24rem; min-height:8rem; width:auto; max-width:calc(100vw - 2rem);`
 		: `right:0; top:calc(100% + 0.5rem); min-width:24rem; min-height:8rem; width:auto; max-width:calc(100vw - 2rem);`;
 
+	let initialized = false;
+
 	onMount(() => {
-		userStore.init();
+		// Await init so the refresh token exchange completes before any
+		// child page mounts and fires its API calls — prevents the 6×401
+		// storm that occurs when the access token is gone after a hard reload.
+		userStore.init().then(() => { initialized = true; });
+
 		// Close profile and language dropdown when clicking outside
 		const onDocClick = () => {
 			showProfile = false;
@@ -350,7 +356,9 @@
 	</header>
 
 	<main class="flex-1 container mx-auto px-4 pt-0 pb-8">
-		<slot />
+		{#if initialized}
+			<slot />
+		{/if}
 	</main>
 
 	<footer class="border-t border-black">

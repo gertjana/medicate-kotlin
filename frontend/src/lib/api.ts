@@ -95,6 +95,10 @@ const API_BASE = browser
 // Store access token in memory (not localStorage for security)
 let accessToken: string | null = null;
 
+// Singleton in-flight refresh promise — prevents parallel refresh requests
+// when multiple API calls race on a cold page load.
+let refreshPromise: Promise<boolean> | null = null;
+
 // Helper function to get the current access token
 export function getAccessToken(): string | null {
 	return accessToken;
@@ -146,25 +150,33 @@ function getHeaders(includeContentType: boolean = false, locale?: string): Heade
 async function refreshAccessToken(): Promise<boolean> {
 	if (!browser) return false;
 
-	try {
-		const response = await fetch(`${API_BASE}/auth/refresh`, {
-			method: 'POST',
-			credentials: 'include' // Include cookies
-		});
+	// Deduplicate: if a refresh is already in flight, wait for it instead of
+	// firing another request (prevents N parallel refreshes on cold page load).
+	if (refreshPromise) return refreshPromise;
 
-		if (!response.ok) {
-			// Refresh token is also invalid - need to login again
+	refreshPromise = (async () => {
+		try {
+			const response = await fetch(`${API_BASE}/auth/refresh`, {
+				method: 'POST',
+				credentials: 'include' // Include cookies
+			});
+
+			if (!response.ok) {
+				return false;
+			}
+
+			const data = await response.json();
+			setAccessToken(data.token);
+			return true;
+		} catch (e) {
+			console.error('Failed to refresh token:', e);
 			return false;
+		} finally {
+			refreshPromise = null;
 		}
+	})();
 
-		const data = await response.json();
-		// Store new access token in memory
-		setAccessToken(data.token);
-		return true;
-	} catch (e) {
-		console.error('Failed to refresh token:', e);
-		return false;
-	}
+	return refreshPromise;
 }
 
 // Helper function to handle API responses and auto-refresh/logout on 401
