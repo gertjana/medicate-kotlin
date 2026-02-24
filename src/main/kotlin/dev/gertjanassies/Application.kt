@@ -215,6 +215,6 @@ fun Application.module() {
 
     // Cleanup on shutdown
     environment.monitor.subscribe(ApplicationStopping) {
-        (redisService as? RedisService)?.close()
+        redisService.close()
     }
 }
