@@ -4,6 +4,9 @@
 	import { userStore } from '$lib/stores/user';
 	import { setAccessToken } from '$lib/api';
 
+	export let data: Record<string, unknown> = {};
+	export let params: Record<string, string> = {};
+
 	// Inline helper: parse isAdmin from JWT payload without verifying signature
 	function parseIsAdminFromToken(token: string): boolean {
 		try {

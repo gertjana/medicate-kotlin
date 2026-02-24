@@ -9,6 +9,9 @@
 	import { setLocale } from '$lib/i18n/i18n';
 	import '$lib/i18n/i18n';
 
+	export let data: Record<string, unknown> = {};
+	export let params: Record<string, string> = {};
+
 	const navItems = [
 		{ path: '/', label: 'nav.dashboard' },
 		{ path: '/medicines', label: 'nav.medicines' },

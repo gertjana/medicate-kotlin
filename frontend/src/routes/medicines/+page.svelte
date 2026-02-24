@@ -15,6 +15,9 @@
 		type MedicineSearchResult
 	} from '$lib/api';
 
+	export let data: Record<string, unknown> = {};
+	export let params: Record<string, string> = {};
+
 	let medicines: Medicine[] = [];
 	let loading = true;
 	let error = '';

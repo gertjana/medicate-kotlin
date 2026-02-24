@@ -5,6 +5,9 @@
 	import { goto } from '$app/navigation';
 	import { _ } from 'svelte-i18n';
 
+	export let data: Record<string, unknown> = {};
+	export let params: Record<string, string> = {};
+
 	let adminUsers: AdminUser[] = [];
 	let loadingUsers = true;
 	let adminError = '';

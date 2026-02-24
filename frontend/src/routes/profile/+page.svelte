@@ -5,6 +5,9 @@
 	import { goto } from '$app/navigation';
 	import { _ } from 'svelte-i18n';
 
+	export let data: Record<string, unknown> = {};
+	export let params: Record<string, string> = {};
+
 	let user: User | null = null;
 	let email = '';
 	let firstName = '';

@@ -5,6 +5,9 @@
 	import { getDailySchedule, getDosageHistories, getWeeklyAdherence, takeDose, deleteDosageHistory, getMedicineExpiry, getMedicines, getSchedules, type DailySchedule, type DosageHistory, type TimeSlot, type WeeklyAdherence, type Medicine, type MedicineExpiry, type Schedule } from '$lib/api';
 	import { _ } from 'svelte-i18n';
 
+	export let data: Record<string, unknown> = {};
+	export let params: Record<string, string> = {};
+
 	let dailySchedule: DailySchedule | null = null;
 	let dosageHistories: DosageHistory[] = [];
 	let weeklyAdherence: WeeklyAdherence | null = null;

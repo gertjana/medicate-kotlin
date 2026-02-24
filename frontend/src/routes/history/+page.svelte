@@ -7,6 +7,9 @@
 	import { page } from '$app/stores';
 	import { tick } from 'svelte';
 
+	export let data: Record<string, unknown> = {};
+	export let params: Record<string, string> = {};
+
 	let histories: DosageHistory[] = [];
 	let medicines: Medicine[] = [];
 	let schedules: Schedule[] = [];

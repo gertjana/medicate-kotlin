@@ -4,6 +4,9 @@
 	import { updatePassword } from '$lib/api';
 	import { userStore } from '$lib/stores/user';
 
+	export let data: Record<string, unknown> = {};
+	export let params: Record<string, string> = {};
+
 	let token = '';
 	let newPassword = '';
 	let confirmPassword = '';
