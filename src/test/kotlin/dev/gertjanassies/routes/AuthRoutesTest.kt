@@ -38,7 +38,7 @@ class AuthRoutesTest : FunSpec({
     lateinit var emailService: EmailService
     lateinit var jwtService: JwtService
 
-    val json = Json { ignoreUnknownKeys = true }
+    val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     val environment = "test"
     val testApiKey = "test_api_key"
     val testAppUrl = "http://localhost:5173"

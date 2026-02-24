@@ -30,7 +30,7 @@ class ScheduleServiceTest : FunSpec({
     lateinit var mockAsyncCommands: RedisAsyncCommands<String, String>
     lateinit var redisService: RedisService
 
-    val json = Json { ignoreUnknownKeys = true }
+    val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     val environment = "test"
     val testUserId = UUID.fromString("00000000-0000-0000-0000-000000000001")
 

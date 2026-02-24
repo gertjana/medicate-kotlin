@@ -33,7 +33,7 @@ class RedisService private constructor(
     private val tls: Boolean = false
 ) : StorageService {
     private var client: RedisClient? = null
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     private val logger = LoggerFactory.getLogger(RedisService::class.java)
 
     // Use medicate prefix for all keys

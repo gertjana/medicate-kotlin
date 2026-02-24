@@ -29,7 +29,7 @@ class EmailServiceTest : FunSpec({
     val testApiKey = "test_api_key_123"
     val testAppUrl = "http://localhost:5173"
     val environment = "test"
-    val json = Json { ignoreUnknownKeys = true }
+    val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
 
     beforeEach {

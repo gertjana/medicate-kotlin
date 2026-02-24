@@ -41,7 +41,7 @@ class UserRoutesTest : FunSpec({
     lateinit var emailService: EmailService
     lateinit var mockHttpClient: HttpClient
 
-    val json = Json { ignoreUnknownKeys = true }
+    val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     val environment = "test"
 
     beforeEach {

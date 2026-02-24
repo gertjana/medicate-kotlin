@@ -28,7 +28,7 @@ class UserServiceTest : FunSpec({
     lateinit var mockAsyncCommands: RedisAsyncCommands<String, String>
     lateinit var redisService: RedisService
 
-    val json = Json { ignoreUnknownKeys = true }
+    val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     val environment = "test"
 
     beforeEach {

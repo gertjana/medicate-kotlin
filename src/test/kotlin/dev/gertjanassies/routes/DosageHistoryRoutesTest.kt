@@ -33,7 +33,7 @@ class DosageHistoryRoutesTest : FunSpec({
     lateinit var mockAsyncCommands: RedisAsyncCommands<String, String>
     lateinit var redisService: RedisService
 
-    val json = Json { ignoreUnknownKeys = true }
+    val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
     val environment = "test"
     val testUsername = "testuser"
     val testUserId = UUID.randomUUID()
