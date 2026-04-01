@@ -41,7 +41,7 @@ jobs:
 
         echo "Creating SQLite database for memory-efficient searches..."
         chmod +x migrate-medicines-to-sqlite.py
-        python3 migrate-medicines-to-sqlite.py
+        MEDICINES_DATA_DIR=. python3 migrate-medicines-to-sqlite.py
 
         echo "Verifying database..."
         ls -lh medicines.db
