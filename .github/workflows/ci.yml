@@ -171,7 +171,7 @@ jobs:
           ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-${{ steps.version.outputs.short_sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        platforms: linux/amd64,linux/arm64
+        platforms: linux/amd64
 
     - name: Build and push Docker image (other branches)
       if: github.ref != 'refs/heads/main'
@@ -182,4 +182,4 @@ jobs:
         tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.branch_name }}-${{ steps.version.outputs.short_sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-        platforms: linux/amd64,linux/arm64
+        platforms: linux/amd64

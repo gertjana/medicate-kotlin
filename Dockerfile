@@ -6,7 +6,8 @@ WORKDIR /app/frontend
 
 # Copy package files and install dependencies
 COPY frontend/package*.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 # Copy all frontend source files (including updated api.ts)
 COPY frontend/ ./
@@ -25,10 +26,12 @@ COPY gradlew ./
 COPY gradle ./gradle
 COPY build.gradle.kts settings.gradle.kts gradle.properties ./
 RUN chmod +x gradlew
-RUN ./gradlew dependencies --no-daemon || true
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew dependencies --no-daemon || true
 COPY src ./src
 COPY data/medicines.db ./data/medicines.db
-RUN ./gradlew assemble --no-daemon -x test
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew assemble --no-daemon -x test
 
 # Stage 3: Final runtime image - JRE base, Node, and nginx
 FROM eclipse-temurin:21-jre-alpine
