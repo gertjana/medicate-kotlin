@@ -204,6 +204,13 @@ async function handleApiResponse(response: Response, retryFn?: () => Promise<Res
 		throw new Error('Session expired. Please login again.');
 	}
 
+	// Retry once on 503 (transient backend unavailability, e.g. during token refresh race)
+	if (response.status === 503 && retryFn) {
+		await new Promise(resolve => setTimeout(resolve, 500));
+		const retryResponse = await retryFn();
+		return handleApiResponse(retryResponse);
+	}
+
 	if (!response.ok) {
 		// Try to get error message from response
 		let errorData;
