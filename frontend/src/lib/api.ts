@@ -204,12 +204,12 @@ async function handleApiResponse(response: Response, retryFn?: () => Promise<Res
 		throw new Error('Session expired. Please login again.');
 	}
 
-	// Retry once on 503 (transient backend unavailability, e.g. during token refresh race)
-	if (response.status === 503 && retryFn) {
-		await new Promise(resolve => setTimeout(resolve, 500));
-		const retryResponse = await retryFn();
-		return handleApiResponse(retryResponse);
-	}
+	// NOTE: there used to be an automatic retry on 503 here. It was masking an
+	// nginx rate-limit misconfiguration (limit_req defaults to returning 503),
+	// and made things worse: retrying re-hit an already-exhausted limiter and
+	// doubled load exactly when the app was over quota. The limiter is fixed in
+	// deployment/nginx.conf and now correctly returns 429, so a genuine 503 is
+	// a real backend outage and should surface to the user rather than be retried.
 
 	if (!response.ok) {
 		// Try to get error message from response
